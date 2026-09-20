@@ -147,7 +147,11 @@ static void install_common_theme(void)
         surface);
 
     provider = gtk_css_provider_new();
+#if GTK_CHECK_VERSION(4, 12, 0)
+    gtk_css_provider_load_from_string(provider, css->str);
+#else
     gtk_css_provider_load_from_data(provider, css->str, -1);
+#endif
     gtk_style_context_add_provider_for_display(
         gdk_display_get_default(),
         GTK_STYLE_PROVIDER(provider),
