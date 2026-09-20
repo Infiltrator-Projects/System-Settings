@@ -213,7 +213,7 @@ Common is consumed through an exact pinned release/commit so each settings relea
 
 System Settings also owns user-wide presentation preferences whose value comes from being consistent across applications. The first defined family is temporal presentation: applications keep canonical timestamps, while Common renders human-visible dates/times according to the system policy selected here.
 
-This allows filesystem timestamps, histories and other UI timestamps to follow the selected clock mode, primary calendar, optional secondary calendar, seconds policy and location-aware historical/astronomical presentation without rewriting the underlying data.
+This allows filesystem timestamps, histories and other UI timestamps to follow the selected clock mode, calendar, seconds policy and location-aware historical/astronomical presentation without rewriting the underlying data.
 
 See [System-wide Presentation Policy](docs/PRESENTATION_POLICY.md).
 
