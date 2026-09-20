@@ -9,13 +9,13 @@
 extern "C" {
 #endif
 
-/*
- * Platform-owned persistence for the Infiltrator extension policy.
- * A missing file/value is success with *found == false and default policy.
- */
-bool ss_temporal_policy_store_load(InfiltratrTemporalPolicy *policy,
-                                   bool *found);
-bool ss_temporal_policy_store_save(const InfiltratrTemporalPolicy *policy);
+typedef struct SsTemporalPolicyStore {
+    bool (*load)(InfiltratrTemporalPolicy *policy, bool *found);
+    bool (*save)(const InfiltratrTemporalPolicy *policy);
+} SsTemporalPolicyStore;
+
+/* Returns the current platform's user-policy persistence adapter. */
+const SsTemporalPolicyStore *ss_platform_temporal_policy_store(void);
 
 #ifdef __cplusplus
 }
