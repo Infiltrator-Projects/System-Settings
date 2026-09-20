@@ -1,0 +1,83 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: publish-release
+
+on:
+  workflow_run:
+    workflows: ["System Settings CI"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      startsWith(github.event.workflow_run.head_commit.message, 'Release ')
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out approved main commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake libgtk-4-dev pkg-config
+
+      - name: Verify release identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.workflow_run.head_sha }}"
+          test "$(git rev-parse HEAD)" = "$expected"
+          git fetch origin main --tags
+          test "$(git rev-parse origin/main)" = "$expected"
+          version="$(cat VERSION)"
+          subject="$(git log -1 --format=%s)"
+          [[ "$subject" == "Release $version"* ]]
+
+      - name: Build and test package
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+          cmake --build build --parallel
+          ctest --test-dir build --output-on-failure
+          cd build
+          cpack -G DEB
+
+      - name: Publish immutable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(cat VERSION)"
+          tag="v$version"
+          sha="$(git rev-parse HEAD)"
+          deb="$(find build -maxdepth 1 -type f -name 'infiltrator-system-settings_*.deb' -print -quit)"
+          test -n "$deb"
+          test -s "$deb"
+
+          existing="$(git ls-remote origin "refs/tags/$tag" | awk '{print $1}')"
+          if [[ -n "$existing" && "$existing" != "$sha" ]]; then
+            echo "Tag $tag already points to another commit." >&2
+            exit 1
+          fi
+          if [[ -z "$existing" ]]; then
+            git tag "$tag" "$sha"
+            git push origin "$tag"
+          fi
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; verifying asset name."
+            gh release view "$tag" --json assets --jq '.assets[].name' |               grep -qx "$(basename "$deb")"
+          else
+            gh release create "$tag" "$deb"               --verify-tag               --target "$sha"               --title "System Settings $version"               --notes "First usable System Settings shell with the Date & Time panel, live clock preview, system/12-hour/24-hour/decimal-10 selection, seconds control, and shared temporal-policy integration with Calendar."
+          fi
