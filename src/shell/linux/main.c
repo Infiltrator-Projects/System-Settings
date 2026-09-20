@@ -535,7 +535,7 @@ static GtkWidget *build_date_time_panel(SettingsWindow *state)
 {
     GtkWidget *page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 14);
     GtkWidget *summary = make_label(
-        "This is the system-wide temporal authority. Common-aware applications read these clock, calendar and location choices.",
+        "This is the richer system-wide temporal authority. Before an Infiltrator policy is saved, Mint/Cinnamon's native temporal preferences are used as the starting point.",
         "page-summary");
     GtkWidget *preview_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
     GtkWidget *clock_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
@@ -761,7 +761,7 @@ static void on_activate(GtkApplication *application, gpointer user_data)
         state,
         state->model.persisted_policy_present
             ? "Using the saved system-wide temporal policy."
-            : "Using the default system-wide temporal policy.",
+            : "Using Mint/Cinnamon temporal preferences until an Infiltrator policy is saved.",
         false);
 
     state->timer_id = g_timeout_add_seconds(1U, refresh_preview, state);
