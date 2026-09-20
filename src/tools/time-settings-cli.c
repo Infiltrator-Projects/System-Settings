@@ -8,8 +8,7 @@
 static void print_usage(const char *program)
 {
     fprintf(stderr,
-            "Usage: %s [--clock MODE] [--primary-calendar ID] "
-            "[--secondary-calendar ID] [--seconds on|off] "
+            "Usage: %s [--clock MODE] [--calendar ID] [--seconds on|off] "
             "[--location LAT LON|--clear-location]\n",
             program);
 }
@@ -30,18 +29,10 @@ int main(int argc, char **argv)
                 fputs("Unable to set clock mode.\n", stderr);
                 return 2;
             }
-        } else if (strcmp(argv[index], "--primary-calendar") == 0 &&
+        } else if (strcmp(argv[index], "--calendar") == 0 &&
                    index + 1 < argc) {
-            if (!ss_date_time_model_set_primary_calendar(
-                    &model, argv[++index])) {
-                fputs("Unable to set primary calendar.\n", stderr);
-                return 2;
-            }
-        } else if (strcmp(argv[index], "--secondary-calendar") == 0 &&
-                   index + 1 < argc) {
-            if (!ss_date_time_model_set_secondary_calendar(
-                    &model, argv[++index])) {
-                fputs("Unable to set secondary calendar.\n", stderr);
+            if (!ss_date_time_model_set_calendar(&model, argv[++index])) {
+                fputs("Unable to set calendar.\n", stderr);
                 return 2;
             }
         } else if (strcmp(argv[index], "--seconds") == 0 &&
@@ -90,16 +81,14 @@ int main(int argc, char **argv)
     }
 
     printf("clock-mode=%s\n"
-           "primary-calendar=%s\n"
-           "secondary-calendar=%s\n"
+           "calendar=%s\n"
            "show-seconds=%s\n"
            "location-configured=%s\n"
            "latitude=%.6f\n"
            "longitude=%.6f\n"
            "source=%s\n",
            model.policy.clock_mode,
-           model.policy.primary_calendar,
-           model.policy.secondary_calendar,
+           model.policy.calendar,
            model.policy.show_seconds ? "true" : "false",
            model.policy.location_configured ? "true" : "false",
            model.policy.latitude,
