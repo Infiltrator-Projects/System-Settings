@@ -28,3 +28,15 @@ jobs:
         run: cmake --build build --config Release --parallel
       - name: Test
         run: ctest --test-dir build -C Release --output-on-failure
+      - name: Build Debian package
+        if: runner.os == 'Linux'
+        run: |
+          cd build
+          cpack -G DEB
+      - name: Upload Debian package
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: infiltrator-system-settings-deb
+          path: build/*.deb
+          if-no-files-found: error
