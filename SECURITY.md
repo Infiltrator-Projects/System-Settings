@@ -14,7 +14,7 @@ Do not open a public issue for a vulnerability that could expose credentials, pe
 
 Use GitHub private vulnerability reporting when available. Otherwise contact `infiltratr@yandex.com` with the subject `System Settings security report`.
 
-Include the affected commit/version, Linux Mint/Cinnamon environment, privilege context, affected module/backend, impact and a reliable reproduction. Sanitise unrelated private data.
+Include the affected commit/version, operating system/environment, privilege context, affected module/backend, impact and a reliable reproduction. Sanitise unrelated private data.
 
 ## Trust boundaries
 
@@ -34,7 +34,7 @@ An in-process shared library is not a sandbox. Future third-party modules requir
 
 ### Privilege
 
-The GUI shell runs as the normal user.
+The GUI shell runs with ordinary user authority: non-root on Linux and non-elevated on Windows.
 
 Protected operations use narrow native authorised interfaces. The application does not elevate the whole settings process merely because one control is privileged.
 
@@ -50,7 +50,7 @@ If a project-owned privileged component is ever unavoidable, its public operatio
 
 ### Backend input
 
-D-Bus responses, configuration files, service data, device metadata and kernel-exposed strings are external input. They can be malformed, stale, unavailable or changed concurrently.
+D-Bus responses, Win32/WinRT responses, configuration files, documented registry-backed API data, service data, device metadata and kernel-exposed strings are external input. They can be malformed, stale, unavailable or changed concurrently.
 
 Parsing, allocation and path handling must be bounded. State can change between validation and apply and must be rechecked where the consequence matters.
 
@@ -64,7 +64,7 @@ Modules should use atomic/transactional native facilities where available. Parti
 
 Manifests are data, never scripts.
 
-They cannot contain commands to execute. Library names are resolved only within trusted directories according to loader policy.
+They cannot contain commands to execute. Library names are resolved only within trusted directories according to loader policy. Windows DLL loading must not fall back to the current working directory or arbitrary user-controlled search paths.
 
 ### Release integrity
 
