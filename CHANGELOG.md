@@ -6,6 +6,19 @@ All notable user-visible and architectural changes are recorded here.
 
 ## Unreleased
 
+No unreleased changes.
+
+## 0.2.0 — 2026-09-20
+
+- Replaced the four-profile bootstrap model with Common 1.19.16 temporal policy v2.
+- Made System Settings the authority for the complete temporal environment rather than only a clock-format preference.
+- Added all 21 shared clock systems, all 30 primary calendars, optional secondary calendar, seconds policy and geographic latitude/longitude to Date & Time.
+- Removed the global self-referential “Follow system” clock concept; the global conventional default is Standard time (OS locale).
+- Added deterministic v1-to-v2 policy migration through Common and retained one authoritative per-user presentation.conf store on Linux and Windows.
+- Updated the Linux GTK4 panel, CLI, model tests and Calendar integration contract to use the same stable clock/calendar identifiers.
+
+## 0.1.0 — 2026-09-20
+
 ### Architecture
 
 - Established System Settings as one unified shell over focused first-party settings modules.
@@ -45,4 +58,4 @@ All notable user-visible and architectural changes are recorded here.
 
 ### Status
 
-No supported binary release exists yet. The repository is in architecture/bootstrap stage.
+0.1.0 was the first bootstrap binary release; 0.2.0 replaces its limited temporal model with the complete authority described above.
