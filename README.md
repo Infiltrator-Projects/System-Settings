@@ -8,7 +8,7 @@ System Settings is a native cross-platform settings environment for Linux Mint/C
 
 The project takes the strongest part of the classic Amiga/Control Panel model — small focused preference tools with clear ownership — and combines it with the strongest part of a modern settings application — one consistent window, global search, deep links, shared navigation and predictable privilege handling.
 
-**Status:** architecture and design foundation; no supported release yet  
+**Status:** Phase 1 bootstrap; Date & Time is the first implemented vertical slice, with Linux/Windows policy persistence and Calendar integration in progress  
 **Primary targets:** Linux Mint/Cinnamon and Windows desktop  
 **Implementation:** native C/C++, using the strongest style for each component  
 **Shared foundation:** Infiltrator Common, pinned to an exact release when implementation begins  
@@ -68,6 +68,12 @@ System Settings should:
 - minimise avoidable dependencies without recreating mature operating-system subsystems;
 - represent unsupported, unavailable and permission-denied states explicitly rather than pretending an operation succeeded;
 - preserve a clean path for future modules without requiring the shell itself to be redesigned.
+
+## Current implementation
+
+The first implementation slice is Date & Time. The repository now contains the shared semantic Date & Time model, Linux and Windows per-user temporal-policy stores, module metadata, a small integration utility, tests, and Linux/Windows CI. The final shell/panel UI is intentionally not replaced by a one-off platform-specific settings window; it will consume this same module/model through the shell architecture.
+
+The current temporal policy supports Follow system, explicit conventional 12-hour/24-hour profiles, and decimal 10-hour presentation through Common 1.19.14. Calendar is the first external consumer.
 
 ## User experience
 
