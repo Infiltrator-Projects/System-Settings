@@ -138,3 +138,28 @@ See [PRESENTATION_POLICY.md](PRESENTATION_POLICY.md).
 **Consequence.** Modules identify the authoritative owner before implementation. Existing desktop settings are read/written through platform adapters; Infiltrator extensions retain their own semantics; optional integrations may teach selected Mint applications to consume extensions without requiring full upstream forks.
 
 See [MINT_COMPATIBILITY.md](MINT_COMPATIBILITY.md).
+
+
+## ADR-017 — Mint/Cinnamon and Windows are first-class from the first executable
+
+**Decision.** The shell, semantic modules, manifest format, module ABI, Common presentation-policy interface and validation strategy are designed for Linux Mint/Cinnamon and Windows from Phase 1 rather than porting a completed Linux implementation later.
+
+**Rationale.** Platform assumptions become expensive once they enter ABI, UI ownership, dynamic loading, privilege and persistence contracts.
+
+**Consequence.** Phase 1 CI/builds include both platforms and at least one module/fixture through the same semantic ABI. Mint may receive broader feature coverage first, but Windows portability is not deferred architecturally.
+
+## ADR-018 — Toolkit/native UI objects do not cross the module ABI
+
+**Decision.** Public module contracts cannot expose GTK widgets, HWND values, WinUI objects or other platform-specific presentation types.
+
+**Rationale.** Exposing one toolkit in ABI v1 would bind every module to that platform/runtime.
+
+**Consequence.** Modules communicate through semantic state and a platform-neutral host/presentation abstraction. Platform-specific UI remains behind that boundary.
+
+## ADR-019 — Documented platform authority before private storage
+
+**Decision.** Platform adapters use documented operating-system/desktop APIs or documented native-settings handoffs before storage-level mechanisms such as private registry keys or private desktop configuration.
+
+**Rationale.** Private storage can bypass platform policy, notifications, validation and migration logic.
+
+**Consequence.** If Windows exposes only a supported Settings destination for a workflow, System Settings may hand off rather than reverse-engineering Settings internals. Equivalent discipline applies to Mint/Cinnamon.
