@@ -8,6 +8,16 @@ All notable user-visible and architectural changes are recorded here.
 
 No unreleased changes.
 
+## 0.3.0 — 2026-09-20
+
+- Moved Date & Time to Common 1.19.18 temporal policy v3.
+- Removed the retired secondary-calendar feature from the model, GUI, CLI, search manifest and persisted policy.
+- Replaced primary/secondary terminology with one authoritative system Calendar setting.
+- System Settings now writes `calendar=...` alongside clock mode, seconds and location; current consumers read that policy directly.
+- Removed the consumer-side “Follow System Settings” model from the architecture: following System Settings is the normal contract, not an optional override mode.
+- Retained private migration of existing v2 presentation.conf data so the previous primary calendar becomes the single v3 calendar while the retired secondary value is discarded.
+- Preserved Linux and Windows persistence with the same one-calendar policy contract.
+
 ## 0.2.0 — 2026-09-20
 
 - Replaced the four-profile bootstrap model with Common 1.19.16 temporal policy v2.
