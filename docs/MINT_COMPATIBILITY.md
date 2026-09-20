@@ -69,6 +69,8 @@ Enhanced integration is optional. The core System Settings design must remain co
 
 An extended Infiltrator policy may have no exact representation in Mint.
 
+The presence of System Settings must never become a runtime prerequisite for an application that can otherwise operate on Mint. Before a valid Infiltrator policy exists, Common-aware consumers use Mint/Cinnamon's native temporal preferences and ordinary locale behaviour. Publishing an Infiltrator policy enriches those consumers; it does not create a second mandatory desktop service.
+
 In that case System Settings records the real Infiltrator policy and, only where useful and unambiguous, maintains a compatible conventional Mint value for applications that do not understand the extension.
 
 Example:
