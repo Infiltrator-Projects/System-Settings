@@ -292,7 +292,7 @@ A normal backend failure is contained inside the module panel.
 
 Because first-party libraries are in-process on both Linux and Windows, memory corruption or a hard crash cannot be sandboxed by the loader. CI, sanitizers and narrow interfaces are therefore part of the module trust model.
 
-If future third-party modules are required, use an explicitly designed process boundary rather than pretending `dlopen` provides isolation.
+If future third-party modules are required, use an explicitly designed process boundary rather than pretending in-process dynamic loading provides isolation.
 
 ## Admission criteria for a new first-party module
 
