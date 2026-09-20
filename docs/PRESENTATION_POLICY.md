@@ -249,6 +249,8 @@ Thus a log can be stored once and viewed in different clock/calendar systems wit
 
 Presentation policy is user state, not application-local state.
 
+The Infiltrator policy is an optional enrichment layer for participating applications, not a hard dependency that prevents an application from running without System Settings. When no valid policy has been published, a platform-integrated consumer resolves the equivalent native operating-system/desktop preferences and remains fully usable. On Mint/Cinnamon, Calendar therefore behaves like the stock temporal surface until an Infiltrator policy exists; once a valid policy exists, the richer Infiltrator clock/calendar/location choices become authoritative for Common-aware presentation.
+
 The implementation provides one authoritative per-user `presentation.conf` policy document with schema versioning, atomic updates, deterministic defaults and validation. Policy v3 stores `clock-mode`, `calendar`, `show-seconds`, `location-configured`, `latitude` and `longitude`. Linux stores it below the XDG configuration home; Windows stores the equivalent user policy below LocalAppData. Common parses/serializes the same versioned contract on both platforms. Existing v2 files are privately migrated by keeping their former primary calendar as the single v3 calendar and discarding the retired secondary value.
 
 ## Third-party applications
