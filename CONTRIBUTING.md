@@ -6,12 +6,12 @@ System Settings is a native C/C++ project. C, procedural C++ and object-oriented
 
 ## Engineering rules
 
-- Preserve the one-shell/many-modules architecture.
+- Preserve the one-shell/many-modules architecture across Linux Mint/Cinnamon and Windows.
 - Keep domain policy inside its owning module.
-- Keep the module ABI small, versioned and C-compatible.
-- Do not expose C++ ABI types across the module boundary.
+- Keep the module ABI small, versioned, C-compatible and platform-neutral.
+- Do not expose C++ ABI types, GTK widgets, HWND values, WinUI objects or other platform-specific UI types across the module boundary.
 - Keep startup lightweight; do not load or enumerate unrelated domains before they are needed.
-- Prefer authoritative native APIs/services over parsing external command output.
+- Prefer authoritative documented native APIs/services over parsing external command output or writing undocumented platform storage.
 - Keep the shell unprivileged.
 - Request authorisation only for the protected action being performed.
 - Never add a project-owned password collection path when the platform authorisation agent owns credentials.
@@ -28,10 +28,10 @@ Read [docs/MODULES.md](docs/MODULES.md) before introducing or changing a module.
 A new module should not begin as UI code. Establish:
 
 1. domain ownership;
-2. authoritative backend;
+2. authoritative backend or supported native Settings handoff for each target platform;
 3. read semantics;
 4. write/transaction semantics;
-5. privilege requirements;
+5. privilege/elevation requirements per platform;
 6. external change behaviour;
 7. manifest/search/deep-link identities;
 8. failure states;
