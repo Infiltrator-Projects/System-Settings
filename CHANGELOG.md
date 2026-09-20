@@ -29,6 +29,16 @@ All notable user-visible and architectural changes are recorded here.
 - Added native Windows Settings handoff as a supported integration mode where no safe public write API exists.
 - Generalised validation, privilege and security contracts for Linux and Windows.
 
+### Implementation
+
+- Added the first Date & Time semantic module model and static module manifest.
+- Added portable system/12-hour/24-hour/decimal-10 policy selection through Common 1.19.14.
+- Added Linux XDG and Windows LocalAppData per-user persistence adapters.
+- Added Linux and Windows CI for the first executable integration slice.
+- Added a temporary `system-settings-time` integration utility for exercising the policy before the full shell UI exists.
+- Kept platform persistence injected behind the model so the core has no Linux/Windows dependency cycle.
+- Began Calendar integration as the first consumer of the system temporal policy.
+
 ### Status
 
 No supported binary release exists yet. The repository is in architecture/bootstrap stage.
