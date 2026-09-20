@@ -159,9 +159,9 @@ Machine/export contexts may deliberately resolve to a fixed canonical representa
 
 Temporal Presentation uses stable clock-system identifiers supplied by Common rather than application-local conditionals.
 
-Common 1.19.16 defines the complete current catalogue shared with Calendar: standard OS-locale time, explicit 12-hour and 24-hour time, Internet Time, Unix time, binary and hexadecimal clocks, Julian/MJD, sidereal/apparent/mean-solar time, French Republican decimal time, traditional Chinese double-hours and hundred-kè, Roman temporal time, Edo Japanese seasonal time, Italian hours, Babylonian hours, Indian ghaṭī time and Nuremberg hours.
+Common 1.19.18 defines the complete current catalogue shared with Calendar: standard OS-locale time, explicit 12-hour and 24-hour time, Internet Time, Unix time, binary and hexadecimal clocks, Julian/MJD, sidereal/apparent/mean-solar time, French Republican decimal time, traditional Chinese double-hours and hundred-kè, Roman temporal time, Edo Japanese seasonal time, Italian hours, Babylonian hours, Indian ghaṭī time and Nuremberg hours.
 
-System Settings is the authority. Therefore the global catalogue contains **Standard time (OS locale)** rather than a self-referential **Follow system** choice. Applications may independently offer **Follow System Settings** as a local behaviour.
+System Settings is the authority. Therefore the global catalogue contains **Standard time (OS locale)** rather than a self-referential **Follow system** choice. Common-aware applications consume the System Settings policy directly rather than offering competing local clock/calendar choices.
 
 ### Decimal 10-hour profile
 
@@ -189,18 +189,17 @@ Daylight-saving transition semantics must be specified and regression-tested bef
 
 Clock representation and calendar representation are independent policy dimensions.
 
-Temporal policy v2 combines these dimensions directly. For example:
+Temporal policy v3 combines these dimensions directly. For example:
 
 ```text
 Timezone:       Australia/Melbourne
-Primary:        Gregorian
-Secondary:      Egyptian civil (optional)
+Calendar:       Egyptian civil
 Clock:          French Republican decimal time
 Seconds:        shown
 Location:       optional latitude/longitude
 ```
 
-The current shared catalogue contains 30 primary calendar systems plus None for the optional secondary calendar. Calendar remains the implementation owner of chronology arithmetic; Common/System Settings own the stable policy identifiers and user-wide selection contract.
+The current shared catalogue contains 30 selectable calendar systems. There is one system calendar policy, not primary/secondary calendar state. Calendar remains the implementation owner of chronology arithmetic; Common/System Settings own the stable policy identifiers and user-wide selection contract.
 
 ## Timezone
 
@@ -250,7 +249,7 @@ Thus a log can be stored once and viewed in different clock/calendar systems wit
 
 Presentation policy is user state, not application-local state.
 
-The implementation provides one authoritative per-user `presentation.conf` policy document with schema versioning, atomic updates, deterministic defaults and validation. Policy v2 stores `clock-mode`, `primary-calendar`, `secondary-calendar`, `show-seconds`, `location-configured`, `latitude` and `longitude`. Linux stores it below the XDG configuration home; Windows stores the equivalent user policy below LocalAppData. Common parses/serializes the same versioned contract on both platforms, and v1 documents migrate in memory to v2.
+The implementation provides one authoritative per-user `presentation.conf` policy document with schema versioning, atomic updates, deterministic defaults and validation. Policy v3 stores `clock-mode`, `calendar`, `show-seconds`, `location-configured`, `latitude` and `longitude`. Linux stores it below the XDG configuration home; Windows stores the equivalent user policy below LocalAppData. Common parses/serializes the same versioned contract on both platforms. Existing v2 files are privately migrated by keeping their former primary calendar as the single v3 calendar and discarding the retired secondary value.
 
 ## Third-party applications
 
