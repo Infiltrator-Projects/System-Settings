@@ -22,8 +22,7 @@ typedef struct SettingsWindow {
     GtkWidget *date_preview;
     GtkWidget *timezone_value;
     GtkDropDown *clock_mode;
-    GtkDropDown *primary_calendar;
-    GtkDropDown *secondary_calendar;
+    GtkDropDown *calendar;
     GtkSwitch *show_seconds;
     GtkSwitch *location_configured;
     GtkSpinButton *latitude;
@@ -226,12 +225,12 @@ static GtkStringList *clock_mode_strings(void)
     return list;
 }
 
-static GtkStringList *calendar_strings(bool include_none)
+static GtkStringList *calendar_strings(void)
 {
     GtkStringList *list = gtk_string_list_new(NULL);
-    size_t index = include_none ? 0U : 1U;
+    size_t index;
 
-    for (; index < infiltratr_temporal_calendar_count(); ++index) {
+    for (index = 0U; index < infiltratr_temporal_calendar_count(); ++index) {
         const InfiltratrTemporalCalendarInfo *info =
             infiltratr_temporal_calendar_at(index);
         if (info != NULL) {
@@ -254,16 +253,15 @@ static guint clock_index_for_id(const char *id)
     return 0U;
 }
 
-static guint calendar_index_for_id(const char *id, bool include_none)
+static guint calendar_index_for_id(const char *id)
 {
-    size_t index = include_none ? 0U : 1U;
-    guint visible = 0U;
+    size_t index;
 
-    for (; index < infiltratr_temporal_calendar_count(); ++index, ++visible) {
+    for (index = 0U; index < infiltratr_temporal_calendar_count(); ++index) {
         const InfiltratrTemporalCalendarInfo *info =
             infiltratr_temporal_calendar_at(index);
         if (info != NULL && strcmp(info->id, id) == 0) {
-            return visible;
+            return (guint)index;
         }
     }
     return 0U;
@@ -281,16 +279,13 @@ selected_clock_mode(const SettingsWindow *state)
 }
 
 static const InfiltratrTemporalCalendarInfo *
-selected_calendar(GtkDropDown *dropdown, bool include_none)
+selected_calendar(GtkDropDown *dropdown)
 {
     size_t index;
     if (dropdown == NULL) {
         return NULL;
     }
     index = (size_t)gtk_drop_down_get_selected(dropdown);
-    if (!include_none) {
-        ++index;
-    }
     return infiltratr_temporal_calendar_at(index);
 }
 
@@ -325,7 +320,7 @@ static bool format_preview(const SettingsWindow *state,
                            char *buffer,
                            size_t capacity)
 {
-    const InfiltratrTemporalPolicyV2 *policy =
+    const InfiltratrTemporalPolicyV3 *policy =
         ss_date_time_model_policy(&state->model);
     const InfiltratrTemporalClockModeInfo *mode;
     g_autoptr(GDateTime) now = g_date_time_new_now_local();
@@ -367,9 +362,8 @@ static bool format_preview(const SettingsWindow *state,
 static gboolean refresh_preview(gpointer user_data)
 {
     SettingsWindow *state = user_data;
-    const InfiltratrTemporalPolicyV2 *policy;
-    const InfiltratrTemporalCalendarInfo *primary;
-    const InfiltratrTemporalCalendarInfo *secondary;
+    const InfiltratrTemporalPolicyV3 *policy;
+    const InfiltratrTemporalCalendarInfo *calendar;
     g_autoptr(GDateTime) now = g_date_time_new_now_local();
     char clock_text[160];
 
@@ -386,22 +380,15 @@ static gboolean refresh_preview(gpointer user_data)
         gtk_label_set_text(GTK_LABEL(state->clock_preview), clock_text);
     }
 
-    primary = infiltratr_temporal_calendar_find(policy->primary_calendar);
-    secondary = infiltratr_temporal_calendar_find(policy->secondary_calendar);
+    calendar = infiltratr_temporal_calendar_find(policy->calendar);
     {
         g_autofree gchar *date = g_date_time_format(now, "%A, %e %B %Y");
         g_autofree gchar *summary = NULL;
         const gchar *zone = g_date_time_get_timezone_abbreviation(now);
 
-        if (primary != NULL && secondary != NULL &&
-            strcmp(secondary->id, "none") != 0) {
+        if (calendar != NULL) {
             summary = g_strdup_printf(
-                "%s • secondary: %s • %s",
-                primary->name, secondary->name,
-                date != NULL ? date : "");
-        } else if (primary != NULL) {
-            summary = g_strdup_printf(
-                "%s • %s", primary->name, date != NULL ? date : "");
+                "%s • %s", calendar->name, date != NULL ? date : "");
         }
         if (summary != NULL) {
             gtk_label_set_text(GTK_LABEL(state->date_preview), summary);
@@ -415,7 +402,7 @@ static gboolean refresh_preview(gpointer user_data)
 
 static void sync_controls(SettingsWindow *state)
 {
-    const InfiltratrTemporalPolicyV2 *policy =
+    const InfiltratrTemporalPolicyV3 *policy =
         ss_date_time_model_policy(&state->model);
 
     if (policy == NULL) {
@@ -426,11 +413,8 @@ static void sync_controls(SettingsWindow *state)
     gtk_drop_down_set_selected(
         state->clock_mode, clock_index_for_id(policy->clock_mode));
     gtk_drop_down_set_selected(
-        state->primary_calendar,
-        calendar_index_for_id(policy->primary_calendar, false));
-    gtk_drop_down_set_selected(
-        state->secondary_calendar,
-        calendar_index_for_id(policy->secondary_calendar, true));
+        state->calendar,
+        calendar_index_for_id(policy->calendar));
     gtk_switch_set_active(state->show_seconds, policy->show_seconds);
     gtk_switch_set_active(state->location_configured,
                           policy->location_configured);
@@ -444,7 +428,7 @@ static void sync_controls(SettingsWindow *state)
 static void policy_saved(SettingsWindow *state)
 {
     set_status(state,
-               "System temporal policy saved. Calendar follows it when “Follow System Settings” is enabled.",
+               "System temporal policy saved. Calendar and other Common-aware applications use this setting.",
                false);
     update_control_capabilities(state);
     (void)refresh_preview(state);
@@ -473,9 +457,9 @@ static void on_clock_changed(GObject *object,
     policy_saved(state);
 }
 
-static void on_primary_calendar_changed(GObject *object,
-                                        GParamSpec *pspec,
-                                        gpointer user_data)
+static void on_calendar_changed(GObject *object,
+                                GParamSpec *pspec,
+                                gpointer user_data)
 {
     SettingsWindow *state = user_data;
     const InfiltratrTemporalCalendarInfo *calendar;
@@ -486,35 +470,10 @@ static void on_primary_calendar_changed(GObject *object,
         return;
     }
 
-    calendar = selected_calendar(state->primary_calendar, false);
+    calendar = selected_calendar(state->calendar);
     if (calendar == NULL ||
-        !ss_date_time_model_set_primary_calendar(
-            &state->model, calendar->id)) {
-        set_status(state, "Could not save the primary calendar.", true);
-        sync_controls(state);
-        return;
-    }
-    policy_saved(state);
-}
-
-static void on_secondary_calendar_changed(GObject *object,
-                                          GParamSpec *pspec,
-                                          gpointer user_data)
-{
-    SettingsWindow *state = user_data;
-    const InfiltratrTemporalCalendarInfo *calendar;
-
-    (void)object;
-    (void)pspec;
-    if (state == NULL || state->updating_controls) {
-        return;
-    }
-
-    calendar = selected_calendar(state->secondary_calendar, true);
-    if (calendar == NULL ||
-        !ss_date_time_model_set_secondary_calendar(
-            &state->model, calendar->id)) {
-        set_status(state, "Could not save the secondary calendar.", true);
+        !ss_date_time_model_set_calendar(&state->model, calendar->id)) {
+        set_status(state, "Could not save the calendar.", true);
         sync_controls(state);
         return;
     }
@@ -624,31 +583,18 @@ static GtkWidget *build_date_time_panel(SettingsWindow *state)
 
     gtk_widget_add_css_class(calendar_card, "settings-card");
     gtk_box_append(GTK_BOX(calendar_card),
-                   make_label("Calendar systems", "section-title"));
+                   make_label("Calendar system", "section-title"));
 
-    strings = calendar_strings(false);
-    state->primary_calendar = GTK_DROP_DOWN(
+    strings = calendar_strings();
+    state->calendar = GTK_DROP_DOWN(
         gtk_drop_down_new(G_LIST_MODEL(strings), NULL));
     g_object_unref(strings);
-    gtk_widget_set_size_request(
-        GTK_WIDGET(state->primary_calendar), 360, -1);
+    gtk_widget_set_size_request(GTK_WIDGET(state->calendar), 360, -1);
     gtk_box_append(GTK_BOX(calendar_card),
                    make_setting_row(
-                       "Primary calendar",
-                       "The calendar system applications should use for their principal human-facing date representation.",
-                       GTK_WIDGET(state->primary_calendar)));
-
-    strings = calendar_strings(true);
-    state->secondary_calendar = GTK_DROP_DOWN(
-        gtk_drop_down_new(G_LIST_MODEL(strings), NULL));
-    g_object_unref(strings);
-    gtk_widget_set_size_request(
-        GTK_WIDGET(state->secondary_calendar), 360, -1);
-    gtk_box_append(GTK_BOX(calendar_card),
-                   make_setting_row(
-                       "Secondary calendar",
-                       "Optionally show the same civil day using another calendar system.",
-                       GTK_WIDGET(state->secondary_calendar)));
+                       "Calendar",
+                       "Choose the calendar system used by Common-aware applications.",
+                       GTK_WIDGET(state->calendar)));
     gtk_box_append(GTK_BOX(page), calendar_card);
 
     gtk_widget_add_css_class(location_card, "settings-card");
@@ -700,10 +646,8 @@ static GtkWidget *build_date_time_panel(SettingsWindow *state)
 
     g_signal_connect(state->clock_mode, "notify::selected",
                      G_CALLBACK(on_clock_changed), state);
-    g_signal_connect(state->primary_calendar, "notify::selected",
-                     G_CALLBACK(on_primary_calendar_changed), state);
-    g_signal_connect(state->secondary_calendar, "notify::selected",
-                     G_CALLBACK(on_secondary_calendar_changed), state);
+    g_signal_connect(state->calendar, "notify::selected",
+                     G_CALLBACK(on_calendar_changed), state);
     g_signal_connect(state->show_seconds, "notify::active",
                      G_CALLBACK(on_seconds_changed), state);
     g_signal_connect(state->location_configured, "notify::active",
