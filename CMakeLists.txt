@@ -34,12 +34,12 @@ if(WIN32)
     add_library(system-settings-platform STATIC
         src/platform/windows/temporal-policy-store.c)
     target_link_libraries(system-settings-platform
-        PUBLIC system-settings-core InfiltratrCommon::Portable shell32 ole32)
+        PUBLIC InfiltratrCommon::Portable shell32 ole32)
 elseif(UNIX)
     add_library(system-settings-platform STATIC
         src/platform/linux/temporal-policy-store.c)
     target_link_libraries(system-settings-platform
-        PUBLIC system-settings-core InfiltratrCommon::Common)
+        PUBLIC InfiltratrCommon::Common)
 else()
     message(FATAL_ERROR "System Settings currently supports Windows and POSIX/Linux.")
 endif()
@@ -47,11 +47,11 @@ ss_configure(system-settings-platform)
 
 add_executable(system-settings-time src/tools/time-settings-cli.c)
 ss_configure(system-settings-time)
-target_link_libraries(system-settings-time PRIVATE system-settings-platform)
+target_link_libraries(system-settings-time PRIVATE system-settings-core system-settings-platform)
 
 if(BUILD_TESTING)
     add_executable(date-time-model-test tests/date-time-model-test.c)
     ss_configure(date-time-model-test)
-    target_link_libraries(date-time-model-test PRIVATE system-settings-platform)
+    target_link_libraries(date-time-model-test PRIVATE system-settings-core)
     add_test(NAME date-time-model COMMAND date-time-model-test)
 endif()
