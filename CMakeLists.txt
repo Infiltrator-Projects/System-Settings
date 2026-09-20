@@ -1,6 +1,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 cmake_minimum_required(VERSION 3.20)
-project(InfiltratrSystemSettings VERSION 0.1.0 LANGUAGES C)
+
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" SYSTEM_SETTINGS_VERSION)
+string(STRIP "${SYSTEM_SETTINGS_VERSION}" SYSTEM_SETTINGS_VERSION)
+if(NOT SYSTEM_SETTINGS_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
+    message(FATAL_ERROR "VERSION must contain major.minor.patch")
+endif()
+
+project(InfiltratrSystemSettings VERSION "${SYSTEM_SETTINGS_VERSION}" LANGUAGES C)
 include(CTest)
 include(GNUInstallDirs)
 
