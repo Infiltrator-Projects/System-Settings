@@ -10,11 +10,10 @@ extern "C" {
 #endif
 
 typedef struct SsTemporalPolicyStore {
-    bool (*load)(InfiltratrTemporalPolicy *policy, bool *found);
-    bool (*save)(const InfiltratrTemporalPolicy *policy);
+    bool (*load)(InfiltratrTemporalPolicyV2 *policy, bool *found);
+    bool (*save)(const InfiltratrTemporalPolicyV2 *policy);
 } SsTemporalPolicyStore;
 
-/* Returns the current platform's user-policy persistence adapter. */
 const SsTemporalPolicyStore *ss_platform_temporal_policy_store(void);
 
 #ifdef __cplusplus
