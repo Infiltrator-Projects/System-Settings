@@ -22,6 +22,13 @@ All notable user-visible and architectural changes are recorded here.
 - Defined system-wide presentation policy: System Settings owns the user's policy, Common provides shared formatting, and applications retain canonical data. Temporal Presentation is the first family, including the planned decimal 10-hour clock model.
 - Defined Mint/Cinnamon compatibility policy: reuse existing authoritative desktop settings, add Infiltrator extensions only for missing semantics, preserve safe conventional fallbacks, and avoid unnecessary upstream forks.
 
+- Promoted Windows from a future portability concern to a first-class target from Phase 1.
+- Added shared platform-compatibility and Windows-specific compatibility contracts.
+- Prohibited GTK, HWND, WinUI and other platform UI objects from the public module ABI.
+- Generalised trusted module loading to Linux shared objects and Windows DLLs.
+- Added native Windows Settings handoff as a supported integration mode where no safe public write API exists.
+- Generalised validation, privilege and security contracts for Linux and Windows.
+
 ### Status
 
 No supported binary release exists yet. The repository is in architecture/bootstrap stage.
