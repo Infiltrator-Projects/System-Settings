@@ -24,13 +24,9 @@ Keywords=seconds;clock;precision
 Title=Time zone
 Keywords=timezone;zone;city;region;utc
 
-[Target "primary-calendar"]
-Title=Primary calendar
+[Target "calendar"]
+Title=Calendar
 Keywords=calendar;gregorian;julian;hebrew;islamic;persian;chinese;dangi;indian;japanese;minguo;roman;byzantine;egyptian;armenian;mayan;french republican;international fixed;world;positivist
-
-[Target "secondary-calendar"]
-Title=Secondary calendar
-Keywords=calendar;secondary;alternate;dual date
 
 [Target "location"]
 Title=Geographic location
