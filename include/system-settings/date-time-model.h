@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <infiltratr/temporal.h>
+#include "system-settings/temporal-policy-store.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -12,10 +13,12 @@ extern "C" {
 
 typedef struct SsDateTimeModel {
     InfiltratrTemporalPolicy policy;
+    const SsTemporalPolicyStore *store;
     bool persisted_policy_present;
 } SsDateTimeModel;
 
-bool ss_date_time_model_init(SsDateTimeModel *model);
+bool ss_date_time_model_init(SsDateTimeModel *model,
+                             const SsTemporalPolicyStore *store);
 bool ss_date_time_model_reload(SsDateTimeModel *model);
 const InfiltratrTemporalPolicy *
 ss_date_time_model_policy(const SsDateTimeModel *model);
