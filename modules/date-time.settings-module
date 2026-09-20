@@ -10,11 +10,11 @@ Summary=Clock, date, timezone and temporal presentation
 Icon=preferences-system-time
 
 [Search]
-Keywords=time;date;clock;timezone;format;12 hour;24 hour;decimal;10 hour;calendar
+Keywords=time;date;clock;timezone;format;12 hour;24 hour;decimal;internet time;unix;binary;hexadecimal;julian;sidereal;solar;roman;chinese;japanese;calendar;gregorian;hebrew;islamic;persian;mayan;location
 
-[Target "clock-profile"]
+[Target "clock-mode"]
 Title=Clock system
-Keywords=clock;12 hour;24 hour;decimal;10 hour;time format
+Keywords=clock;12 hour;24 hour;decimal;internet;unix;binary;hexadecimal;julian;sidereal;solar;roman;chinese;japanese;time format
 
 [Target "show-seconds"]
 Title=Display seconds
@@ -23,3 +23,15 @@ Keywords=seconds;clock;precision
 [Target "timezone"]
 Title=Time zone
 Keywords=timezone;zone;city;region;utc
+
+[Target "primary-calendar"]
+Title=Primary calendar
+Keywords=calendar;gregorian;julian;hebrew;islamic;persian;chinese;dangi;indian;japanese;minguo;roman;byzantine;egyptian;armenian;mayan;french republican;international fixed;world;positivist
+
+[Target "secondary-calendar"]
+Title=Secondary calendar
+Keywords=calendar;secondary;alternate;dual date
+
+[Target "location"]
+Title=Geographic location
+Keywords=latitude;longitude;solar;sidereal;sunrise;sunset;location
