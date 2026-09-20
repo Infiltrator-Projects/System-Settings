@@ -4,7 +4,7 @@
 #include <string.h>
 
 static bool save_candidate(SsDateTimeModel *model,
-                           const InfiltratrTemporalPolicyV2 *candidate)
+                           const InfiltratrTemporalPolicyV3 *candidate)
 {
     if (model == NULL || candidate == NULL ||
         model->store == NULL || model->store->save == NULL ||
@@ -21,7 +21,7 @@ bool ss_date_time_model_init(SsDateTimeModel *model,
 {
     if (model == NULL || store == NULL || store->load == NULL ||
         store->save == NULL ||
-        !infiltratr_temporal_policy_v2_default(&model->policy)) {
+        !infiltratr_temporal_policy_v3_default(&model->policy)) {
         return false;
     }
     model->store = store;
@@ -31,11 +31,11 @@ bool ss_date_time_model_init(SsDateTimeModel *model,
 
 bool ss_date_time_model_reload(SsDateTimeModel *model)
 {
-    InfiltratrTemporalPolicyV2 loaded;
+    InfiltratrTemporalPolicyV3 loaded;
     bool found = false;
 
     if (model == NULL ||
-        !infiltratr_temporal_policy_v2_default(&loaded) ||
+        !infiltratr_temporal_policy_v3_default(&loaded) ||
         !model->store->load(&loaded, &found)) {
         return false;
     }
@@ -44,7 +44,7 @@ bool ss_date_time_model_reload(SsDateTimeModel *model)
     return true;
 }
 
-const InfiltratrTemporalPolicyV2 *
+const InfiltratrTemporalPolicyV3 *
 ss_date_time_model_policy(const SsDateTimeModel *model)
 {
     return model != NULL ? &model->policy : NULL;
@@ -53,7 +53,7 @@ ss_date_time_model_policy(const SsDateTimeModel *model)
 bool ss_date_time_model_set_clock_mode(SsDateTimeModel *model,
                                        const char *clock_mode)
 {
-    InfiltratrTemporalPolicyV2 candidate;
+    InfiltratrTemporalPolicyV3 candidate;
 
     if (model == NULL ||
         infiltratr_temporal_clock_mode_find(clock_mode) == NULL) {
@@ -67,45 +67,27 @@ bool ss_date_time_model_set_clock_mode(SsDateTimeModel *model,
     return save_candidate(model, &candidate);
 }
 
-bool ss_date_time_model_set_primary_calendar(SsDateTimeModel *model,
-                                             const char *calendar_id)
+bool ss_date_time_model_set_calendar(SsDateTimeModel *model,
+                                     const char *calendar_id)
 {
-    InfiltratrTemporalPolicyV2 candidate;
+    InfiltratrTemporalPolicyV3 candidate;
 
     if (model == NULL || calendar_id == NULL ||
-        strcmp(calendar_id, "none") == 0 ||
         infiltratr_temporal_calendar_find(calendar_id) == NULL) {
         return false;
     }
     candidate = model->policy;
-    if (strlen(calendar_id) >= sizeof(candidate.primary_calendar)) {
+    if (strlen(calendar_id) >= sizeof(candidate.calendar)) {
         return false;
     }
-    strcpy(candidate.primary_calendar, calendar_id);
-    return save_candidate(model, &candidate);
-}
-
-bool ss_date_time_model_set_secondary_calendar(SsDateTimeModel *model,
-                                               const char *calendar_id)
-{
-    InfiltratrTemporalPolicyV2 candidate;
-
-    if (model == NULL ||
-        infiltratr_temporal_calendar_find(calendar_id) == NULL) {
-        return false;
-    }
-    candidate = model->policy;
-    if (strlen(calendar_id) >= sizeof(candidate.secondary_calendar)) {
-        return false;
-    }
-    strcpy(candidate.secondary_calendar, calendar_id);
+    strcpy(candidate.calendar, calendar_id);
     return save_candidate(model, &candidate);
 }
 
 bool ss_date_time_model_set_show_seconds(SsDateTimeModel *model,
                                          bool show_seconds)
 {
-    InfiltratrTemporalPolicyV2 candidate;
+    InfiltratrTemporalPolicyV3 candidate;
 
     if (model == NULL) {
         return false;
@@ -120,7 +102,7 @@ bool ss_date_time_model_set_location(SsDateTimeModel *model,
                                      double latitude,
                                      double longitude)
 {
-    InfiltratrTemporalPolicyV2 candidate;
+    InfiltratrTemporalPolicyV3 candidate;
 
     if (model == NULL ||
         latitude < -90.0 || latitude > 90.0 ||
