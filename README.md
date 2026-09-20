@@ -73,7 +73,7 @@ System Settings should:
 
 The first implementation slice is Date & Time. The repository now contains the shared semantic Date & Time model, Linux and Windows per-user temporal-policy stores, module metadata, tests, Linux/Windows CI, and the first native System Settings shell. On Linux the GTK4 shell presents a real Date & Time panel with a live clock/date preview, all 21 shared clock systems, all 30 calendar systems, seconds policy, geographic location and current time-zone display. Changes are saved immediately through the same model used by non-UI consumers.
 
-The current temporal policy is version 3 in Common 1.19.18. System Settings is the sole authority for clock system, calendar system, seconds and geographic location. Calendar is the first external consumer and reads that policy directly; it does not maintain competing temporal choices.
+The current temporal policy is version 3 in Common 1.19.18. System Settings is the sole Infiltrator authority for the richer clock system, calendar system, seconds and geographic-location policy; Calendar does not maintain competing local choices. The policy is deliberately optional for consumers: if no valid Infiltrator policy exists, Calendar and other compatible applications remain usable through their native platform defaults. On Mint/Cinnamon this means the Calendar replacement continues to follow Cinnamon/locale temporal preferences until System Settings publishes an extended policy.
 
 ## User experience
 
