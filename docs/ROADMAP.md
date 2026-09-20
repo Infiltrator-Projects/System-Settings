@@ -99,7 +99,13 @@ This phase must prove:
 
 ## Phase 5 — Mint/Cinnamon replacement audit
 
-Perform a forensic capability audit against the target Linux Mint/Cinnamon Settings environment.
+Perform a forensic capability and authority audit against the target Linux Mint/Cinnamon Settings environment.
+
+For each setting, record whether it is:
+- an existing Mint/Cinnamon/system authority to reuse directly;
+- an Infiltrator extension because no faithful upstream representation exists;
+- a specialised-application deep link;
+- intentionally unsupported until the correct authority is known.
 
 The goal is functional coverage, not visual cloning.
 

@@ -292,6 +292,35 @@ Applications must distinguish civil instants from durations and machine/export t
 
 The complete contract lives in [PRESENTATION_POLICY.md](PRESENTATION_POLICY.md).
 
+## Mint/Cinnamon compatibility layer
+
+The first platform target is Linux Mint/Cinnamon, but the shell and module contracts must not hard-code individual Cinnamon schema names throughout the UI.
+
+Where an existing Mint/Cinnamon setting is authoritative, the owning module uses a platform compatibility adapter to read and write that existing value. New Infiltrator settings are created only when the desktop cannot represent the required semantic concept.
+
+```text
+module
+  ↓
+Mint/Cinnamon compatibility adapter
+  ↓
+authoritative GSettings / D-Bus / native desktop interface
+```
+
+For extended policies:
+
+```text
+module
+  ↓
+Infiltrator policy
+  ↓
+Common-aware applications
+  └── optional compatible Mint fallback
+```
+
+An existing Mint value must never be overloaded with a different meaning to simulate an extension.
+
+The full mapping, fallback and synchronisation contract is defined in [MINT_COMPATIBILITY.md](MINT_COMPATIBILITY.md).
+
 ## Dependency policy
 
 The target is zero avoidable dependencies, not zero dependencies.

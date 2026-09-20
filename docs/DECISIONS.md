@@ -127,3 +127,14 @@ This file records durable architectural choices for System Settings.
 **Consequence.** Human-visible temporal formatting migrates toward Common Temporal. Applications classify values as instants, civil date/time, calendar dates, durations or machine/export timestamps. Clock/calendar presentation applies only where semantically appropriate. Future cross-application presentation families may reuse the same architecture.
 
 See [PRESENTATION_POLICY.md](PRESENTATION_POLICY.md).
+
+
+## ADR-016 — Mint/Cinnamon compatibility at the edges, independence at the core
+
+**Decision.** System Settings reuses an existing Mint/Cinnamon authority when it represents the same semantic setting, creates an Infiltrator extension only when the concept cannot be represented faithfully upstream, and uses a compatible fallback only where that fallback is safe and unambiguous.
+
+**Rationale.** Duplicating ordinary desktop settings would create conflicting sources of truth, while restricting System Settings to only what Mint currently supports would prevent new system-wide policies such as decimal 10-hour time. A compatibility-adapter boundary permits both interoperability and extension.
+
+**Consequence.** Modules identify the authoritative owner before implementation. Existing desktop settings are read/written through platform adapters; Infiltrator extensions retain their own semantics; optional integrations may teach selected Mint applications to consume extensions without requiring full upstream forks.
+
+See [MINT_COMPATIBILITY.md](MINT_COMPATIBILITY.md).

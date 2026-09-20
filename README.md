@@ -134,7 +134,7 @@ The exact command-line contract will be finalised with the first implementation,
               generic persistence / common infrastructure
 ```
 
-See [Architecture](docs/ARCHITECTURE.md), [Design](docs/DESIGN.md), [Module contract](docs/MODULES.md), [System-wide Presentation Policy](docs/PRESENTATION_POLICY.md), [Decisions](docs/DECISIONS.md), [Roadmap](docs/ROADMAP.md) and [Validation](docs/VALIDATION.md).
+See [Architecture](docs/ARCHITECTURE.md), [Design](docs/DESIGN.md), [Module contract](docs/MODULES.md), [System-wide Presentation Policy](docs/PRESENTATION_POLICY.md), [Mint/Cinnamon Compatibility](docs/MINT_COMPATIBILITY.md), [Decisions](docs/DECISIONS.md), [Roadmap](docs/ROADMAP.md) and [Validation](docs/VALIDATION.md).
 
 ## Shell ownership
 
@@ -223,6 +223,14 @@ Where another Infiltrator application already owns a complete domain, Settings e
 This rule keeps specialised applications strong and prevents System Settings becoming a second implementation of functionality that already has an authoritative project owner.
 
 Cross-application deep links should become stable project contracts where useful. Until a specialised application supports a specific deep link, Settings may launch its normal entry point rather than reimplementing the feature.
+
+## Mint/Cinnamon compatibility
+
+System Settings is intended to be a compatible superset of the Mint/Cinnamon settings environment. When Mint/Cinnamon already has an authoritative setting for the same concept, System Settings should use that setting directly rather than create a duplicate. New Infiltrator policy is introduced only for concepts the existing desktop cannot represent faithfully.
+
+The rule is: **reuse what is already correct, extend what is missing, replace only when necessary.**
+
+See [Mint/Cinnamon Compatibility](docs/MINT_COMPATIBILITY.md).
 
 ## Native-interface policy
 
