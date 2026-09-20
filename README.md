@@ -8,7 +8,7 @@ System Settings is a native cross-platform settings environment for Linux Mint/C
 
 The project takes the strongest part of the classic Amiga/Control Panel model — small focused preference tools with clear ownership — and combines it with the strongest part of a modern settings application — one consistent window, global search, deep links, shared navigation and predictable privilege handling.
 
-**Status:** Phase 1 bootstrap; Date & Time is the first implemented vertical slice, with Linux/Windows policy persistence and Calendar integration in progress  
+**Status:** Phase 1 bootstrap with a working Linux GTK4 shell and Date & Time panel; Linux/Windows temporal-policy persistence is implemented and Calendar consumes the shared policy  
 **Primary targets:** Linux Mint/Cinnamon and Windows desktop  
 **Implementation:** native C/C++, using the strongest style for each component  
 **Shared foundation:** Infiltrator Common, pinned to an exact release when implementation begins  
@@ -71,7 +71,7 @@ System Settings should:
 
 ## Current implementation
 
-The first implementation slice is Date & Time. The repository now contains the shared semantic Date & Time model, Linux and Windows per-user temporal-policy stores, module metadata, a small integration utility, tests, and Linux/Windows CI. The final shell/panel UI is intentionally not replaced by a one-off platform-specific settings window; it will consume this same module/model through the shell architecture.
+The first implementation slice is Date & Time. The repository now contains the shared semantic Date & Time model, Linux and Windows per-user temporal-policy stores, module metadata, tests, Linux/Windows CI, and the first native System Settings shell. On Linux the GTK4 shell presents a real Date & Time panel with a live clock/date preview, clock-system selector, seconds control and current time-zone display. Changes are saved immediately through the same model used by non-UI consumers.
 
 The current temporal policy supports Follow system, explicit conventional 12-hour/24-hour profiles, and decimal 10-hour presentation through Common 1.19.14. Calendar is the first external consumer.
 
