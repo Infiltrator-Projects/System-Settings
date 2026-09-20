@@ -472,8 +472,6 @@ static GtkWidget *build_sidebar(void)
     gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), row_box);
     gtk_list_box_append(GTK_LIST_BOX(list), row);
     gtk_list_box_select_row(GTK_LIST_BOX(list), GTK_LIST_BOX_ROW(row));
-    gtk_selection_model_selection_changed(
-        GTK_SELECTION_MODEL(gtk_single_selection_new(NULL)), 0U, 0U);
     gtk_box_append(GTK_BOX(sidebar), list);
 
     return sidebar;
@@ -496,6 +494,18 @@ static GtkWidget *build_header(void)
     gtk_box_append(GTK_BOX(identity), subtitle);
     gtk_box_append(GTK_BOX(header), identity);
     return header;
+}
+
+static gboolean on_close_request(GtkWindow *window, gpointer user_data)
+{
+    SettingsWindow *state = user_data;
+
+    (void)window;
+    if (state != NULL && state->timer_id != 0U) {
+        g_source_remove(state->timer_id);
+        state->timer_id = 0U;
+    }
+    return FALSE;
 }
 
 static void on_activate(GtkApplication *application, gpointer user_data)
@@ -549,6 +559,8 @@ static void on_activate(GtkApplication *application, gpointer user_data)
                false);
 
     state->timer_id = g_timeout_add_seconds(1U, refresh_preview, state);
+    g_signal_connect(state->window, "close-request",
+                     G_CALLBACK(on_close_request), state);
     g_object_set_data_full(G_OBJECT(state->window),
                            "system-settings-state",
                            state,
