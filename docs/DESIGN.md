@@ -2,7 +2,7 @@
 
 # Design
 
-System Settings should feel like one deliberate operating-system component even though its implementation is modular.
+System Settings should feel like one deliberate operating-system component on both Linux Mint/Cinnamon and Windows even though its implementation is modular.
 
 The design goal is not to imitate a particular release of Windows, macOS, AmigaOS or Linux Mint. Those systems are evidence. System Settings keeps the strongest useful patterns and rejects weaknesses that are consequences of their historical architecture.
 
@@ -24,7 +24,7 @@ The primary window has four stable regions:
 +----------------------+-----------------------------------------+
 ```
 
-The exact responsive layout may change with window width, but the conceptual model remains:
+The exact platform rendering and responsive layout may change with window width, but the conceptual model remains:
 
 - persistent orientation;
 - clear current location;
@@ -124,7 +124,7 @@ That includes the current:
 - buttons, toggles, text fields, lists and navigation controls;
 - spacing and focus treatment.
 
-A local panel may introduce a domain visualisation when necessary, but it must not invent a second general design system.
+A local panel may introduce a domain visualisation when necessary, but it must not invent a second general design system. Linux and Windows presentation backends consume the same Common semantic roles; platform-native control mechanics may differ beneath that shared design contract.
 
 ## System-wide presentation choices
 
