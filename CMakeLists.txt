@@ -2,6 +2,7 @@
 cmake_minimum_required(VERSION 3.20)
 project(InfiltratrSystemSettings VERSION 0.1.0 LANGUAGES C)
 include(CTest)
+include(GNUInstallDirs)
 
 option(SYSTEM_SETTINGS_WARNINGS_AS_ERRORS "Treat warnings as errors" ON)
 
@@ -40,6 +41,25 @@ elseif(UNIX)
         src/platform/linux/temporal-policy-store.c)
     target_link_libraries(system-settings-platform
         PUBLIC InfiltratrCommon::Common)
+
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(GTK4 REQUIRED IMPORTED_TARGET gtk4>=4.6)
+
+    add_executable(system-settings
+        src/shell/linux/main.c)
+    ss_configure(system-settings)
+    target_link_libraries(system-settings PRIVATE
+        system-settings-core
+        system-settings-platform
+        InfiltratrCommon::Portable
+        PkgConfig::GTK4)
+
+    install(TARGETS system-settings
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+    install(FILES data/org.infiltrator.SystemSettings.desktop
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/applications")
+    install(FILES modules/date-time.settings-module
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/infiltrator/system-settings/modules")
 else()
     message(FATAL_ERROR "System Settings currently supports Windows and POSIX/Linux.")
 endif()
@@ -55,3 +75,7 @@ if(BUILD_TESTING)
     target_link_libraries(date-time-model-test PRIVATE system-settings-core)
     add_test(NAME date-time-model COMMAND date-time-model-test)
 endif()
+
+
+install(TARGETS system-settings-time
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
