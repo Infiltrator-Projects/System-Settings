@@ -2,7 +2,7 @@
 
 # Architecture
 
-System Settings uses a unified shell over independently owned settings modules. The architecture is intentionally neither a single monolith nor a loose folder of unrelated preference executables.
+System Settings uses a unified cross-platform shell over independently owned semantic settings modules. Linux Mint/Cinnamon and Windows are first-class targets. The architecture is intentionally neither a single monolith nor a loose folder of unrelated preference executables.
 
 The shell provides one discoverable product. Modules preserve small ownership boundaries.
 
@@ -25,11 +25,13 @@ The shell provides one discoverable product. Modules preserve small ownership bo
 +------+------+          +------+------+           +------+------+
        |                        |                         |
        v                        v                         v
- desktop/display          network service           account service
- native interfaces        native interfaces         native interfaces
+        semantic domain contracts / platform capabilities
        \_______________________|_________________________/
                                |
-                     operating-system contracts
+                    platform authority adapters
+                     /                      \
+        Mint/Cinnamon native APIs      Windows native APIs
+        and services                    and settings handoffs
 
 +--------------------------------------------------------------+
 | Infiltrator Common                                          |
@@ -78,7 +80,7 @@ A display module knows display semantics. A network module knows network semanti
 
 ### Backend/native interface
 
-Backends are the narrowest reliable bridge from a module to the system being configured. Examples may include:
+Backends are platform adapters providing the narrowest reliable bridge from a semantic module to the system being configured. Linux examples may include:
 
 - GSettings for desktop/session settings where it is authoritative;
 - D-Bus services for system components;
@@ -89,7 +91,9 @@ Backends are the narrowest reliable bridge from a module to the system being con
 - AccountsService or another authoritative account interface where appropriate;
 - sysfs/procfs/ioctls where a kernel contract is genuinely the correct settings interface.
 
-The exact backend is chosen per feature after verifying the maintained native contract. Command-line utility output is not used as an API merely for implementation convenience.
+Windows sibling backends use documented Win32/WinRT/globalisation/subsystem APIs or explicit Windows Settings handoffs as appropriate. The exact backend is chosen per feature after verifying the maintained platform contract. Command-line utility output, undocumented registry storage and private desktop settings are not used as APIs merely for convenience.
+
+See [PLATFORM_COMPATIBILITY.md](PLATFORM_COMPATIBILITY.md).
 
 ## Module discovery
 
@@ -176,7 +180,7 @@ A requested value is not assumed to be effective merely because the write call r
 
 ## Concurrency
 
-UI toolkit objects remain on the UI thread.
+Platform UI objects remain on their owning UI thread. Toolkit/native UI types do not cross the public module ABI.
 
 Potentially blocking work — service enumeration, device discovery, filesystem scanning, NSS/account operations, slow D-Bus methods or equivalent — must use asynchronous native APIs or bounded workers.
 
@@ -292,9 +296,9 @@ Applications must distinguish civil instants from durations and machine/export t
 
 The complete contract lives in [PRESENTATION_POLICY.md](PRESENTATION_POLICY.md).
 
-## Mint/Cinnamon compatibility layer
+## Platform compatibility layer
 
-The first platform target is Linux Mint/Cinnamon, but the shell and module contracts must not hard-code individual Cinnamon schema names throughout the UI.
+Linux Mint/Cinnamon and Windows are first-class targets. The shell and semantic module contracts must not hard-code Cinnamon schema names, Windows registry paths, HWND values or platform service details throughout the UI.
 
 Where an existing Mint/Cinnamon setting is authoritative, the owning module uses a platform compatibility adapter to read and write that existing value. New Infiltrator settings are created only when the desktop cannot represent the required semantic concept.
 
@@ -319,13 +323,13 @@ Common-aware applications
 
 An existing Mint value must never be overloaded with a different meaning to simulate an extension.
 
-The full mapping, fallback and synchronisation contract is defined in [MINT_COMPATIBILITY.md](MINT_COMPATIBILITY.md).
+The general mapping, fallback, capability and handoff contract is defined in [PLATFORM_COMPATIBILITY.md](PLATFORM_COMPATIBILITY.md). Concrete mappings live in [MINT_COMPATIBILITY.md](MINT_COMPATIBILITY.md) and [WINDOWS_COMPATIBILITY.md](WINDOWS_COMPATIBILITY.md).
 
 ## Dependency policy
 
 The target is zero avoidable dependencies, not zero dependencies.
 
-GTK/GLib/GIO or another desktop/runtime boundary may be retained when replacing it would mean rebuilding a major mature subsystem without a stronger result. Existing system services remain appropriate dependencies for the system facilities they own.
+Platform presentation/runtime boundaries may be retained when replacing them would mean rebuilding a major mature subsystem without a stronger result. No Linux-specific toolkit becomes part of the module ABI merely because it is used by the Linux presentation backend. Existing system services remain appropriate dependencies for the system facilities they own.
 
 A package or helper is removed only when a stable native or project-owned contract can replace it without reducing correctness, security, desktop integration, accessibility or maintainability.
 
