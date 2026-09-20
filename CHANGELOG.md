@@ -18,6 +18,7 @@ All notable user-visible and architectural changes are recorded here.
 - Defined logical deep-link/search identities independent of widget layout.
 - Defined Common as shared presentation/infrastructure while keeping settings-domain policy local.
 - Added the initial phased roadmap and validation/security requirements.
+- Defined integration boundaries so Software, System Monitor and Defragmenter retain ownership of their specialised domains while Settings provides launch/deep-link entry points where appropriate.
 
 ### Status
 

@@ -50,13 +50,27 @@ Wi-Fi, Ethernet, VPN, proxy and connectivity configuration.
 
 ### System
 
-Users, date/time, storage, startup, power, updates and system information.
+Users, date/time, storage, startup, power, system information and entry points into specialised system applications.
 
 ### Security
 
 Authentication, firewall/security surfaces and other security configuration that does not belong more naturally to a specific domain.
 
 Categories are allowed to evolve when real modules demonstrate a stronger grouping. A category is not retained merely because it was written down first.
+
+## Specialised tools
+
+A coherent settings experience does not require every system tool to be embedded.
+
+Rows that lead to an established specialised application should look intentional and should state the destination when that matters. Examples include:
+
+- Software / Updates → Infiltrator Software;
+- live performance/process diagnostics → System Monitor;
+- filesystem defragmentation/recovery → Defragmenter.
+
+When the destination supports a stable deep link, Settings should open the relevant view directly. Otherwise it launches the application's normal entry point. Settings does not create a reduced copy of the specialised feature merely to avoid leaving the window.
+
+If the destination application is unavailable, present that as an unavailable integration with enough identity to understand what is missing.
 
 ## Search
 

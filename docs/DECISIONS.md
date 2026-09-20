@@ -107,3 +107,12 @@ This file records durable architectural choices for System Settings.
 **Rationale.** The repository is maintained as one forward-moving product line.
 
 **Consequence.** Every `main` change must remain coherent enough to build/validate once implementation exists, and releases advance from exact verified main revisions.
+
+
+## ADR-014 — Specialised applications retain their domains
+
+**Decision.** System Settings links or deep-links to established project applications instead of reimplementing the complete domains they already own.
+
+**Rationale.** Software management, live monitoring and filesystem defragmentation are substantial products with their own engines, validation and safety contracts. Duplicating them inside Settings would create two authorities and eventually inconsistent behaviour.
+
+**Consequence.** Infiltrator Software remains the owner of package/software/update workflows, System Monitor remains the owner of live monitoring, and Defragmenter remains the owner of filesystem defragmentation/recovery. Settings may own configuration adjacent to those domains and provide intentional launch/deep-link entry points.

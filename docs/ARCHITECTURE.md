@@ -273,6 +273,22 @@ GTK/GLib/GIO or another desktop/runtime boundary may be retained when replacing 
 
 A package or helper is removed only when a stable native or project-owned contract can replace it without reducing correctness, security, desktop integration, accessibility or maintainability.
 
+## Specialised application boundaries
+
+System Settings owns configuration surfaces. It does not absorb mature project-owned applications merely to place every system-related task inside one process.
+
+Current boundaries include:
+
+- Infiltrator Software owns package/software discovery, installation, removal, repositories, updates, history and package repair;
+- System Monitor owns live monitoring, process/service inspection and performance telemetry;
+- Defragmenter owns filesystem analysis, defragmentation and recovery.
+
+A settings module may expose context and a launch/deep-link action into one of these applications. It must not copy the specialised application's engine into System Settings.
+
+For example, a Storage module may own mount/configuration settings and capacity-related configuration, but "Defragment filesystem" should transfer to Defragmenter. A System/Software row may transfer to Software's Updates view rather than implementing a second updater.
+
+The shell should treat external project applications as explicit destinations. Their failure to be installed is an availability state, not a reason to hide duplicate fallback implementations inside Settings.
+
 ## Packaging boundary
 
 The package owns:

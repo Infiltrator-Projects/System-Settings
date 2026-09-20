@@ -109,6 +109,8 @@ For each target setting:
 - document exclusions with rationale;
 - test migration/side-by-side behaviour with Mint defaults.
 
+Existing project ownership is preserved during this audit: package/update workflows belong to Infiltrator Software, live monitoring belongs to System Monitor, and filesystem defragmentation/recovery belongs to Defragmenter. Settings may supply launch/deep-link entries instead of duplicate engines.
+
 Feature parity is not declared from a count of panels. Important behaviour, recovery, accessibility and privilege correctness must be equivalent or stronger for the supported target.
 
 ## Phase 6 — Release hardening

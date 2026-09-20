@@ -76,7 +76,7 @@ The default window is category-oriented rather than an undifferentiated scrollin
 - **Appearance** — theme, fonts, desktop and visual behaviour;
 - **Hardware** — displays, sound, keyboard, mouse/touchpad, Bluetooth and printers;
 - **Network** — Wi-Fi, Ethernet, VPN, proxy and related connectivity;
-- **System** — users, date/time, storage, startup, power, updates and system information;
+- **System** — users, date/time, storage, startup, power, system information and entry points to specialised system applications such as Software;
 - **Security** — authentication, firewall/security surfaces and permission-related configuration.
 
 These categories are navigation aids, not code boundaries. A module may expose settings under more than one searchable term while retaining one clear implementation owner.
@@ -201,6 +201,20 @@ System Settings is expected to consume Common for presentation primitives such a
 Common must not become a dumping ground for System Settings policy. A function for rendering a standard toggle may belong in Common; code deciding how NetworkManager Wi-Fi configuration is written does not.
 
 When implementation begins, Common will be consumed through an exact pinned revision so a settings release is reproducible.
+
+## Specialised application ownership
+
+System Settings is the configuration front door, not a reason to absorb every existing system application.
+
+Where another Infiltrator application already owns a complete domain, Settings exposes a clear launch/deep-link entry rather than duplicating the implementation:
+
+- **Software** remains the owner of software discovery, installation/removal, repositories, system updates, history and package repair. Settings may expose Software or Updates entries, but the operation belongs to Software.
+- **System Monitor** remains the owner of live process/performance/hardware/service monitoring. Settings may link to it from system-information or diagnostic contexts without copying its monitoring engine.
+- **Defragmenter** remains the owner of filesystem analysis, defragmentation and recovery. A Storage settings module owns actual storage configuration, while defragmentation actions launch/deep-link to Defragmenter.
+
+This rule keeps specialised applications strong and prevents System Settings becoming a second implementation of functionality that already has an authoritative project owner.
+
+Cross-application deep links should become stable project contracts where useful. Until a specialised application supports a specific deep link, Settings may launch its normal entry point rather than reimplementing the feature.
 
 ## Native-interface policy
 
