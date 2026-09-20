@@ -34,7 +34,7 @@ if(WIN32)
     add_library(system-settings-platform STATIC
         src/platform/windows/temporal-policy-store.c)
     target_link_libraries(system-settings-platform
-        PUBLIC system-settings-core InfiltratrCommon::Portable shell32)
+        PUBLIC system-settings-core InfiltratrCommon::Portable shell32 ole32)
 elseif(UNIX)
     add_library(system-settings-platform STATIC
         src/platform/linux/temporal-policy-store.c)
@@ -52,6 +52,6 @@ target_link_libraries(system-settings-time PRIVATE system-settings-platform)
 if(BUILD_TESTING)
     add_executable(date-time-model-test tests/date-time-model-test.c)
     ss_configure(date-time-model-test)
-    target_link_libraries(date-time-model-test PRIVATE system-settings-core)
+    target_link_libraries(date-time-model-test PRIVATE system-settings-platform)
     add_test(NAME date-time-model COMMAND date-time-model-test)
 endif()
