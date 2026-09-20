@@ -44,13 +44,14 @@ if(WIN32)
     target_link_libraries(system-settings-platform
         PUBLIC InfiltratrCommon::Portable shell32 ole32)
 elseif(UNIX)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(GIO2 REQUIRED IMPORTED_TARGET gio-2.0)
+    pkg_check_modules(GTK4 REQUIRED IMPORTED_TARGET gtk4>=4.6)
+
     add_library(system-settings-platform STATIC
         src/platform/linux/temporal-policy-store.c)
     target_link_libraries(system-settings-platform
-        PUBLIC InfiltratrCommon::Common)
-
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(GTK4 REQUIRED IMPORTED_TARGET gtk4>=4.6)
+        PUBLIC InfiltratrCommon::Common PkgConfig::GIO2)
 
     add_executable(system-settings
         src/shell/linux/main.c)
