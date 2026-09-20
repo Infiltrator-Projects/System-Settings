@@ -79,3 +79,21 @@ endif()
 
 install(TARGETS system-settings-time
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+
+
+set(CPACK_PACKAGE_NAME "infiltrator-system-settings")
+set(CPACK_PACKAGE_VENDOR "Infiltrator Projects")
+set(CPACK_PACKAGE_CONTACT "Shannon Smith <infiltratr@yandex.com>")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
+    "Native system-wide settings shell for Infiltrator applications")
+set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+
+if(UNIX AND NOT APPLE)
+    set(CPACK_GENERATOR "DEB")
+    set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
+    set(CPACK_DEBIAN_PACKAGE_SECTION "utils")
+    set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
+    set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+endif()
+
+include(CPack)
