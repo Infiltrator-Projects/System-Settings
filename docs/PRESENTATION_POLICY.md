@@ -268,15 +268,15 @@ The implementation should provide:
 - validation/fallback for unknown profiles;
 - no requirement to restart every application after a policy change.
 
-The exact backend is chosen during implementation. The public contract matters more than whether the first implementation uses GSettings, a Common-owned configuration mechanism or another suitable native facility.
+The exact persistence/notification backend may differ by platform. The public Common contract remains the same whether the implementation uses a Linux desktop setting mechanism, a documented Windows user-setting mechanism or a Common-owned extension store.
 
 ## Third-party applications
 
 All Infiltrator applications can be migrated to consume Common policy.
 
-Arbitrary existing Linux applications cannot be forced to obey a new clock/calendar representation if they hard-code their own formatting. System Settings may later expose a documented public API/service so willing third-party applications can use the same policy.
+Arbitrary existing applications on Linux or Windows cannot be forced to obey a new clock/calendar representation if they hard-code their own formatting. System Settings may later expose a documented public API/service so willing third-party applications can use the same policy.
 
-Compatibility with ordinary locale-aware applications should be preserved where possible, but the project must not globally intercept unrelated process time functions in a way that changes program semantics.
+Compatibility with ordinary locale-aware applications should be preserved where possible through each platform's documented locale/globalisation settings. The project must not globally intercept unrelated process time functions in a way that changes program semantics.
 
 ## Migration rule for existing applications
 
