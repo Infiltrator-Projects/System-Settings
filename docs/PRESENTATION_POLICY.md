@@ -102,7 +102,7 @@ Canonical filesystem timestamp:
 
 User policy:
     Timezone: Australia/Melbourne
-    Clock profile: decimal-10-hour
+    Clock mode: decimal
 
 Displayed:
     <decimal-clock representation>
@@ -155,20 +155,13 @@ The final Common API may use different names/types, but the contract is durable:
 
 Machine/export contexts may deliberately resolve to a fixed canonical representation instead of following the human display clock.
 
-## Clock profiles
+## Clock systems
 
-Temporal Presentation should support clock profiles as data/implementation contracts rather than hard-coded conditionals across applications.
+Temporal Presentation uses stable clock-system identifiers supplied by Common rather than application-local conditionals.
 
-Initial candidates include:
+Common 1.19.16 defines the complete current catalogue shared with Calendar: standard OS-locale time, explicit 12-hour and 24-hour time, Internet Time, Unix time, binary and hexadecimal clocks, Julian/MJD, sidereal/apparent/mean-solar time, French Republican decimal time, traditional Chinese double-hours and hundred-kè, Roman temporal time, Edo Japanese seasonal time, Italian hours, Babylonian hours, Indian ghaṭī time and Nuremberg hours.
 
-- locale-default 12/24-hour;
-- explicit 12-hour;
-- explicit 24-hour;
-- decimal 10-hour;
-- future historically or culturally defined clock representations where their semantics are specified accurately;
-- future custom profiles if a safe, deterministic model is defined.
-
-A profile defines enough information to turn a civil instant into a display representation. It does not redefine stored time.
+System Settings is the authority. Therefore the global catalogue contains **Standard time (OS locale)** rather than a self-referential **Follow system** choice. Applications may independently offer **Follow System Settings** as a local behaviour.
 
 ### Decimal 10-hour profile
 
@@ -196,19 +189,18 @@ Daylight-saving transition semantics must be specified and regression-tested bef
 
 Clock representation and calendar representation are independent policy dimensions.
 
-A future temporal policy may therefore combine, for example:
+Temporal policy v2 combines these dimensions directly. For example:
 
 ```text
 Timezone:       Australia/Melbourne
-Calendar:       Gregorian
-Clock:          decimal-10-hour
-Date style:     long
+Primary:        Gregorian
+Secondary:      Egyptian civil (optional)
+Clock:          French Republican decimal time
 Seconds:        shown
+Location:       optional latitude/longitude
 ```
 
-or another supported calendar/clock pair.
-
-Historically inspired systems, including Egyptian or other ancient representations, require an explicit documented conversion model before they are offered. A label alone is not enough; the project must define what date/clock rules the profile actually implements and what historical approximation, if any, is being made.
+The current shared catalogue contains 30 primary calendar systems plus None for the optional secondary calendar. Calendar remains the implementation owner of chronology arithmetic; Common/System Settings own the stable policy identifiers and user-wide selection contract.
 
 ## Timezone
 
@@ -258,17 +250,7 @@ Thus a log can be stored once and viewed in different clock/calendar systems wit
 
 Presentation policy is user state, not application-local state.
 
-The implementation should provide:
-
-- one authoritative per-user policy store;
-- schema/versioning;
-- atomic updates;
-- deterministic defaults;
-- change notification;
-- validation/fallback for unknown profiles;
-- no requirement to restart every application after a policy change.
-
-The exact persistence/notification backend may differ by platform. The public Common contract remains the same whether the implementation uses a Linux desktop setting mechanism, a documented Windows user-setting mechanism or a Common-owned extension store.
+The implementation provides one authoritative per-user `presentation.conf` policy document with schema versioning, atomic updates, deterministic defaults and validation. Policy v2 stores `clock-mode`, `primary-calendar`, `secondary-calendar`, `show-seconds`, `location-configured`, `latitude` and `longitude`. Linux stores it below the XDG configuration home; Windows stores the equivalent user policy below LocalAppData. Common parses/serializes the same versioned contract on both platforms, and v1 documents migrate in memory to v2.
 
 ## Third-party applications
 
