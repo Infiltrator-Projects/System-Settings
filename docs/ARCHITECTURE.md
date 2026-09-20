@@ -265,6 +265,33 @@ System Settings retains settings-domain policy. Network configuration logic does
 
 The repository consumes an exact Common revision when source implementation begins.
 
+## Cross-application presentation policy
+
+Some System Settings choices are not settings for one backend; they are user-wide presentation policy consumed by many applications.
+
+For these policies, ownership is split deliberately:
+
+```text
+System Settings
+   edits policy
+       ↓
+authoritative per-user policy
+       ↓
+Common
+   resolves/formats
+       ↓
+applications
+   present canonical data
+```
+
+The application/domain continues to own canonical values. Common owns the reusable presentation mechanism. System Settings owns the user's selected policy.
+
+Temporal presentation is the first defined example. A filesystem or application timestamp remains canonical for storage, sorting, arithmetic and interchange; its human-visible rendering can follow the selected clock/calendar/timezone policy.
+
+Applications must distinguish civil instants from durations and machine/export timestamps so a clock-system change cannot alter protocol timing or forensic data.
+
+The complete contract lives in [PRESENTATION_POLICY.md](PRESENTATION_POLICY.md).
+
 ## Dependency policy
 
 The target is zero avoidable dependencies, not zero dependencies.

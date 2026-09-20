@@ -47,14 +47,16 @@ Implement settings that can establish the UX without broad system privilege:
 - Fonts/desktop preferences where authoritative APIs permit;
 - Keyboard;
 - Mouse/Touchpad;
-- Startup/session-facing settings where appropriate.
+- Startup/session-facing settings where appropriate;
+- Temporal Presentation policy foundation in Common plus the Date & Time UI for at least conventional 12/24-hour and decimal 10-hour profiles.
 
 Requirements:
 
 - external change reconciliation;
 - per-setting search/deep links;
 - no startup-wide module loading;
-- no project shadow database.
+- no project shadow database;
+- migrated applications must not rewrite canonical timestamps merely to follow presentation policy.
 
 ## Phase 3 — Hardware and service domains
 

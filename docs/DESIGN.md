@@ -126,6 +126,18 @@ That includes the current:
 
 A local panel may introduce a domain visualisation when necessary, but it must not invent a second general design system.
 
+## System-wide presentation choices
+
+Some controls change how information is represented throughout the user's environment rather than configuring only the Settings application.
+
+Temporal Presentation is the first such design. Date & Time should eventually expose user-facing choices such as timezone, calendar profile, clock profile, seconds/date style and related presentation settings without implying that underlying timestamps are rewritten.
+
+A preview should show the effect of a clock/calendar choice before it is applied. The UI must distinguish ordinary 12/24-hour selection from alternate profiles such as decimal 10-hour time, and historically inspired profiles must state the actual implemented model rather than relying on a vague name.
+
+Changing presentation policy should update compatible running applications through the shared Common contract where practical.
+
+See [PRESENTATION_POLICY.md](PRESENTATION_POLICY.md).
+
 ## Responsive behaviour
 
 The settings window must remain useful on ordinary laptop resolutions. No panel may assume an oversized desktop.

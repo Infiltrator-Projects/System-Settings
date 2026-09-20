@@ -116,3 +116,14 @@ This file records durable architectural choices for System Settings.
 **Rationale.** Software management, live monitoring and filesystem defragmentation are substantial products with their own engines, validation and safety contracts. Duplicating them inside Settings would create two authorities and eventually inconsistent behaviour.
 
 **Consequence.** Infiltrator Software remains the owner of package/software/update workflows, System Monitor remains the owner of live monitoring, and Defragmenter remains the owner of filesystem defragmentation/recovery. Settings may own configuration adjacent to those domains and provide intentional launch/deep-link entry points.
+
+
+## ADR-015 — Canonical data is separate from system-wide presentation policy
+
+**Decision.** System Settings owns user-wide presentation preferences, while applications retain canonical domain data and Common performs shared presentation transforms.
+
+**Rationale.** A preference such as decimal 10-hour time should affect filesystem timestamps, histories and other human-visible times consistently without rewriting stored timestamps, breaking sort order, changing protocol values or requiring each application to implement the clock system independently.
+
+**Consequence.** Human-visible temporal formatting migrates toward Common Temporal. Applications classify values as instants, civil date/time, calendar dates, durations or machine/export timestamps. Clock/calendar presentation applies only where semantically appropriate. Future cross-application presentation families may reuse the same architecture.
+
+See [PRESENTATION_POLICY.md](PRESENTATION_POLICY.md).

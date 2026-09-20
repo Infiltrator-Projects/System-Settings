@@ -134,7 +134,7 @@ The exact command-line contract will be finalised with the first implementation,
               generic persistence / common infrastructure
 ```
 
-See [Architecture](docs/ARCHITECTURE.md), [Design](docs/DESIGN.md), [Module contract](docs/MODULES.md), [Decisions](docs/DECISIONS.md), [Roadmap](docs/ROADMAP.md) and [Validation](docs/VALIDATION.md).
+See [Architecture](docs/ARCHITECTURE.md), [Design](docs/DESIGN.md), [Module contract](docs/MODULES.md), [System-wide Presentation Policy](docs/PRESENTATION_POLICY.md), [Decisions](docs/DECISIONS.md), [Roadmap](docs/ROADMAP.md) and [Validation](docs/VALIDATION.md).
 
 ## Shell ownership
 
@@ -201,6 +201,14 @@ System Settings is expected to consume Common for presentation primitives such a
 Common must not become a dumping ground for System Settings policy. A function for rendering a standard toggle may belong in Common; code deciding how NetworkManager Wi-Fi configuration is written does not.
 
 When implementation begins, Common will be consumed through an exact pinned revision so a settings release is reproducible.
+
+## System-wide presentation policy
+
+System Settings also owns user-wide presentation preferences whose value comes from being consistent across applications. The first defined family is temporal presentation: applications keep canonical timestamps, while Common renders human-visible dates/times according to the system policy selected here.
+
+This allows, for example, filesystem timestamps, histories and other UI timestamps to follow a selected 12-hour, 24-hour, decimal 10-hour or future documented clock/calendar profile without rewriting the underlying data.
+
+See [System-wide Presentation Policy](docs/PRESENTATION_POLICY.md).
 
 ## Specialised application ownership
 
