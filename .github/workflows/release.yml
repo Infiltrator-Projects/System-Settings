@@ -79,5 +79,5 @@ jobs:
             echo "Release $tag already exists; verifying asset name."
             gh release view "$tag" --json assets --jq '.assets[].name' |               grep -qx "$(basename "$deb")"
           else
-            gh release create "$tag" "$deb"               --verify-tag               --target "$sha"               --title "System Settings $version"               --notes "First usable System Settings shell with the Date & Time panel, live clock preview, system/12-hour/24-hour/decimal-10 selection, seconds control, and shared temporal-policy integration with Calendar."
+            gh release create "$tag" "$deb"               --verify-tag               --target "$sha"               --title "System Settings $version"               --notes "System Settings 0.2.0 makes Date & Time the complete system-wide temporal authority: 21 clock systems, 30 primary calendars, optional secondary calendar, seconds policy, geographic location, Common 1.19.16 integration, and Calendar follow-system support."
           fi
