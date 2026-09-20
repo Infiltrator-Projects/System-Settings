@@ -8,10 +8,10 @@ System Settings is a native cross-platform settings environment for Linux Mint/C
 
 The project takes the strongest part of the classic Amiga/Control Panel model — small focused preference tools with clear ownership — and combines it with the strongest part of a modern settings application — one consistent window, global search, deep links, shared navigation and predictable privilege handling.
 
-**Status:** Phase 1 bootstrap with a working Linux GTK4 shell and Date & Time panel; Linux/Windows temporal-policy persistence is implemented and Calendar consumes the shared policy  
+**Status:** Phase 1 usable build with a working Linux GTK4 shell and complete Date & Time temporal-authority panel; Linux/Windows policy persistence is implemented and Calendar consumes the shared policy  
 **Primary targets:** Linux Mint/Cinnamon and Windows desktop  
 **Implementation:** native C/C++, using the strongest style for each component  
-**Shared foundation:** Infiltrator Common, pinned to an exact release when implementation begins  
+**Shared foundation:** pinned Infiltratr Common 1.19.16  
 **Licence:** GPL-3.0-or-later
 
 ## Core idea
@@ -71,9 +71,9 @@ System Settings should:
 
 ## Current implementation
 
-The first implementation slice is Date & Time. The repository now contains the shared semantic Date & Time model, Linux and Windows per-user temporal-policy stores, module metadata, tests, Linux/Windows CI, and the first native System Settings shell. On Linux the GTK4 shell presents a real Date & Time panel with a live clock/date preview, clock-system selector, seconds control and current time-zone display. Changes are saved immediately through the same model used by non-UI consumers.
+The first implementation slice is Date & Time. The repository now contains the shared semantic Date & Time model, Linux and Windows per-user temporal-policy stores, module metadata, tests, Linux/Windows CI, and the first native System Settings shell. On Linux the GTK4 shell presents a real Date & Time panel with a live clock/date preview, all 21 shared clock systems, all 30 primary calendar systems, an optional secondary calendar, seconds policy, geographic location and current time-zone display. Changes are saved immediately through the same model used by non-UI consumers.
 
-The current temporal policy supports Follow system, explicit conventional 12-hour/24-hour profiles, and decimal 10-hour presentation through Common 1.19.14. Calendar is the first external consumer.
+The current temporal policy is version 2 in Common 1.19.16. System Settings is the authority: the global standard clock is “Standard time (OS locale)”, not a self-referential Follow-system mode. Calendar is the first external consumer and follows the complete policy by default, with local overrides available only when its Follow System Settings switch is disabled.
 
 ## User experience
 
@@ -207,13 +207,13 @@ System Settings is expected to consume Common for presentation primitives such a
 
 Common must not become a dumping ground for System Settings policy. A function for rendering a standard toggle may belong in Common; code deciding how NetworkManager Wi-Fi configuration is written does not.
 
-When implementation begins, Common will be consumed through an exact pinned revision so a settings release is reproducible.
+Common is consumed through an exact pinned release/commit so each settings release is reproducible.
 
 ## System-wide presentation policy
 
 System Settings also owns user-wide presentation preferences whose value comes from being consistent across applications. The first defined family is temporal presentation: applications keep canonical timestamps, while Common renders human-visible dates/times according to the system policy selected here.
 
-This allows, for example, filesystem timestamps, histories and other UI timestamps to follow a selected 12-hour, 24-hour, decimal 10-hour or future documented clock/calendar profile without rewriting the underlying data.
+This allows filesystem timestamps, histories and other UI timestamps to follow the selected clock mode, primary calendar, optional secondary calendar, seconds policy and location-aware historical/astronomical presentation without rewriting the underlying data.
 
 See [System-wide Presentation Policy](docs/PRESENTATION_POLICY.md).
 
