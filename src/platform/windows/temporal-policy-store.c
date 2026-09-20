@@ -63,7 +63,7 @@ static bool build_paths(wchar_t **directory_out, wchar_t **path_out)
     return true;
 }
 
-static bool platform_load(InfiltratrTemporalPolicyV2 *policy,
+static bool platform_load(InfiltratrTemporalPolicyV3 *policy,
                                    bool *found)
 {
     wchar_t *directory = NULL;
@@ -75,7 +75,7 @@ static bool platform_load(InfiltratrTemporalPolicyV2 *policy,
     bool ok = false;
 
     if (policy == NULL || found == NULL ||
-        !infiltratr_temporal_policy_v2_default(policy) ||
+        !infiltratr_temporal_policy_v3_default(policy) ||
         !build_paths(&directory, &path)) {
         return false;
     }
@@ -97,7 +97,7 @@ static bool platform_load(InfiltratrTemporalPolicyV2 *policy,
         ReadFile(file, text, (DWORD)size.QuadPart, &read_count, NULL) &&
         read_count == (DWORD)size.QuadPart) {
         text[read_count] = '\0';
-        ok = infiltratr_temporal_policy_v2_parse(text, policy);
+        ok = infiltratr_temporal_policy_v3_parse(text, policy);
         *found = ok;
     }
 
@@ -107,7 +107,7 @@ static bool platform_load(InfiltratrTemporalPolicyV2 *policy,
     return ok;
 }
 
-static bool platform_save(const InfiltratrTemporalPolicyV2 *policy)
+static bool platform_save(const InfiltratrTemporalPolicyV3 *policy)
 {
     wchar_t *directory = NULL;
     wchar_t *path = NULL;
@@ -120,7 +120,7 @@ static bool platform_save(const InfiltratrTemporalPolicyV2 *policy)
     bool ok = false;
 
     if (policy == NULL ||
-        !infiltratr_temporal_policy_v2_serialize(policy, text, sizeof(text),
+        !infiltratr_temporal_policy_v3_serialize(policy, text, sizeof(text),
                                               &length) ||
         !build_paths(&directory, &path)) {
         return false;
