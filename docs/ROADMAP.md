@@ -19,6 +19,8 @@ Current work:
 
 Phase 0 is complete when the documents agree and no core design question is hidden inside assumed implementation.
 
+**Current implementation note:** the Date & Time vertical slice has begun and now proves the shared semantic model, portable temporal policy, Linux/Windows persistence adapters, module metadata and cross-platform CI. The proper shell/panel presentation remains part of Phase 1 rather than being bypassed with a one-off toolkit window.
+
 ## Phase 1 — Shell and module framework
 
 Build the minimum real product skeleton:
