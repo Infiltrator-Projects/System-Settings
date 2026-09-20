@@ -11,7 +11,7 @@ The project takes the strongest part of the classic Amiga/Control Panel model �
 **Status:** Phase 1 usable build with a working Linux GTK4 shell and complete Date & Time temporal-authority panel; Linux/Windows policy persistence is implemented and Calendar consumes the shared policy  
 **Primary targets:** Linux Mint/Cinnamon and Windows desktop  
 **Implementation:** native C/C++, using the strongest style for each component  
-**Shared foundation:** pinned Infiltratr Common 1.19.16  
+**Shared foundation:** pinned Infiltratr Common 1.19.18  
 **Licence:** GPL-3.0-or-later
 
 ## Core idea
@@ -71,9 +71,9 @@ System Settings should:
 
 ## Current implementation
 
-The first implementation slice is Date & Time. The repository now contains the shared semantic Date & Time model, Linux and Windows per-user temporal-policy stores, module metadata, tests, Linux/Windows CI, and the first native System Settings shell. On Linux the GTK4 shell presents a real Date & Time panel with a live clock/date preview, all 21 shared clock systems, all 30 primary calendar systems, an optional secondary calendar, seconds policy, geographic location and current time-zone display. Changes are saved immediately through the same model used by non-UI consumers.
+The first implementation slice is Date & Time. The repository now contains the shared semantic Date & Time model, Linux and Windows per-user temporal-policy stores, module metadata, tests, Linux/Windows CI, and the first native System Settings shell. On Linux the GTK4 shell presents a real Date & Time panel with a live clock/date preview, all 21 shared clock systems, all 30 calendar systems, seconds policy, geographic location and current time-zone display. Changes are saved immediately through the same model used by non-UI consumers.
 
-The current temporal policy is version 2 in Common 1.19.16. System Settings is the authority: the global standard clock is “Standard time (OS locale)”, not a self-referential Follow-system mode. Calendar is the first external consumer and follows the complete policy by default, with local overrides available only when its Follow System Settings switch is disabled.
+The current temporal policy is version 3 in Common 1.19.18. System Settings is the sole authority for clock system, calendar system, seconds and geographic location. Calendar is the first external consumer and reads that policy directly; it does not maintain competing temporal choices.
 
 ## User experience
 
