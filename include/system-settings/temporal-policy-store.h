@@ -10,8 +10,8 @@ extern "C" {
 #endif
 
 typedef struct SsTemporalPolicyStore {
-    bool (*load)(InfiltratrTemporalPolicyV2 *policy, bool *found);
-    bool (*save)(const InfiltratrTemporalPolicyV2 *policy);
+    bool (*load)(InfiltratrTemporalPolicyV3 *policy, bool *found);
+    bool (*save)(const InfiltratrTemporalPolicyV3 *policy);
 } SsTemporalPolicyStore;
 
 const SsTemporalPolicyStore *ss_platform_temporal_policy_store(void);
