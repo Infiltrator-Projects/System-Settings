@@ -16,7 +16,7 @@ int main(int argc, char **argv)
     SsDateTimeModel model;
     int index;
 
-    if (!ss_date_time_model_init(&model)) {
+    if (!ss_date_time_model_init(&model, ss_platform_temporal_policy_store())) {
         fputs("Unable to load temporal presentation policy.\n", stderr);
         return 1;
     }
