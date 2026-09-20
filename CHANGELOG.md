@@ -6,9 +6,14 @@ All notable user-visible and architectural changes are recorded here.
 
 ## Unreleased
 
+No unreleased changes.
+
+## 0.3.1 — 2026-09-21
+
 - Seed the first Linux Date & Time policy from Cinnamon's native 12/24-hour and seconds preferences when no Infiltrator policy has been saved yet.
 - Mirror exact conventional choices back to Cinnamon when System Settings saves them, keeping stock Mint consumers aligned without pretending richer Infiltrator clocks or calendars have a native equivalent.
 - Keep the Infiltrator policy optional for consumers so Calendar remains a standalone Mint replacement before System Settings is installed or configured.
+- Document the native-fallback/enrichment boundary as a durable Mint/Cinnamon compatibility contract.
 
 ## 0.3.0 — 2026-09-20
 
