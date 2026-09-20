@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /**
  * @file main.c
- * @brief Native Linux System Settings shell with the Date & Time panel.
+ * @brief Native Linux System Settings shell with complete Date & Time policy.
  */
 
 #include "system-settings/date-time-model.h"
@@ -21,21 +21,18 @@ typedef struct SettingsWindow {
     GtkWidget *clock_preview;
     GtkWidget *date_preview;
     GtkWidget *timezone_value;
-    GtkDropDown *clock_profile;
+    GtkDropDown *clock_mode;
+    GtkDropDown *primary_calendar;
+    GtkDropDown *secondary_calendar;
     GtkSwitch *show_seconds;
+    GtkSwitch *location_configured;
+    GtkSpinButton *latitude;
+    GtkSpinButton *longitude;
     GtkWidget *status_label;
     SsDateTimeModel model;
     guint timer_id;
     bool updating_controls;
 } SettingsWindow;
-
-static const char *const profile_labels[] = {
-    "Follow system",
-    "12-hour time",
-    "24-hour time",
-    "Decimal time (10-hour day)",
-    NULL
-};
 
 static gchar *rgb_css(uint32_t rgb)
 {
@@ -119,7 +116,7 @@ static void install_common_theme(void)
         ".page-title { color: %s; font-size: 26px; font-weight: 700; }\n"
         ".page-summary { color: %s; font-size: 13px; margin-bottom: 6px; }\n"
         ".preview-card, .settings-card { background: %s; border: 1px solid %s; border-radius: %upx; padding: 18px; }\n"
-        ".preview-time { color: %s; font-size: 36px; font-weight: 700; }\n"
+        ".preview-time { color: %s; font-size: 30px; font-weight: 700; }\n"
         ".preview-date { color: %s; font-size: 14px; }\n"
         ".section-title { color: %s; font-size: 16px; font-weight: 700; }\n"
         ".setting-label { color: %s; font-weight: 700; }\n"
@@ -128,23 +125,13 @@ static void install_common_theme(void)
         ".divider { background: %s; min-height: 1px; }\n"
         ".accent-note { color: %s; font-size: 12px; }\n"
         ".status-ok { color: %s; font-size: 12px; }\n"
-        "dropdown, switch { background: %s; }\n",
+        "dropdown, switch, spinbutton { background: %s; }\n",
         background, text, type->ui_family, type->gtk_fallback,
-        titlebar, border,
-        title, muted,
-        panel, border,
-        muted,
-        metrics->control_radius, selected,
-        metrics->screen_padding,
-        title, muted,
-        card, border, metrics->card_radius,
-        title, muted,
-        title,
-        text, muted,
-        border,
-        accent,
-        palette->success_rgb == 0U ? accent : "#63ab7c",
-        surface);
+        titlebar, border, title, muted, panel, border, muted,
+        metrics->control_radius, selected, metrics->screen_padding,
+        title, muted, card, border, metrics->card_radius, title, muted,
+        title, text, muted, border, accent,
+        palette->success_rgb == 0U ? accent : "#63ab7c", surface);
 
     provider = gtk_css_provider_new();
 #if GTK_CHECK_VERSION(4, 12, 0)
@@ -196,10 +183,27 @@ static GtkWidget *make_setting_identity(const char *title,
     return box;
 }
 
+static GtkWidget *make_setting_row(const char *title,
+                                   const char *description,
+                                   GtkWidget *control)
+{
+    GtkWidget *row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 18);
+
+    gtk_widget_add_css_class(row, "setting-row");
+    gtk_widget_set_hexpand(row, TRUE);
+    gtk_box_append(GTK_BOX(row), make_setting_identity(title, description));
+    gtk_widget_set_valign(control, GTK_ALIGN_CENTER);
+    gtk_box_append(GTK_BOX(row), control);
+    return row;
+}
+
 static void set_status(SettingsWindow *state,
                        const char *message,
                        bool error)
 {
+    if (state == NULL || state->status_label == NULL) {
+        return;
+    }
     gtk_label_set_text(GTK_LABEL(state->status_label), message);
     gtk_widget_remove_css_class(state->status_label, "status-ok");
     gtk_widget_remove_css_class(state->status_label, "error");
@@ -207,49 +211,174 @@ static void set_status(SettingsWindow *state,
                              error ? "error" : "status-ok");
 }
 
+static GtkStringList *clock_mode_strings(void)
+{
+    GtkStringList *list = gtk_string_list_new(NULL);
+    size_t index;
+
+    for (index = 0U; index < infiltratr_temporal_clock_mode_count(); ++index) {
+        const InfiltratrTemporalClockModeInfo *info =
+            infiltratr_temporal_clock_mode_at(index);
+        if (info != NULL) {
+            gtk_string_list_append(list, info->name);
+        }
+    }
+    return list;
+}
+
+static GtkStringList *calendar_strings(bool include_none)
+{
+    GtkStringList *list = gtk_string_list_new(NULL);
+    size_t index = include_none ? 0U : 1U;
+
+    for (; index < infiltratr_temporal_calendar_count(); ++index) {
+        const InfiltratrTemporalCalendarInfo *info =
+            infiltratr_temporal_calendar_at(index);
+        if (info != NULL) {
+            gtk_string_list_append(list, info->name);
+        }
+    }
+    return list;
+}
+
+static guint clock_index_for_id(const char *id)
+{
+    size_t index;
+    for (index = 0U; index < infiltratr_temporal_clock_mode_count(); ++index) {
+        const InfiltratrTemporalClockModeInfo *info =
+            infiltratr_temporal_clock_mode_at(index);
+        if (info != NULL && strcmp(info->id, id) == 0) {
+            return (guint)index;
+        }
+    }
+    return 0U;
+}
+
+static guint calendar_index_for_id(const char *id, bool include_none)
+{
+    size_t index = include_none ? 0U : 1U;
+    guint visible = 0U;
+
+    for (; index < infiltratr_temporal_calendar_count(); ++index, ++visible) {
+        const InfiltratrTemporalCalendarInfo *info =
+            infiltratr_temporal_calendar_at(index);
+        if (info != NULL && strcmp(info->id, id) == 0) {
+            return visible;
+        }
+    }
+    return 0U;
+}
+
+static const InfiltratrTemporalClockModeInfo *
+selected_clock_mode(const SettingsWindow *state)
+{
+    guint selected;
+    if (state == NULL || state->clock_mode == NULL) {
+        return NULL;
+    }
+    selected = gtk_drop_down_get_selected(state->clock_mode);
+    return infiltratr_temporal_clock_mode_at((size_t)selected);
+}
+
+static const InfiltratrTemporalCalendarInfo *
+selected_calendar(GtkDropDown *dropdown, bool include_none)
+{
+    size_t index;
+    if (dropdown == NULL) {
+        return NULL;
+    }
+    index = (size_t)gtk_drop_down_get_selected(dropdown);
+    if (!include_none) {
+        ++index;
+    }
+    return infiltratr_temporal_calendar_at(index);
+}
+
+static void update_control_capabilities(SettingsWindow *state)
+{
+    const InfiltratrTemporalClockModeInfo *mode;
+    bool location_enabled;
+
+    if (state == NULL) {
+        return;
+    }
+
+    mode = selected_clock_mode(state);
+    gtk_widget_set_sensitive(GTK_WIDGET(state->show_seconds),
+                             mode == NULL || mode->supports_seconds);
+
+    location_enabled =
+        gtk_switch_get_active(state->location_configured) != FALSE;
+    gtk_widget_set_sensitive(GTK_WIDGET(state->latitude), location_enabled);
+    gtk_widget_set_sensitive(GTK_WIDGET(state->longitude), location_enabled);
+
+    if (mode != NULL &&
+        (mode->requires_latitude || mode->requires_longitude) &&
+        !location_enabled) {
+        set_status(state,
+                   "This clock system needs a geographic location for a meaningful result.",
+                   false);
+    }
+}
+
 static bool format_preview(const SettingsWindow *state,
                            char *buffer,
                            size_t capacity)
 {
-    const InfiltratrTemporalPolicy *policy =
+    const InfiltratrTemporalPolicyV2 *policy =
         ss_date_time_model_policy(&state->model);
+    const InfiltratrTemporalClockModeInfo *mode;
     g_autoptr(GDateTime) now = g_date_time_new_now_local();
     int64_t unix_us;
     gint64 offset_us;
+    InfiltratrClockProfile conventional;
 
     if (policy == NULL || now == NULL || buffer == NULL || capacity == 0U) {
         return false;
     }
 
-    if (policy->clock_profile == INFILTRATR_CLOCK_PROFILE_SYSTEM) {
+    if (strcmp(policy->clock_mode, "standard") == 0) {
         g_autofree gchar *formatted =
             g_date_time_format(now, policy->show_seconds ? "%X" : "%H:%M");
-        if (formatted == NULL ||
-            g_strlcpy(buffer, formatted, capacity) >= capacity) {
-            return false;
-        }
-        return true;
+        return formatted != NULL &&
+               g_strlcpy(buffer, formatted, capacity) < capacity;
+    }
+
+    if (strcmp(policy->clock_mode, "standard-12") == 0) {
+        conventional = INFILTRATR_CLOCK_PROFILE_CONVENTIONAL_12;
+    } else if (strcmp(policy->clock_mode, "standard-24") == 0) {
+        conventional = INFILTRATR_CLOCK_PROFILE_CONVENTIONAL_24;
+    } else if (strcmp(policy->clock_mode, "decimal") == 0) {
+        conventional = INFILTRATR_CLOCK_PROFILE_DECIMAL_10;
+    } else {
+        mode = infiltratr_temporal_clock_mode_find(policy->clock_mode);
+        return mode != NULL &&
+               g_strlcpy(buffer, mode->name, capacity) < capacity;
     }
 
     unix_us = g_get_real_time();
     offset_us = g_date_time_get_utc_offset(now);
     return infiltratr_temporal_format_clock(
-        policy->clock_profile,
-        unix_us,
+        conventional, unix_us,
         (int32_t)(offset_us / G_USEC_PER_SEC),
-        policy->show_seconds,
-        buffer,
-        capacity,
-        NULL);
+        policy->show_seconds, buffer, capacity, NULL);
 }
 
 static gboolean refresh_preview(gpointer user_data)
 {
     SettingsWindow *state = user_data;
+    const InfiltratrTemporalPolicyV2 *policy;
+    const InfiltratrTemporalCalendarInfo *primary;
+    const InfiltratrTemporalCalendarInfo *secondary;
     g_autoptr(GDateTime) now = g_date_time_new_now_local();
-    char clock_text[64];
+    char clock_text[160];
 
     if (state == NULL || state->clock_preview == NULL || now == NULL) {
+        return G_SOURCE_CONTINUE;
+    }
+
+    policy = ss_date_time_model_policy(&state->model);
+    if (policy == NULL) {
         return G_SOURCE_CONTINUE;
     }
 
@@ -257,11 +386,25 @@ static gboolean refresh_preview(gpointer user_data)
         gtk_label_set_text(GTK_LABEL(state->clock_preview), clock_text);
     }
 
+    primary = infiltratr_temporal_calendar_find(policy->primary_calendar);
+    secondary = infiltratr_temporal_calendar_find(policy->secondary_calendar);
     {
         g_autofree gchar *date = g_date_time_format(now, "%A, %e %B %Y");
+        g_autofree gchar *summary = NULL;
         const gchar *zone = g_date_time_get_timezone_abbreviation(now);
-        if (date != NULL) {
-            gtk_label_set_text(GTK_LABEL(state->date_preview), date);
+
+        if (primary != NULL && secondary != NULL &&
+            strcmp(secondary->id, "none") != 0) {
+            summary = g_strdup_printf(
+                "%s • secondary: %s • %s",
+                primary->name, secondary->name,
+                date != NULL ? date : "");
+        } else if (primary != NULL) {
+            summary = g_strdup_printf(
+                "%s • %s", primary->name, date != NULL ? date : "");
+        }
+        if (summary != NULL) {
+            gtk_label_set_text(GTK_LABEL(state->date_preview), summary);
         }
         gtk_label_set_text(GTK_LABEL(state->timezone_value),
                            zone != NULL ? zone : "Local time");
@@ -270,39 +413,9 @@ static gboolean refresh_preview(gpointer user_data)
     return G_SOURCE_CONTINUE;
 }
 
-static guint profile_index(InfiltratrClockProfile profile)
-{
-    switch (profile) {
-    case INFILTRATR_CLOCK_PROFILE_CONVENTIONAL_12:
-        return 1U;
-    case INFILTRATR_CLOCK_PROFILE_CONVENTIONAL_24:
-        return 2U;
-    case INFILTRATR_CLOCK_PROFILE_DECIMAL_10:
-        return 3U;
-    case INFILTRATR_CLOCK_PROFILE_SYSTEM:
-    default:
-        return 0U;
-    }
-}
-
-static InfiltratrClockProfile profile_from_index(guint index)
-{
-    switch (index) {
-    case 1U:
-        return INFILTRATR_CLOCK_PROFILE_CONVENTIONAL_12;
-    case 2U:
-        return INFILTRATR_CLOCK_PROFILE_CONVENTIONAL_24;
-    case 3U:
-        return INFILTRATR_CLOCK_PROFILE_DECIMAL_10;
-    case 0U:
-    default:
-        return INFILTRATR_CLOCK_PROFILE_SYSTEM;
-    }
-}
-
 static void sync_controls(SettingsWindow *state)
 {
-    const InfiltratrTemporalPolicy *policy =
+    const InfiltratrTemporalPolicyV2 *policy =
         ss_date_time_model_policy(&state->model);
 
     if (policy == NULL) {
@@ -310,37 +423,102 @@ static void sync_controls(SettingsWindow *state)
     }
 
     state->updating_controls = true;
-    gtk_drop_down_set_selected(state->clock_profile,
-                               profile_index(policy->clock_profile));
+    gtk_drop_down_set_selected(
+        state->clock_mode, clock_index_for_id(policy->clock_mode));
+    gtk_drop_down_set_selected(
+        state->primary_calendar,
+        calendar_index_for_id(policy->primary_calendar, false));
+    gtk_drop_down_set_selected(
+        state->secondary_calendar,
+        calendar_index_for_id(policy->secondary_calendar, true));
     gtk_switch_set_active(state->show_seconds, policy->show_seconds);
+    gtk_switch_set_active(state->location_configured,
+                          policy->location_configured);
+    gtk_spin_button_set_value(state->latitude, policy->latitude);
+    gtk_spin_button_set_value(state->longitude, policy->longitude);
     state->updating_controls = false;
+    update_control_capabilities(state);
     (void)refresh_preview(state);
 }
 
-static void on_profile_changed(GObject *object,
-                               GParamSpec *pspec,
-                               gpointer user_data)
+static void policy_saved(SettingsWindow *state)
+{
+    set_status(state,
+               "System temporal policy saved. Calendar follows it when “Follow System Settings” is enabled.",
+               false);
+    update_control_capabilities(state);
+    (void)refresh_preview(state);
+}
+
+static void on_clock_changed(GObject *object,
+                             GParamSpec *pspec,
+                             gpointer user_data)
 {
     SettingsWindow *state = user_data;
-    guint selected;
-    InfiltratrClockProfile profile;
+    const InfiltratrTemporalClockModeInfo *mode;
 
+    (void)object;
     (void)pspec;
     if (state == NULL || state->updating_controls) {
         return;
     }
 
-    selected = gtk_drop_down_get_selected(GTK_DROP_DOWN(object));
-    profile = profile_from_index(selected);
-    if (!ss_date_time_model_set_clock_profile(&state->model, profile)) {
-        set_status(state, "Could not save the clock-system setting.", true);
+    mode = selected_clock_mode(state);
+    if (mode == NULL ||
+        !ss_date_time_model_set_clock_mode(&state->model, mode->id)) {
+        set_status(state, "Could not save the clock system.", true);
         sync_controls(state);
         return;
     }
+    policy_saved(state);
+}
 
-    set_status(state, "Clock system saved. Calendar will follow this setting.",
-               false);
-    (void)refresh_preview(state);
+static void on_primary_calendar_changed(GObject *object,
+                                        GParamSpec *pspec,
+                                        gpointer user_data)
+{
+    SettingsWindow *state = user_data;
+    const InfiltratrTemporalCalendarInfo *calendar;
+
+    (void)object;
+    (void)pspec;
+    if (state == NULL || state->updating_controls) {
+        return;
+    }
+
+    calendar = selected_calendar(state->primary_calendar, false);
+    if (calendar == NULL ||
+        !ss_date_time_model_set_primary_calendar(
+            &state->model, calendar->id)) {
+        set_status(state, "Could not save the primary calendar.", true);
+        sync_controls(state);
+        return;
+    }
+    policy_saved(state);
+}
+
+static void on_secondary_calendar_changed(GObject *object,
+                                          GParamSpec *pspec,
+                                          gpointer user_data)
+{
+    SettingsWindow *state = user_data;
+    const InfiltratrTemporalCalendarInfo *calendar;
+
+    (void)object;
+    (void)pspec;
+    if (state == NULL || state->updating_controls) {
+        return;
+    }
+
+    calendar = selected_calendar(state->secondary_calendar, true);
+    if (calendar == NULL ||
+        !ss_date_time_model_set_secondary_calendar(
+            &state->model, calendar->id)) {
+        set_status(state, "Could not save the secondary calendar.", true);
+        sync_controls(state);
+        return;
+    }
+    policy_saved(state);
 }
 
 static void on_seconds_changed(GObject *object,
@@ -362,95 +540,178 @@ static void on_seconds_changed(GObject *object,
         sync_controls(state);
         return;
     }
+    policy_saved(state);
+}
 
-    set_status(state, "Seconds preference saved.", false);
-    (void)refresh_preview(state);
+static void on_location_changed(GObject *object,
+                                GParamSpec *pspec,
+                                gpointer user_data)
+{
+    SettingsWindow *state = user_data;
+    bool configured;
+    double latitude;
+    double longitude;
+
+    (void)object;
+    (void)pspec;
+    if (state == NULL || state->updating_controls) {
+        return;
+    }
+
+    configured =
+        gtk_switch_get_active(state->location_configured) != FALSE;
+    latitude = gtk_spin_button_get_value(state->latitude);
+    longitude = gtk_spin_button_get_value(state->longitude);
+
+    if (!ss_date_time_model_set_location(
+            &state->model, configured, latitude, longitude)) {
+        set_status(state, "Could not save geographic location.", true);
+        sync_controls(state);
+        return;
+    }
+    policy_saved(state);
 }
 
 static GtkWidget *build_date_time_panel(SettingsWindow *state)
 {
     GtkWidget *page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 14);
-    GtkWidget *title = make_label("Date & Time", "page-title");
     GtkWidget *summary = make_label(
-        "Choose how time is presented across Common-aware applications.",
+        "This is the system-wide temporal authority. Common-aware applications read these clock, calendar and location choices.",
         "page-summary");
     GtkWidget *preview_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
-    GtkWidget *settings_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
-    GtkWidget *clock_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 18);
-    GtkWidget *seconds_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 18);
-    GtkWidget *timezone_row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 18);
-    GtkStringList *profiles;
+    GtkWidget *clock_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
+    GtkWidget *calendar_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
+    GtkWidget *location_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
+    GtkWidget *system_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
+    GtkStringList *strings;
 
     gtk_widget_add_css_class(page, "settings-content");
-    gtk_box_append(GTK_BOX(page), title);
+    gtk_box_append(GTK_BOX(page), make_label("Date & Time", "page-title"));
     gtk_label_set_wrap(GTK_LABEL(summary), TRUE);
     gtk_box_append(GTK_BOX(page), summary);
 
     gtk_widget_add_css_class(preview_card, "preview-card");
     state->clock_preview = make_label("--:--", "preview-time");
     state->date_preview = make_label("", "preview-date");
+    gtk_label_set_wrap(GTK_LABEL(state->clock_preview), TRUE);
+    gtk_label_set_wrap(GTK_LABEL(state->date_preview), TRUE);
     gtk_box_append(GTK_BOX(preview_card), state->clock_preview);
     gtk_box_append(GTK_BOX(preview_card), state->date_preview);
     gtk_box_append(GTK_BOX(page), preview_card);
 
-    gtk_widget_add_css_class(settings_card, "settings-card");
-    gtk_box_append(GTK_BOX(settings_card),
-                   make_label("Clock presentation", "section-title"));
+    gtk_widget_add_css_class(clock_card, "settings-card");
+    gtk_box_append(GTK_BOX(clock_card),
+                   make_label("Clock system", "section-title"));
 
-    gtk_widget_add_css_class(clock_row, "setting-row");
-    gtk_widget_set_hexpand(clock_row, TRUE);
-    gtk_box_append(GTK_BOX(clock_row),
-                   make_setting_identity(
-                       "Clock system",
-                       "Follow the operating system, force conventional 12/24-hour time, or use a 10-hour decimal day."));
-    profiles = gtk_string_list_new(profile_labels);
-    state->clock_profile = GTK_DROP_DOWN(
-        gtk_drop_down_new(G_LIST_MODEL(profiles), NULL));
-    g_object_unref(profiles);
-    gtk_widget_set_valign(GTK_WIDGET(state->clock_profile), GTK_ALIGN_CENTER);
-    gtk_widget_set_size_request(GTK_WIDGET(state->clock_profile), 230, -1);
-    gtk_box_append(GTK_BOX(clock_row), GTK_WIDGET(state->clock_profile));
-    gtk_box_append(GTK_BOX(settings_card), clock_row);
+    strings = clock_mode_strings();
+    state->clock_mode = GTK_DROP_DOWN(
+        gtk_drop_down_new(G_LIST_MODEL(strings), NULL));
+    g_object_unref(strings);
+    gtk_widget_set_size_request(GTK_WIDGET(state->clock_mode), 360, -1);
+    gtk_box_append(GTK_BOX(clock_card),
+                   make_setting_row(
+                       "System clock",
+                       "Choose the clock representation used by Common-aware applications. Standard time uses the operating-system locale; this is not a “Follow system” setting because System Settings is the authority.",
+                       GTK_WIDGET(state->clock_mode)));
 
-    gtk_box_append(GTK_BOX(settings_card),
-                   make_label("", "divider"));
-
-    gtk_widget_add_css_class(seconds_row, "setting-row");
-    gtk_widget_set_hexpand(seconds_row, TRUE);
-    gtk_box_append(GTK_BOX(seconds_row),
-                   make_setting_identity(
-                       "Show seconds",
-                       "Display seconds, or the nearest finer unit supported by the selected clock system."));
     state->show_seconds = GTK_SWITCH(gtk_switch_new());
-    gtk_widget_set_valign(GTK_WIDGET(state->show_seconds), GTK_ALIGN_CENTER);
-    gtk_box_append(GTK_BOX(seconds_row), GTK_WIDGET(state->show_seconds));
-    gtk_box_append(GTK_BOX(settings_card), seconds_row);
+    gtk_box_append(GTK_BOX(clock_card),
+                   make_setting_row(
+                       "Show seconds",
+                       "Show seconds or the closest finer unit supported by the selected clock system.",
+                       GTK_WIDGET(state->show_seconds)));
+    gtk_box_append(GTK_BOX(page), clock_card);
 
-    gtk_box_append(GTK_BOX(settings_card),
-                   make_label("", "divider"));
+    gtk_widget_add_css_class(calendar_card, "settings-card");
+    gtk_box_append(GTK_BOX(calendar_card),
+                   make_label("Calendar systems", "section-title"));
 
-    gtk_widget_add_css_class(timezone_row, "setting-row");
-    gtk_box_append(GTK_BOX(timezone_row),
-                   make_setting_identity(
-                       "Time zone",
-                       "The current operating-system time zone. Time-zone editing will use the native system service in the protected system settings phase."));
+    strings = calendar_strings(false);
+    state->primary_calendar = GTK_DROP_DOWN(
+        gtk_drop_down_new(G_LIST_MODEL(strings), NULL));
+    g_object_unref(strings);
+    gtk_widget_set_size_request(
+        GTK_WIDGET(state->primary_calendar), 360, -1);
+    gtk_box_append(GTK_BOX(calendar_card),
+                   make_setting_row(
+                       "Primary calendar",
+                       "The calendar system applications should use for their principal human-facing date representation.",
+                       GTK_WIDGET(state->primary_calendar)));
+
+    strings = calendar_strings(true);
+    state->secondary_calendar = GTK_DROP_DOWN(
+        gtk_drop_down_new(G_LIST_MODEL(strings), NULL));
+    g_object_unref(strings);
+    gtk_widget_set_size_request(
+        GTK_WIDGET(state->secondary_calendar), 360, -1);
+    gtk_box_append(GTK_BOX(calendar_card),
+                   make_setting_row(
+                       "Secondary calendar",
+                       "Optionally show the same civil day using another calendar system.",
+                       GTK_WIDGET(state->secondary_calendar)));
+    gtk_box_append(GTK_BOX(page), calendar_card);
+
+    gtk_widget_add_css_class(location_card, "settings-card");
+    gtk_box_append(GTK_BOX(location_card),
+                   make_label("Geographic location", "section-title"));
+
+    state->location_configured = GTK_SWITCH(gtk_switch_new());
+    gtk_box_append(GTK_BOX(location_card),
+                   make_setting_row(
+                       "Use geographic location",
+                       "Required by solar, sidereal and several historical clock systems.",
+                       GTK_WIDGET(state->location_configured)));
+
+    state->latitude = GTK_SPIN_BUTTON(
+        gtk_spin_button_new_with_range(-90.0, 90.0, 0.01));
+    gtk_spin_button_set_digits(state->latitude, 2U);
+    gtk_box_append(GTK_BOX(location_card),
+                   make_setting_row(
+                       "Latitude",
+                       "Degrees north are positive; degrees south are negative.",
+                       GTK_WIDGET(state->latitude)));
+
+    state->longitude = GTK_SPIN_BUTTON(
+        gtk_spin_button_new_with_range(-180.0, 180.0, 0.01));
+    gtk_spin_button_set_digits(state->longitude, 2U);
+    gtk_box_append(GTK_BOX(location_card),
+                   make_setting_row(
+                       "Longitude",
+                       "Degrees east of Greenwich are positive; degrees west are negative.",
+                       GTK_WIDGET(state->longitude)));
+    gtk_box_append(GTK_BOX(page), location_card);
+
+    gtk_widget_add_css_class(system_card, "settings-card");
+    gtk_box_append(GTK_BOX(system_card),
+                   make_label("Operating-system time", "section-title"));
     state->timezone_value = make_label("Local time", "accent-note");
-    gtk_widget_set_valign(state->timezone_value, GTK_ALIGN_CENTER);
     gtk_widget_set_halign(state->timezone_value, GTK_ALIGN_END);
     gtk_widget_set_hexpand(state->timezone_value, TRUE);
-    gtk_box_append(GTK_BOX(timezone_row), state->timezone_value);
-    gtk_box_append(GTK_BOX(settings_card), timezone_row);
+    gtk_box_append(GTK_BOX(system_card),
+                   make_setting_row(
+                       "Time zone",
+                       "Current operating-system time zone. Protected time-zone editing will use the native system service rather than altering the presentation policy.",
+                       state->timezone_value));
 
     state->status_label = make_label("", "status-ok");
     gtk_label_set_wrap(GTK_LABEL(state->status_label), TRUE);
-    gtk_box_append(GTK_BOX(settings_card), state->status_label);
+    gtk_box_append(GTK_BOX(system_card), state->status_label);
+    gtk_box_append(GTK_BOX(page), system_card);
 
-    gtk_box_append(GTK_BOX(page), settings_card);
-
-    g_signal_connect(state->clock_profile, "notify::selected",
-                     G_CALLBACK(on_profile_changed), state);
+    g_signal_connect(state->clock_mode, "notify::selected",
+                     G_CALLBACK(on_clock_changed), state);
+    g_signal_connect(state->primary_calendar, "notify::selected",
+                     G_CALLBACK(on_primary_calendar_changed), state);
+    g_signal_connect(state->secondary_calendar, "notify::selected",
+                     G_CALLBACK(on_secondary_calendar_changed), state);
     g_signal_connect(state->show_seconds, "notify::active",
                      G_CALLBACK(on_seconds_changed), state);
+    g_signal_connect(state->location_configured, "notify::active",
+                     G_CALLBACK(on_location_changed), state);
+    g_signal_connect(state->latitude, "notify::value",
+                     G_CALLBACK(on_location_changed), state);
+    g_signal_connect(state->longitude, "notify::value",
+                     G_CALLBACK(on_location_changed), state);
 
     return page;
 }
@@ -458,44 +719,41 @@ static GtkWidget *build_date_time_panel(SettingsWindow *state)
 static GtkWidget *build_sidebar(void)
 {
     GtkWidget *sidebar = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
-    GtkWidget *label = make_label("SYSTEM", "nav-title");
     GtkWidget *list = gtk_list_box_new();
     GtkWidget *row = gtk_list_box_row_new();
     GtkWidget *row_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
-    GtkWidget *icon = gtk_image_new_from_icon_name("preferences-system-time-symbolic");
-    GtkWidget *row_label = make_label("Date & Time", NULL);
+    GtkWidget *icon = gtk_image_new_from_icon_name(
+        "preferences-system-time-symbolic");
 
     gtk_widget_set_size_request(sidebar, 210, -1);
     gtk_widget_add_css_class(sidebar, "settings-sidebar");
-    gtk_box_append(GTK_BOX(sidebar), label);
+    gtk_box_append(GTK_BOX(sidebar), make_label("SYSTEM", "nav-title"));
 
     gtk_image_set_pixel_size(GTK_IMAGE(icon), 18);
     gtk_box_append(GTK_BOX(row_box), icon);
-    gtk_box_append(GTK_BOX(row_box), row_label);
+    gtk_box_append(GTK_BOX(row_box), make_label("Date & Time", NULL));
     gtk_widget_add_css_class(row, "nav-row");
     gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), row_box);
     gtk_list_box_append(GTK_LIST_BOX(list), row);
     gtk_list_box_select_row(GTK_LIST_BOX(list), GTK_LIST_BOX_ROW(row));
     gtk_box_append(GTK_BOX(sidebar), list);
-
     return sidebar;
 }
 
 static GtkWidget *build_header(void)
 {
     GtkWidget *header = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
-    GtkWidget *icon = gtk_image_new_from_icon_name(
-        "preferences-system-symbolic");
+    GtkWidget *icon = gtk_image_new_from_icon_name("preferences-system-symbolic");
     GtkWidget *identity = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-    GtkWidget *title = make_label("System Settings", "app-title");
-    GtkWidget *subtitle = make_label(
-        "One place for system-wide preferences", "app-subtitle");
 
     gtk_widget_add_css_class(header, "titlebar-shell");
     gtk_image_set_pixel_size(GTK_IMAGE(icon), 24);
     gtk_box_append(GTK_BOX(header), icon);
-    gtk_box_append(GTK_BOX(identity), title);
-    gtk_box_append(GTK_BOX(identity), subtitle);
+    gtk_box_append(GTK_BOX(identity),
+                   make_label("System Settings", "app-title"));
+    gtk_box_append(GTK_BOX(identity),
+                   make_label("One place for system-wide preferences",
+                              "app-subtitle"));
     gtk_box_append(GTK_BOX(header), identity);
     return header;
 }
@@ -517,7 +775,6 @@ static void on_activate(GtkApplication *application, gpointer user_data)
     SettingsWindow *state = g_new0(SettingsWindow, 1);
     GtkWidget *root;
     GtkWidget *body;
-    GtkWidget *panel;
     GtkWidget *scroller;
 
     (void)user_data;
@@ -533,7 +790,7 @@ static void on_activate(GtkApplication *application, gpointer user_data)
 
     state->window = GTK_WINDOW(gtk_application_window_new(application));
     gtk_window_set_title(state->window, "System Settings");
-    gtk_window_set_default_size(state->window, 900, 620);
+    gtk_window_set_default_size(state->window, 1040, 760);
     gtk_window_set_resizable(state->window, TRUE);
 
     root = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
@@ -545,30 +802,29 @@ static void on_activate(GtkApplication *application, gpointer user_data)
     gtk_box_append(GTK_BOX(root), body);
     gtk_box_append(GTK_BOX(body), build_sidebar());
 
-    panel = build_date_time_panel(state);
     scroller = gtk_scrolled_window_new();
     gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroller),
                                    GTK_POLICY_NEVER,
                                    GTK_POLICY_AUTOMATIC);
-    gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroller), panel);
+    gtk_scrolled_window_set_child(
+        GTK_SCROLLED_WINDOW(scroller), build_date_time_panel(state));
     gtk_widget_set_hexpand(scroller, TRUE);
     gtk_widget_set_vexpand(scroller, TRUE);
     gtk_box_append(GTK_BOX(body), scroller);
 
     sync_controls(state);
-    set_status(state,
-               state->model.persisted_policy_present
-                   ? "Using the saved system-wide temporal policy."
-                   : "No custom temporal policy is saved yet; following the operating system.",
-               false);
+    set_status(
+        state,
+        state->model.persisted_policy_present
+            ? "Using the saved system-wide temporal policy."
+            : "Using the default system-wide temporal policy.",
+        false);
 
     state->timer_id = g_timeout_add_seconds(1U, refresh_preview, state);
     g_signal_connect(state->window, "close-request",
                      G_CALLBACK(on_close_request), state);
     g_object_set_data_full(G_OBJECT(state->window),
-                           "system-settings-state",
-                           state,
-                           g_free);
+                           "system-settings-state", state, g_free);
     gtk_window_present(state->window);
 }
 
