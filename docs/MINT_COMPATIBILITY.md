@@ -2,7 +2,7 @@
 
 # Mint/Cinnamon Compatibility
 
-System Settings is designed to replace the user-facing settings experience on Linux Mint/Cinnamon without unnecessarily replacing the underlying Mint/Cinnamon configuration contracts.
+System Settings is designed to replace the user-facing settings experience on Linux Mint/Cinnamon without unnecessarily replacing the underlying Mint/Cinnamon configuration contracts. This document is the Mint-specific application of the general [Platform Compatibility](PLATFORM_COMPATIBILITY.md) contract; Windows is a sibling first-class target documented separately.
 
 The compatibility rule is:
 
