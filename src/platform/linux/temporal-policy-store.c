@@ -15,7 +15,7 @@ static bool policy_paths(char *directory, size_t directory_size,
            infiltratr_path_join(path, path_size, directory, "presentation.conf");
 }
 
-bool ss_temporal_policy_store_load(InfiltratrTemporalPolicy *policy, bool *found)
+static bool platform_load(InfiltratrTemporalPolicy *policy, bool *found)
 {
     char directory[SS_PATH_CAPACITY];
     char path[SS_PATH_CAPACITY];
@@ -38,7 +38,7 @@ bool ss_temporal_policy_store_load(InfiltratrTemporalPolicy *policy, bool *found
     return true;
 }
 
-bool ss_temporal_policy_store_save(const InfiltratrTemporalPolicy *policy)
+static bool platform_save(const InfiltratrTemporalPolicy *policy)
 {
     char directory[SS_PATH_CAPACITY];
     char path[SS_PATH_CAPACITY];
@@ -53,4 +53,14 @@ bool ss_temporal_policy_store_save(const InfiltratrTemporalPolicy *policy)
 
     return infiltratr_atomic_file_write_bytes(
         path, INFILTRATR_ATOMIC_FILE_PRIVATE, text, length) == 0;
+}
+
+
+const SsTemporalPolicyStore *ss_platform_temporal_policy_store(void)
+{
+    static const SsTemporalPolicyStore store = {
+        .load = platform_load,
+        .save = platform_save
+    };
+    return &store;
 }
