@@ -15,12 +15,15 @@ static bool profile_is_catalogued(InfiltratrClockProfile profile)
     return false;
 }
 
-bool ss_date_time_model_init(SsDateTimeModel *model)
+bool ss_date_time_model_init(SsDateTimeModel *model,
+                             const SsTemporalPolicyStore *store)
 {
-    if (model == NULL ||
+    if (model == NULL || store == NULL || store->load == NULL ||
+        store->save == NULL ||
         !infiltratr_temporal_policy_default(&model->policy)) {
         return false;
     }
+    model->store = store;
     model->persisted_policy_present = false;
     return ss_date_time_model_reload(model);
 }
@@ -32,7 +35,7 @@ bool ss_date_time_model_reload(SsDateTimeModel *model)
 
     if (model == NULL ||
         !infiltratr_temporal_policy_default(&loaded) ||
-        !ss_temporal_policy_store_load(&loaded, &found)) {
+        !model->store->load(&loaded, &found)) {
         return false;
     }
     model->policy = loaded;
@@ -55,7 +58,7 @@ bool ss_date_time_model_set_clock_profile(SsDateTimeModel *model,
     }
     candidate = model->policy;
     candidate.clock_profile = profile;
-    if (!ss_temporal_policy_store_save(&candidate)) {
+    if (!model->store->save(&candidate)) {
         return false;
     }
     model->policy = candidate;
@@ -72,7 +75,7 @@ bool ss_date_time_model_set_show_seconds(SsDateTimeModel *model,
     }
     candidate = model->policy;
     candidate.show_seconds = show_seconds;
-    if (!ss_temporal_policy_store_save(&candidate)) {
+    if (!model->store->save(&candidate)) {
         return false;
     }
     model->policy = candidate;
