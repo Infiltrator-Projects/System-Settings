@@ -2,12 +2,15 @@
 #include "system-settings/date-time-model.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static void print_usage(const char *program)
 {
     fprintf(stderr,
-            "Usage: %s [--profile system|conventional-12|conventional-24|decimal-10] [--seconds on|off]\n",
+            "Usage: %s [--clock MODE] [--primary-calendar ID] "
+            "[--secondary-calendar ID] [--seconds on|off] "
+            "[--location LAT LON|--clear-location]\n",
             program);
 }
 
@@ -22,11 +25,23 @@ int main(int argc, char **argv)
     }
 
     for (index = 1; index < argc; ++index) {
-        if (strcmp(argv[index], "--profile") == 0 && index + 1 < argc) {
-            InfiltratrClockProfile profile;
-            if (!infiltratr_clock_profile_from_id(argv[++index], &profile) ||
-                !ss_date_time_model_set_clock_profile(&model, profile)) {
-                fputs("Unable to set clock profile.\n", stderr);
+        if (strcmp(argv[index], "--clock") == 0 && index + 1 < argc) {
+            if (!ss_date_time_model_set_clock_mode(&model, argv[++index])) {
+                fputs("Unable to set clock mode.\n", stderr);
+                return 2;
+            }
+        } else if (strcmp(argv[index], "--primary-calendar") == 0 &&
+                   index + 1 < argc) {
+            if (!ss_date_time_model_set_primary_calendar(
+                    &model, argv[++index])) {
+                fputs("Unable to set primary calendar.\n", stderr);
+                return 2;
+            }
+        } else if (strcmp(argv[index], "--secondary-calendar") == 0 &&
+                   index + 1 < argc) {
+            if (!ss_date_time_model_set_secondary_calendar(
+                    &model, argv[++index])) {
+                fputs("Unable to set secondary calendar.\n", stderr);
                 return 2;
             }
         } else if (strcmp(argv[index], "--seconds") == 0 &&
@@ -45,15 +60,51 @@ int main(int argc, char **argv)
                 fputs("Unable to set seconds policy.\n", stderr);
                 return 2;
             }
+        } else if (strcmp(argv[index], "--location") == 0 &&
+                   index + 2 < argc) {
+            char *end = NULL;
+            double latitude = strtod(argv[++index], &end);
+            if (end == NULL || *end != '\0') {
+                print_usage(argv[0]);
+                return 2;
+            }
+            end = NULL;
+            double longitude = strtod(argv[++index], &end);
+            if (end == NULL || *end != '\0' ||
+                !ss_date_time_model_set_location(
+                    &model, true, latitude, longitude)) {
+                fputs("Unable to set geographic location.\n", stderr);
+                return 2;
+            }
+        } else if (strcmp(argv[index], "--clear-location") == 0) {
+            if (!ss_date_time_model_set_location(
+                    &model, false,
+                    model.policy.latitude, model.policy.longitude)) {
+                fputs("Unable to clear geographic location.\n", stderr);
+                return 2;
+            }
         } else {
             print_usage(argv[0]);
             return 2;
         }
     }
 
-    printf("clock-profile=%s\nshow-seconds=%s\nsource=%s\n",
-           infiltratr_clock_profile_id(model.policy.clock_profile),
+    printf("clock-mode=%s\n"
+           "primary-calendar=%s\n"
+           "secondary-calendar=%s\n"
+           "show-seconds=%s\n"
+           "location-configured=%s\n"
+           "latitude=%.6f\n"
+           "longitude=%.6f\n"
+           "source=%s\n",
+           model.policy.clock_mode,
+           model.policy.primary_calendar,
+           model.policy.secondary_calendar,
            model.policy.show_seconds ? "true" : "false",
-           model.persisted_policy_present ? "infiltrator-policy" : "platform-default");
+           model.policy.location_configured ? "true" : "false",
+           model.policy.latitude,
+           model.policy.longitude,
+           model.persisted_policy_present
+               ? "infiltrator-policy" : "platform-default");
     return 0;
 }
