@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+[Module]
+Id=org.infiltrator.settings.date-time
+ApiVersion=1
+Library=date-time
+Category=system
+Order=40
+Title=Date & Time
+Summary=Clock, date, timezone and temporal presentation
+Icon=preferences-system-time
+
+[Search]
+Keywords=time;date;clock;timezone;format;12 hour;24 hour;decimal;10 hour;calendar
+
+[Target "clock-profile"]
+Title=Clock system
+Keywords=clock;12 hour;24 hour;decimal;10 hour;time format
+
+[Target "show-seconds"]
+Title=Display seconds
+Keywords=seconds;clock;precision
+
+[Target "timezone"]
+Title=Time zone
+Keywords=timezone;zone;city;region;utc
