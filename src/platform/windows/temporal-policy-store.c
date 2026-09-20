@@ -63,7 +63,7 @@ static bool build_paths(wchar_t **directory_out, wchar_t **path_out)
     return true;
 }
 
-bool ss_temporal_policy_store_load(InfiltratrTemporalPolicy *policy,
+static bool platform_load(InfiltratrTemporalPolicy *policy,
                                    bool *found)
 {
     wchar_t *directory = NULL;
@@ -107,7 +107,7 @@ bool ss_temporal_policy_store_load(InfiltratrTemporalPolicy *policy,
     return ok;
 }
 
-bool ss_temporal_policy_store_save(const InfiltratrTemporalPolicy *policy)
+static bool platform_save(const InfiltratrTemporalPolicy *policy)
 {
     wchar_t *directory = NULL;
     wchar_t *path = NULL;
@@ -168,4 +168,14 @@ done:
     free(directory);
     free(path);
     return ok;
+}
+
+
+const SsTemporalPolicyStore *ss_platform_temporal_policy_store(void)
+{
+    static const SsTemporalPolicyStore store = {
+        .load = platform_load,
+        .save = platform_save
+    };
+    return &store;
 }
