@@ -42,7 +42,7 @@ A conceptual manifest contains:
 [Module]
 Id=org.infiltrator.settings.display
 ApiVersion=1
-Library=display.so
+Library=display
 Category=hardware
 Order=20
 Title=Displays
@@ -61,7 +61,7 @@ Title=Refresh rate
 Keywords=hz;frequency
 ```
 
-The final syntax may use GLib key files or a project parser, but it must remain:
+The final syntax uses a project-owned portable parser/format rather than depending on one platform's configuration library, and it must remain:
 
 - human-readable;
 - deterministic;
@@ -128,7 +128,7 @@ This is illustrative until implementation commits the header. The important inva
 
 A module declares the API it requires in both manifest and runtime ABI.
 
-The shell validates the manifest before `dlopen` and validates the returned runtime table before calling any function.
+The shell validates the manifest before invoking the platform-native dynamic loader and validates the returned runtime table before calling any function.
 
 Rules:
 
@@ -149,9 +149,9 @@ parse + validate bounded metadata
       ↓
 add navigation/search entries
       ↓ user opens target
-resolve trusted library path
+resolve trusted platform library path
       ↓
-load library
+load shared object or DLL through native loader
       ↓
 resolve one entry point
       ↓
@@ -190,7 +190,9 @@ The host API must not become a grab bag for domain backends. NetworkManager belo
 
 ## UI ownership
 
-The exact widget ABI depends on the chosen toolkit integration, but the ownership rule is independent of toolkit:
+The v1 module ABI is platform-neutral. GTK widgets, HWND values, WinUI objects and other toolkit/native presentation types do **not** cross the public module boundary.
+
+The exact Common/System Settings presentation abstraction is finalised in Phase 1, but the ownership rule is already fixed:
 
 - the shell owns the container/window;
 - the module owns widgets/state it creates;
@@ -198,7 +200,7 @@ The exact widget ABI depends on the chosen toolkit integration, but the ownershi
 - the shell destroys/detaches a panel only through the documented lifecycle;
 - UI objects are accessed only from the UI thread.
 
-If toolkit-native widget pointers cross the ABI, that toolkit becomes part of module ABI v1 and must be documented explicitly.
+Platform-specific presentation implementations may exist behind the host abstraction, but making a toolkit-native pointer part of ABI v1 is prohibited because it would make the module contract platform-specific.
 
 ## Lifecycle
 
@@ -288,7 +290,7 @@ No callback may access a module after destruction. Generation IDs, cancellables 
 
 A normal backend failure is contained inside the module panel.
 
-Because first-party libraries are in-process, memory corruption or a hard crash cannot be sandboxed by the loader. CI, sanitizers and narrow interfaces are therefore part of the module trust model.
+Because first-party libraries are in-process on both Linux and Windows, memory corruption or a hard crash cannot be sandboxed by the loader. CI, sanitizers and narrow interfaces are therefore part of the module trust model.
 
 If future third-party modules are required, use an explicitly designed process boundary rather than pretending `dlopen` provides isolation.
 
