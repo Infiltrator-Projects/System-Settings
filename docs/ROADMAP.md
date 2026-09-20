@@ -13,7 +13,9 @@ Current work:
 - define trust and privilege model;
 - define static manifest + lazy module ABI direction;
 - define search/deep-link model;
-- define validation criteria before code begins.
+- define validation criteria before code begins;
+- define the shared platform authority/adapter contract for Mint/Cinnamon and Windows;
+- prohibit toolkit-native UI objects from module ABI v1.
 
 Phase 0 is complete when the documents agree and no core design question is hidden inside assumed implementation.
 
@@ -21,7 +23,8 @@ Phase 0 is complete when the documents agree and no core design question is hidd
 
 Build the minimum real product skeleton:
 
-- native application shell;
+- native application shell on Mint/Cinnamon and Windows;
+- platform-neutral shell/module boundary proven on both platforms;
 - exact Common pin;
 - Day/Night/Follow-system presentation through Common;
 - category navigation;
@@ -33,11 +36,13 @@ Build the minimum real product skeleton:
 - deep-link routing;
 - global static search index;
 - module load diagnostics;
-- CI, sanitizer and packaging foundations.
+- Linux and Windows CI from the first executable;
+- trusted shared-object/DLL loading fixtures;
+- packaging foundations for both platforms.
 
 The phase should include at least one deliberately small real module so the ABI is validated by use rather than by headers alone.
 
-A System Information module is a good candidate because it can prove loading, search, navigation and read-only backend behaviour without forcing privilege design to carry the first milestone.
+A System Information module is a good candidate because it can prove loading, search, navigation and read-only backend behaviour without forcing privilege design to carry the first milestone. The same semantic module must run through both platform boundaries before Phase 1 is complete.
 
 ## Phase 2 — User/session settings
 
@@ -97,7 +102,9 @@ This phase must prove:
 - privileged backend input is narrow and validated;
 - no project component stores administrator passwords.
 
-## Phase 5 — Mint/Cinnamon replacement audit
+## Phase 5 — Platform coverage audits
+
+### Mint/Cinnamon
 
 Perform a forensic capability and authority audit against the target Linux Mint/Cinnamon Settings environment.
 
@@ -121,6 +128,12 @@ Existing project ownership is preserved during this audit: package/update workfl
 
 Feature parity is not declared from a count of panels. Important behaviour, recovery, accessibility and privilege correctness must be equivalent or stronger for the supported target.
 
+### Windows
+
+Perform the same capability/authority audit against Windows. For each setting, identify a documented read/write API, operation-scoped privilege path, native Settings handoff, or no safe public mechanism. Conventional Windows locale/time settings should interoperate with Windows user preferences; Infiltrator-only extensions remain separate.
+
+Feature parity means equivalent semantic capability where the platform permits it, not undocumented registry manipulation to force identical checkboxes.
+
 ## Phase 6 — Release hardening
 
 Before 1.0:
@@ -129,7 +142,7 @@ Before 1.0:
 - complete Common bidirectional reuse pass;
 - fuzz/boundary-test manifest parsing and other external data parsers;
 - run ASan/UBSan and lifecycle stress;
-- test supported Mint/Cinnamon versions and representative hardware;
+- test supported Mint/Cinnamon and Windows versions plus representative hardware;
 - validate packaging ownership and upgrade/uninstall paths;
 - validate search catalogue completeness;
 - validate all deep links;
@@ -144,7 +157,7 @@ Only after the first-party product is stable:
 - richer dynamic search results from loaded modules;
 - out-of-process third-party settings providers;
 - additional Linux desktop backends;
-- additional operating-system backends if the shell/module contract remains meaningful;
+- additional operating-system backends beyond the first-class Mint/Cinnamon and Windows targets if the shell/module contract remains meaningful;
 - settings export/diagnostic reports that do not become a shadow state store.
 
 These are not commitments and must pass normal admission criteria.
