@@ -4,12 +4,12 @@
 
 **Project copyright:** © 2000-2026 Shannon Smith
 
-System Settings is a native settings environment for Linux Mint/Cinnamon. Its user interface is deliberately unified, but its implementation is deliberately modular: one searchable Settings shell presents many small, independently owned control panels.
+System Settings is a native cross-platform settings environment for Linux Mint/Cinnamon and Windows. Its user interface is deliberately unified, but its implementation is deliberately modular: one searchable Settings shell presents many small, independently owned control panels.
 
 The project takes the strongest part of the classic Amiga/Control Panel model — small focused preference tools with clear ownership — and combines it with the strongest part of a modern settings application — one consistent window, global search, deep links, shared navigation and predictable privilege handling.
 
 **Status:** architecture and design foundation; no supported release yet  
-**Primary target:** Linux Mint/Cinnamon  
+**Primary targets:** Linux Mint/Cinnamon and Windows desktop  
 **Implementation:** native C/C++, using the strongest style for each component  
 **Shared foundation:** Infiltrator Common, pinned to an exact release when implementation begins  
 **Licence:** GPL-3.0-or-later
@@ -126,15 +126,16 @@ The exact command-line contract will be finalised with the first implementation,
        └────────────────────────┼────────────────────────┘
                                 ▼
                        NATIVE SYSTEM BACKENDS
-              GSettings / D-Bus / system services /
-               kernel interfaces / desktop services
+                   PLATFORM AUTHORITY LAYER
+          Mint/Cinnamon adapters / Windows adapters /
+       native APIs / services / documented settings handoffs
 
                          INFILTRATOR COMMON
                 theme / typography / shared widgets /
               generic persistence / common infrastructure
 ```
 
-See [Architecture](docs/ARCHITECTURE.md), [Design](docs/DESIGN.md), [Module contract](docs/MODULES.md), [System-wide Presentation Policy](docs/PRESENTATION_POLICY.md), [Mint/Cinnamon Compatibility](docs/MINT_COMPATIBILITY.md), [Decisions](docs/DECISIONS.md), [Roadmap](docs/ROADMAP.md) and [Validation](docs/VALIDATION.md).
+See [Architecture](docs/ARCHITECTURE.md), [Design](docs/DESIGN.md), [Module contract](docs/MODULES.md), [System-wide Presentation Policy](docs/PRESENTATION_POLICY.md), [Platform Compatibility](docs/PLATFORM_COMPATIBILITY.md), [Mint/Cinnamon Compatibility](docs/MINT_COMPATIBILITY.md), [Windows Compatibility](docs/WINDOWS_COMPATIBILITY.md), [Decisions](docs/DECISIONS.md), [Roadmap](docs/ROADMAP.md) and [Validation](docs/VALIDATION.md).
 
 ## Shell ownership
 
@@ -174,7 +175,7 @@ First-party modules are loaded only from trusted, system-owned locations. User-w
 
 ## Privilege model
 
-System Settings does **not** start as root and does not ask for administrative credentials merely because it has been opened.
+System Settings starts with ordinary user authority on every platform and does not request elevation or administrative credentials merely because it has been opened.
 
 Read-only settings are displayed using the current user's normal access. User-owned configuration is changed without elevation. System-wide changes use the narrowest authoritative system interface available and request authorisation only when the user performs the protected action.
 
@@ -188,7 +189,7 @@ create or remove a local account     → authorise that operation
 change a protected system service    → authorise that operation
 ```
 
-The preferred boundary is an existing system service with policy-controlled authorisation such as D-Bus/Polkit. A project-owned privileged helper is not introduced merely for convenience.
+The preferred boundary is the narrowest documented platform authority, such as D-Bus/Polkit on Linux or a documented Windows API/UAC/security boundary on Windows. A project-owned privileged helper is not introduced merely for convenience.
 
 See [SECURITY.md](SECURITY.md).
 
@@ -224,6 +225,14 @@ This rule keeps specialised applications strong and prevents System Settings bec
 
 Cross-application deep links should become stable project contracts where useful. Until a specialised application supports a specific deep link, Settings may launch its normal entry point rather than reimplementing the feature.
 
+## Platform compatibility
+
+Linux Mint/Cinnamon and Windows are first-class targets. Modules express the setting's meaning once and use platform adapters to reach the documented authority on each operating system. A platform may require a native Settings handoff when it exposes no safe writable API.
+
+The rule is: **reuse the platform authority when it already represents the setting; extend only what is missing; do not use undocumented internals merely to make two operating systems look identical.**
+
+See [Platform Compatibility](docs/PLATFORM_COMPATIBILITY.md), [Mint/Cinnamon Compatibility](docs/MINT_COMPATIBILITY.md) and [Windows Compatibility](docs/WINDOWS_COMPATIBILITY.md).
+
 ## Mint/Cinnamon compatibility
 
 System Settings is intended to be a compatible superset of the Mint/Cinnamon settings environment. When Mint/Cinnamon already has an authoritative setting for the same concept, System Settings should use that setting directly rather than create a duplicate. New Infiltrator policy is introduced only for concepts the existing desktop cannot represent faithfully.
@@ -236,7 +245,7 @@ See [Mint/Cinnamon Compatibility](docs/MINT_COMPATIBILITY.md).
 
 System Settings is a control surface over operating-system and desktop facilities; it is not an attempt to replace every facility beneath it.
 
-Where a stable native API exists, use it directly. Examples may include GSettings for desktop preferences, D-Bus services for system components, kernel interfaces for appropriate low-level state, and existing system services for network, printing, Bluetooth, accounts or authentication.
+Where a stable native API exists, use it directly. Linux examples include GSettings, D-Bus and kernel/system-service interfaces. Windows examples include documented Win32/WinRT/globalisation/subsystem APIs and supported Settings-page handoffs. Platform-private storage is not treated as an API merely because it can be discovered.
 
 Command-line utilities are not treated as APIs merely because they are easy to invoke. A utility may be used only where it is genuinely the strongest maintained contract for the operation.
 
