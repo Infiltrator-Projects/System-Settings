@@ -31,6 +31,10 @@ All notable user-visible and architectural changes are recorded here.
 
 ### Implementation
 
+- Added the first native GTK4 System Settings shell on Linux with a visible Date & Time panel.
+- Added live clock/date preview, system/12-hour/24-hour/decimal-10 selection, seconds control and current time-zone display.
+- Added desktop integration and install rules so the shell appears as System Settings after installation.
+
 - Added the first Date & Time semantic module model and static module manifest.
 - Added portable system/12-hour/24-hour/decimal-10 policy selection through Common 1.19.14.
 - Added Linux XDG and Windows LocalAppData per-user persistence adapters.
