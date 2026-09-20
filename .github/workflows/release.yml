@@ -79,5 +79,5 @@ jobs:
             echo "Release $tag already exists; verifying asset name."
             gh release view "$tag" --json assets --jq '.assets[].name' |               grep -qx "$(basename "$deb")"
           else
-            gh release create "$tag" "$deb"               --verify-tag               --target "$sha"               --title "System Settings $version"               --notes "System Settings 0.2.0 makes Date & Time the complete system-wide temporal authority: 21 clock systems, 30 primary calendars, optional secondary calendar, seconds policy, geographic location, Common 1.19.16 integration, and Calendar follow-system support."
+            gh release create "$tag" "$deb"               --verify-tag               --target "$sha"               --title "System Settings $version"               --notes "System Settings $version strengthens Mint/Cinnamon temporal interoperability: first-run state is seeded from Cinnamon's 12/24-hour and seconds preferences, exact conventional choices are mirrored back to Cinnamon, and the richer Infiltrator policy remains optional for standalone Calendar use."
           fi
