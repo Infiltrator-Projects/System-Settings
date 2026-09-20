@@ -11,7 +11,7 @@ extern "C" {
 #endif
 
 typedef struct SsDateTimeModel {
-    InfiltratrTemporalPolicyV2 policy;
+    InfiltratrTemporalPolicyV3 policy;
     const SsTemporalPolicyStore *store;
     bool persisted_policy_present;
 } SsDateTimeModel;
@@ -19,15 +19,13 @@ typedef struct SsDateTimeModel {
 bool ss_date_time_model_init(SsDateTimeModel *model,
                              const SsTemporalPolicyStore *store);
 bool ss_date_time_model_reload(SsDateTimeModel *model);
-const InfiltratrTemporalPolicyV2 *
+const InfiltratrTemporalPolicyV3 *
 ss_date_time_model_policy(const SsDateTimeModel *model);
 
 bool ss_date_time_model_set_clock_mode(SsDateTimeModel *model,
                                        const char *clock_mode);
-bool ss_date_time_model_set_primary_calendar(SsDateTimeModel *model,
-                                             const char *calendar_id);
-bool ss_date_time_model_set_secondary_calendar(SsDateTimeModel *model,
-                                               const char *calendar_id);
+bool ss_date_time_model_set_calendar(SsDateTimeModel *model,
+                                     const char *calendar_id);
 bool ss_date_time_model_set_show_seconds(SsDateTimeModel *model,
                                          bool show_seconds);
 bool ss_date_time_model_set_location(SsDateTimeModel *model,
