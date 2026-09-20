@@ -8,28 +8,28 @@
 #define CHECK(expression) \
     do { \
         if (!(expression)) { \
-            fprintf(stderr, "Date & Time test failed: %s (%s:%d)\\n", \
+            fprintf(stderr, "Date & Time test failed: %s (%s:%d)\n", \
                     #expression, __FILE__, __LINE__); \
             exit(EXIT_FAILURE); \
         } \
     } while (0)
 
-static InfiltratrTemporalPolicy persisted;
+static InfiltratrTemporalPolicyV2 persisted;
 static bool persisted_found;
 
-static bool fake_load(InfiltratrTemporalPolicy *policy, bool *found)
+static bool fake_load(InfiltratrTemporalPolicyV2 *policy, bool *found)
 {
     if (policy == NULL || found == NULL)
         return false;
     if (persisted_found)
         *policy = persisted;
     else
-        CHECK(infiltratr_temporal_policy_default(policy));
+        CHECK(infiltratr_temporal_policy_v2_default(policy));
     *found = persisted_found;
     return true;
 }
 
-static bool fake_save(const InfiltratrTemporalPolicy *policy)
+static bool fake_save(const InfiltratrTemporalPolicyV2 *policy)
 {
     if (policy == NULL)
         return false;
@@ -45,40 +45,42 @@ int main(void)
         .save = fake_save
     };
     SsDateTimeModel model;
-    InfiltratrClockProfile profile = INFILTRATR_CLOCK_PROFILE_SYSTEM;
-    size_t i;
-    bool saw_decimal = false;
 
     persisted_found = false;
     CHECK(ss_date_time_model_init(&model, &store));
-    CHECK(model.policy.clock_profile == INFILTRATR_CLOCK_PROFILE_SYSTEM);
+    CHECK(strcmp(model.policy.clock_mode, "standard") == 0);
+    CHECK(strcmp(model.policy.primary_calendar, "gregorian") == 0);
+    CHECK(strcmp(model.policy.secondary_calendar, "none") == 0);
     CHECK(!model.persisted_policy_present);
 
-    CHECK(ss_date_time_model_profile_count() == 4U);
-    for (i = 0U; i < ss_date_time_model_profile_count(); ++i) {
-        CHECK(ss_date_time_model_profile_at(i, &profile));
-        CHECK(infiltratr_clock_profile_id(profile) != NULL);
-        CHECK(infiltratr_clock_profile_name(profile) != NULL);
-        if (profile == INFILTRATR_CLOCK_PROFILE_DECIMAL_10) {
-            saw_decimal = true;
-            CHECK(strcmp(infiltratr_clock_profile_id(profile),
-                          "decimal-10") == 0);
-        }
-    }
-    CHECK(saw_decimal);
+    CHECK(ss_date_time_model_set_clock_mode(&model, "roman-temporal"));
+    CHECK(strcmp(model.policy.clock_mode, "roman-temporal") == 0);
+    CHECK(strcmp(persisted.clock_mode, "roman-temporal") == 0);
 
-    CHECK(ss_date_time_model_set_clock_profile(
-        &model, INFILTRATR_CLOCK_PROFILE_DECIMAL_10));
-    CHECK(model.policy.clock_profile == INFILTRATR_CLOCK_PROFILE_DECIMAL_10);
-    CHECK(persisted.clock_profile == INFILTRATR_CLOCK_PROFILE_DECIMAL_10);
+    CHECK(ss_date_time_model_set_primary_calendar(
+        &model, "egyptian-nabonassar"));
+    CHECK(strcmp(model.policy.primary_calendar, "egyptian-nabonassar") == 0);
+
+    CHECK(ss_date_time_model_set_secondary_calendar(&model, "gregorian"));
+    CHECK(strcmp(model.policy.secondary_calendar, "gregorian") == 0);
 
     CHECK(ss_date_time_model_set_show_seconds(&model, true));
     CHECK(model.policy.show_seconds);
-    CHECK(persisted.show_seconds);
 
-    model.policy.clock_profile = INFILTRATR_CLOCK_PROFILE_SYSTEM;
+    CHECK(ss_date_time_model_set_location(&model, true, -36.39, 145.36));
+    CHECK(model.policy.location_configured);
+    CHECK(model.policy.latitude == -36.39);
+    CHECK(model.policy.longitude == 145.36);
+
+    strcpy(model.policy.clock_mode, "standard");
     CHECK(ss_date_time_model_reload(&model));
-    CHECK(model.policy.clock_profile == INFILTRATR_CLOCK_PROFILE_DECIMAL_10);
+    CHECK(strcmp(model.policy.clock_mode, "roman-temporal") == 0);
+    CHECK(strcmp(model.policy.primary_calendar, "egyptian-nabonassar") == 0);
+    CHECK(strcmp(model.policy.secondary_calendar, "gregorian") == 0);
     CHECK(model.policy.show_seconds);
+    CHECK(model.policy.location_configured);
+
+    CHECK(!ss_date_time_model_set_clock_mode(&model, "system"));
+    CHECK(!ss_date_time_model_set_primary_calendar(&model, "none"));
     return 0;
 }
