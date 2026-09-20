@@ -15,7 +15,7 @@ static bool policy_paths(char *directory, size_t directory_size,
            infiltratr_path_join(path, path_size, directory, "presentation.conf");
 }
 
-static bool platform_load(InfiltratrTemporalPolicyV2 *policy, bool *found)
+static bool platform_load(InfiltratrTemporalPolicyV3 *policy, bool *found)
 {
     char directory[SS_PATH_CAPACITY];
     char path[SS_PATH_CAPACITY];
@@ -23,7 +23,7 @@ static bool platform_load(InfiltratrTemporalPolicyV2 *policy, bool *found)
     InfiltratrIoResult result;
 
     if (policy == NULL || found == NULL ||
-        !infiltratr_temporal_policy_v2_default(policy) ||
+        !infiltratr_temporal_policy_v3_default(policy) ||
         !policy_paths(directory, sizeof(directory), path, sizeof(path)))
         return false;
 
@@ -32,13 +32,13 @@ static bool platform_load(InfiltratrTemporalPolicyV2 *policy, bool *found)
     if (result == INFILTRATR_IO_NOT_FOUND)
         return true;
     if (result != INFILTRATR_IO_OK ||
-        !infiltratr_temporal_policy_v2_parse(text, policy))
+        !infiltratr_temporal_policy_v3_parse(text, policy))
         return false;
     *found = true;
     return true;
 }
 
-static bool platform_save(const InfiltratrTemporalPolicyV2 *policy)
+static bool platform_save(const InfiltratrTemporalPolicyV3 *policy)
 {
     char directory[SS_PATH_CAPACITY];
     char path[SS_PATH_CAPACITY];
@@ -48,7 +48,7 @@ static bool platform_save(const InfiltratrTemporalPolicyV2 *policy)
     if (policy == NULL ||
         !policy_paths(directory, sizeof(directory), path, sizeof(path)) ||
         infiltratr_mkdir_parents(directory, 0700U) != 0 ||
-        !infiltratr_temporal_policy_v2_serialize(policy, text, sizeof(text), &length))
+        !infiltratr_temporal_policy_v3_serialize(policy, text, sizeof(text), &length))
         return false;
 
     return infiltratr_atomic_file_write_bytes(
