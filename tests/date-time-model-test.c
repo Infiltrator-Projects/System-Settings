@@ -14,22 +14,22 @@
         } \
     } while (0)
 
-static InfiltratrTemporalPolicyV2 persisted;
+static InfiltratrTemporalPolicyV3 persisted;
 static bool persisted_found;
 
-static bool fake_load(InfiltratrTemporalPolicyV2 *policy, bool *found)
+static bool fake_load(InfiltratrTemporalPolicyV3 *policy, bool *found)
 {
     if (policy == NULL || found == NULL)
         return false;
     if (persisted_found)
         *policy = persisted;
     else
-        CHECK(infiltratr_temporal_policy_v2_default(policy));
+        CHECK(infiltratr_temporal_policy_v3_default(policy));
     *found = persisted_found;
     return true;
 }
 
-static bool fake_save(const InfiltratrTemporalPolicyV2 *policy)
+static bool fake_save(const InfiltratrTemporalPolicyV3 *policy)
 {
     if (policy == NULL)
         return false;
@@ -49,20 +49,16 @@ int main(void)
     persisted_found = false;
     CHECK(ss_date_time_model_init(&model, &store));
     CHECK(strcmp(model.policy.clock_mode, "standard") == 0);
-    CHECK(strcmp(model.policy.primary_calendar, "gregorian") == 0);
-    CHECK(strcmp(model.policy.secondary_calendar, "none") == 0);
+    CHECK(strcmp(model.policy.calendar, "gregorian") == 0);
     CHECK(!model.persisted_policy_present);
 
     CHECK(ss_date_time_model_set_clock_mode(&model, "roman-temporal"));
     CHECK(strcmp(model.policy.clock_mode, "roman-temporal") == 0);
     CHECK(strcmp(persisted.clock_mode, "roman-temporal") == 0);
 
-    CHECK(ss_date_time_model_set_primary_calendar(
+    CHECK(ss_date_time_model_set_calendar(
         &model, "egyptian-nabonassar"));
-    CHECK(strcmp(model.policy.primary_calendar, "egyptian-nabonassar") == 0);
-
-    CHECK(ss_date_time_model_set_secondary_calendar(&model, "gregorian"));
-    CHECK(strcmp(model.policy.secondary_calendar, "gregorian") == 0);
+    CHECK(strcmp(model.policy.calendar, "egyptian-nabonassar") == 0);
 
     CHECK(ss_date_time_model_set_show_seconds(&model, true));
     CHECK(model.policy.show_seconds);
@@ -75,12 +71,11 @@ int main(void)
     strcpy(model.policy.clock_mode, "standard");
     CHECK(ss_date_time_model_reload(&model));
     CHECK(strcmp(model.policy.clock_mode, "roman-temporal") == 0);
-    CHECK(strcmp(model.policy.primary_calendar, "egyptian-nabonassar") == 0);
-    CHECK(strcmp(model.policy.secondary_calendar, "gregorian") == 0);
+    CHECK(strcmp(model.policy.calendar, "egyptian-nabonassar") == 0);
     CHECK(model.policy.show_seconds);
     CHECK(model.policy.location_configured);
 
     CHECK(!ss_date_time_model_set_clock_mode(&model, "system"));
-    CHECK(!ss_date_time_model_set_primary_calendar(&model, "none"));
+    CHECK(!ss_date_time_model_set_calendar(&model, "none"));
     return 0;
 }
