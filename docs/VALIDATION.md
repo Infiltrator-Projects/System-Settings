@@ -11,7 +11,7 @@ A capability can have several evidence levels:
 1. **compiled** — source builds with the required warning policy;
 2. **unit verified** — deterministic local logic passes tests;
 3. **integration verified** — module communicates correctly with a controlled/real native service interface;
-4. **environment verified** — behaviour is demonstrated on the target Mint/Cinnamon environment;
+4. **environment verified** — behaviour is demonstrated on the relevant supported platform/environment;
 5. **hardware verified** — hardware-sensitive behaviour is demonstrated on representative physical hardware when simulation cannot prove it.
 
 Documentation must not silently promote a lower evidence level into a stronger claim.
@@ -23,7 +23,7 @@ Automated shell coverage should include:
 - manifest parsing and malformed-input rejection;
 - duplicate module/target IDs;
 - unsupported ABI versions;
-- missing library/entry point;
+- missing library/entry point on both native loader families;
 - lazy-load proof: unopened modules do not initialise;
 - category ordering;
 - search token/synonym routing;
@@ -32,6 +32,8 @@ Automated shell coverage should include:
 - module load failure isolation;
 - dirty-navigation handling;
 - module destruction with pending asynchronous work;
+- Linux shared-object and Windows DLL trusted-path loading;
+- proof that public module ABI contains no platform UI/toolkit types;
 - restoration of safe last location;
 - theme persistence through Common.
 
@@ -148,7 +150,9 @@ CI should include, as appropriate:
 
 ## Manual target matrix
 
-Before a stable release, maintain a tested environment matrix recording at least:
+Before a stable release, maintain a tested environment matrix for every supported platform.
+
+Linux records at least:
 
 - Linux Mint release;
 - Cinnamon/session type;
@@ -157,6 +161,15 @@ Before a stable release, maintain a tested environment matrix recording at least
 - GPU/display environment for display testing;
 - network hardware/service environment;
 - Bluetooth/printing hardware where those modules are advertised.
+
+Windows records at least:
+
+- Windows release/build and edition/SKU where relevant;
+- architecture;
+- policy/elevation context;
+- GPU/display environment;
+- network, Bluetooth and printing hardware where advertised;
+- native Settings handoff availability for delegated operations.
 
 A virtual machine is valid evidence for generic shell behaviour but is not automatically evidence for hardware behaviour.
 
