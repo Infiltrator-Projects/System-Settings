@@ -2042,12 +2042,75 @@ static GtkWidget *build_sidebar(void)
     return sidebar;
 }
 
-static GtkWidget *build_header(void)
+static gboolean about_close_requested(GtkWindow *window, gpointer user_data)
+{
+    (void)user_data;
+    gtk_window_destroy(window);
+    return TRUE;
+}
+
+static void show_about(GtkButton *button, gpointer user_data)
+{
+    GtkWindow *parent = GTK_WINDOW(user_data);
+    const InfiltratrProjectInfo *info = ss_project_info();
+    const char *authors[] = {
+        "Shannon Smith — Author and project maintainer",
+        NULL
+    };
+    char comments[512];
+    GtkWidget *dialog;
+
+    (void)button;
+    (void)snprintf(
+        comments, sizeof(comments), "%s\n\nBuild: %s",
+        info->comments,
+        infiltratr_build_profile_label(info->build_profile));
+
+    dialog = gtk_about_dialog_new();
+    gtk_window_set_title(GTK_WINDOW(dialog), "About System Settings");
+    gtk_window_set_transient_for(GTK_WINDOW(dialog), parent);
+    gtk_window_set_modal(GTK_WINDOW(dialog), TRUE);
+    gtk_window_set_destroy_with_parent(GTK_WINDOW(dialog), TRUE);
+    gtk_about_dialog_set_program_name(
+        GTK_ABOUT_DIALOG(dialog), info->program_name);
+    gtk_about_dialog_set_version(
+        GTK_ABOUT_DIALOG(dialog), info->version);
+    gtk_about_dialog_set_comments(
+        GTK_ABOUT_DIALOG(dialog), comments);
+    gtk_about_dialog_set_authors(
+        GTK_ABOUT_DIALOG(dialog), authors);
+    gtk_about_dialog_set_website(
+        GTK_ABOUT_DIALOG(dialog), info->website);
+    gtk_about_dialog_set_website_label(
+        GTK_ABOUT_DIALOG(dialog), "Website");
+    gtk_about_dialog_set_copyright(
+        GTK_ABOUT_DIALOG(dialog), info->copyright_text);
+    gtk_about_dialog_set_license_type(
+        GTK_ABOUT_DIALOG(dialog), GTK_LICENSE_CUSTOM);
+    gtk_about_dialog_set_license(
+        GTK_ABOUT_DIALOG(dialog),
+        "System Settings is free software licensed under the GNU General "
+        "Public License version 3 or, at your option, any later version "
+        "(GPL-3.0-or-later).\n\n"
+        "See LICENSE in the source package for the complete licence text.");
+    gtk_about_dialog_set_wrap_license(
+        GTK_ABOUT_DIALOG(dialog), TRUE);
+    gtk_about_dialog_set_logo_icon_name(
+        GTK_ABOUT_DIALOG(dialog), info->icon_name);
+    g_signal_connect(
+        dialog, "close-request",
+        G_CALLBACK(about_close_requested), NULL);
+    gtk_window_present(GTK_WINDOW(dialog));
+}
+
+static GtkWidget *build_header(GtkWindow *parent)
 {
     const InfiltratrProjectInfo *info = ss_project_info();
     GtkWidget *header = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
     GtkWidget *icon = gtk_image_new_from_icon_name("preferences-system-symbolic");
     GtkWidget *identity = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    GtkWidget *spacer = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    GtkWidget *about = gtk_button_new_from_icon_name("help-about-symbolic");
 
     gtk_widget_add_css_class(header, "titlebar-shell");
     gtk_image_set_pixel_size(GTK_IMAGE(icon), 24);
@@ -2058,6 +2121,12 @@ static GtkWidget *build_header(void)
                    make_label("One place for system-wide preferences",
                               "app-subtitle"));
     gtk_box_append(GTK_BOX(header), identity);
+
+    gtk_widget_set_hexpand(spacer, TRUE);
+    gtk_box_append(GTK_BOX(header), spacer);
+    gtk_widget_set_tooltip_text(about, "About System Settings");
+    g_signal_connect(about, "clicked", G_CALLBACK(show_about), parent);
+    gtk_box_append(GTK_BOX(header), about);
     return header;
 }
 
@@ -2158,7 +2227,7 @@ static void on_activate(GtkApplication *application, gpointer user_data)
 
     root = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     gtk_window_set_child(state->window, root);
-    gtk_box_append(GTK_BOX(root), build_header());
+    gtk_box_append(GTK_BOX(root), build_header(state->window));
 
     body = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     gtk_widget_set_vexpand(body, TRUE);
