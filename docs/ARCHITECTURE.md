@@ -95,6 +95,65 @@ Windows sibling backends use documented Win32/WinRT/globalisation/subsystem APIs
 
 See [PLATFORM_COMPATIBILITY.md](PLATFORM_COMPATIBILITY.md).
 
+## Date & Time as the first real module
+
+The Date & Time vertical slice is now deliberately split at the same ownership
+boundary described above.
+
+```text
+Linux shell
+  main.c
+    application/window lifecycle
+    header/sidebar/scroller
+    Common theme installation
+          |
+          | private built-in bridge (current implementation)
+          v
+Date & Time module
+  linux-date-time-panel.c
+    GTK panel construction
+    temporal-policy model
+    locality search
+    native-setting reconciliation
+    timedated operations
+    async lifetime/cancellation
+          |
+          +----> native Linux/Cinnamon authorities
+          |
+          +----> Common temporal presentation policy
+```
+
+The private `linux-date-time-panel.h` bridge may mention GTK because it is an
+implementation detail linking today's built-in Linux module to today's Linux
+shell. It is **not** the public module ABI described in MODULES.md and is not
+installed as a cross-module contract. The eventual manifest/dynamic-loader ABI
+must remain toolkit-neutral.
+
+This distinction lets the project fix the immediate monolith problem without
+prematurely freezing an ABI around GTK widgets.
+
+### Settings authority versus storage authority
+
+System Settings is the user-facing control authority. That does not mean it
+must duplicate every operating-system value into project-owned storage.
+
+When Linux/Cinnamon already has an exact representation, System Settings writes
+and observes that native authority. Examples include:
+
+- IANA time zone and NTP/manual system time through timedated;
+- conventional 12/24-hour compatibility state through Cinnamon/GNOME;
+- panel date/seconds and first-day-of-week preferences through Cinnamon.
+
+When the platform has no representation, System Settings owns an Infiltrator
+presentation policy consumed through Common. Examples include decimal time,
+sidereal/solar systems and non-native calendars.
+
+An external application changing an exactly representable native setting is an
+external state change, not a reason to expose a user-facing "follow the OS"
+mode. The module reconciles that native state into the equivalent explicit
+System Settings choice when doing so is lossless. Extended modes do not get
+overwritten merely because some unrelated native compatibility value changed.
+
 ## Module discovery
 
 The shell discovers modules from lightweight manifests. It does not load every shared library at startup.

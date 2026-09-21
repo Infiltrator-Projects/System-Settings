@@ -43,12 +43,37 @@ endfunction()
 add_library(system-settings-core STATIC
     src/app/project-info.c
     src/modules/date-time/date-time-model.c
-    src/modules/date-time/manual-time.c)
+    src/modules/date-time/manual-time.c
+    src/modules/date-time/native-clock-policy.c)
 ss_configure(system-settings-core)
 target_compile_definitions(system-settings-core PUBLIC
     SYSTEM_SETTINGS_VERSION="${PROJECT_VERSION}"
     SYSTEM_SETTINGS_BUILD_PROFILE="${SYSTEM_SETTINGS_BUILD_PROFILE}")
 target_link_libraries(system-settings-core PUBLIC InfiltratrCommon::Portable)
+
+# Keep the generic shell free of Date & Time domain/back-end ownership.
+# The current built-in module uses a private GTK bridge, while the future
+# public module ABI remains toolkit-neutral.
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux/main.c"
+    SS_LINUX_SHELL_SOURCE)
+foreach(SS_FORBIDDEN_SHELL_TOKEN
+        "date-time-model.h"
+        "system-time-service.h"
+        "location-search.h"
+        "regional-context.h"
+        "temporal-policy-store.h"
+        "SsDateTimeModel"
+        "SsSystemTimeService")
+    string(FIND "${SS_LINUX_SHELL_SOURCE}"
+        "${SS_FORBIDDEN_SHELL_TOKEN}"
+        SS_FORBIDDEN_SHELL_INDEX)
+    if(NOT SS_FORBIDDEN_SHELL_INDEX EQUAL -1)
+        message(FATAL_ERROR
+            "Linux shell regained Date & Time domain ownership: "
+            "${SS_FORBIDDEN_SHELL_TOKEN}")
+    endif()
+endforeach()
+unset(SS_LINUX_SHELL_SOURCE)
 
 if(WIN32)
     add_library(system-settings-platform STATIC
@@ -70,16 +95,42 @@ elseif(UNIX)
     target_link_libraries(system-settings-platform
         PUBLIC InfiltratrCommon::Common PkgConfig::GIO2)
 
-    add_executable(system-settings
-        src/shell/linux/main.c
+    add_library(system-settings-linux-ui STATIC
+        src/shell/linux/linux-ui-helpers.c)
+    ss_configure(system-settings-linux-ui)
+    target_include_directories(system-settings-linux-ui PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux")
+    target_link_libraries(system-settings-linux-ui PUBLIC
+        PkgConfig::GTK4)
+
+    add_library(system-settings-date-time-linux STATIC
+        src/modules/date-time/linux-date-time-panel.c
         src/platform/linux/location-search.c)
-    ss_configure(system-settings)
-    target_link_libraries(system-settings PRIVATE
+    ss_configure(system-settings-date-time-linux)
+    target_include_directories(system-settings-date-time-linux PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/modules/date-time"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux")
+    target_link_libraries(system-settings-date-time-linux PRIVATE
         system-settings-core
         system-settings-platform
+        system-settings-linux-ui
         InfiltratrCommon::Portable
         PkgConfig::GTK4
         PkgConfig::GEOCODE)
+
+    add_executable(system-settings
+        src/shell/linux/main.c)
+    ss_configure(system-settings)
+    target_include_directories(system-settings PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/modules/date-time"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux")
+    target_link_libraries(system-settings PRIVATE
+        system-settings-date-time-linux
+        system-settings-linux-ui
+        system-settings-core
+        system-settings-platform
+        InfiltratrCommon::Portable
+        PkgConfig::GTK4)
 
     install(TARGETS system-settings
         RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
@@ -111,6 +162,14 @@ if(BUILD_TESTING)
     ss_configure(manual-time-test)
     target_link_libraries(manual-time-test PRIVATE system-settings-core)
     add_test(NAME manual-time COMMAND manual-time-test)
+
+    add_executable(native-clock-policy-test
+        tests/native-clock-policy-test.c)
+    ss_configure(native-clock-policy-test)
+    target_link_libraries(native-clock-policy-test PRIVATE
+        system-settings-core)
+    add_test(NAME native-clock-policy
+        COMMAND native-clock-policy-test)
 
     add_executable(project-info-test tests/project-info-test.c)
     ss_configure(project-info-test)

@@ -69,6 +69,26 @@ Enhanced integration is optional. The core System Settings design must remain co
 
 On Mint/Linux, the System Settings package publishes the canonical `/usr/share/infiltrator/policy-providers/temporal-v3` capability marker defined by Common. Consumers use that marker rather than executable-name/PATH probing. The marker means the richer provider is installed; it does not by itself mean a user policy exists. Until a valid policy is present, native Cinnamon settings remain authoritative.
 
+### Conventional clock authority
+
+System Settings no longer exposes the Cinnamon `clock-use-24h` Boolean as a
+separate switch and does not need a user-facing "OS locale" clock mode.
+
+The visible conventional choices are explicit clock systems. Standard 12-hour
+and Standard 24-hour have exact native representations, so selecting either
+writes the matching Cinnamon/GNOME value. If another native program changes
+that value while a conventional clock is active, System Settings reconciles to
+the corresponding explicit choice.
+
+The internal Common `standard` identifier remains a bootstrap/fallback so
+applications can behave sensibly when System Settings is absent. It is not a
+third setting once System Settings is the authority.
+
+When an extended mode such as decimal or sidereal is selected, the native
+12/24-hour value remains only a compatibility value for software outside the
+Common-aware ecosystem. Native changes to that fallback do not silently replace
+the user's extended clock system.
+
 ## Region, time zone and geographic location
 
 The long-term Mint/Cinnamon integration treats language, regional formats, time zone and geographic location as related but separate authorities.

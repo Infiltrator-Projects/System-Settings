@@ -69,6 +69,33 @@ The project should build fixture modules that intentionally provide:
 
 This ensures loader error handling is tested independently of real settings modules.
 
+## Date & Time authority/reconciliation tests
+
+The replacement Date & Time module adds specific invariants:
+
+- the generic Linux shell must not include Date & Time model, timedated,
+  locality-search or temporal-policy backend ownership;
+- the internal Common bootstrap clock identifier `standard` is not presented
+  as a third conventional user choice when System Settings is installed;
+- explicit Standard 12-hour and Standard 24-hour choices mirror the exact
+  Cinnamon/GNOME conventional value;
+- an external native 12/24-hour change reconciles an active conventional
+  System Settings clock choice;
+- an external native 12/24-hour change does not replace decimal, sidereal,
+  solar or another extended System Settings clock;
+- external native seconds changes reconcile into the shared seconds policy;
+- native values are read back/observed after mutation rather than trusting the
+  requested value;
+- locality and time-zone state remain independently correct when the user
+  deliberately overrides the inferred zone;
+- asynchronous searches and timedated writes cannot outlive the host window's
+  module instance;
+- closing the window cancels outstanding module work and removes periodic
+  sources before module destruction.
+
+The build contains an architectural CMake guard for the first invariant and
+unit coverage for the conventional/native clock-policy mapping.
+
 ## Read/write validation
 
 Every writable setting needs evidence for:

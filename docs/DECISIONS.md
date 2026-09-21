@@ -185,3 +185,22 @@ See [MINT_COMPATIBILITY.md](MINT_COMPATIBILITY.md).
 The world-map widget itself is not an authority. The replacement may use a searchable IANA selector and named-locality search instead of embedding Mint's GTK3-only `libtimezonemap` widget inside the GTK4 shell, provided all underlying system capabilities remain reachable.
 
 Named locality is distinct from time-zone identity. A locality search result supplies geographic coordinates for location-dependent presentation and may propose/apply the nearest plausible same-country IANA zone, but the explicit system time-zone selector remains authoritative and user-correctable.
+
+
+## ADR-022 — System Settings is the control authority; native settings are backends
+
+**Decision.** For settings that Linux/Cinnamon can represent exactly, System Settings exposes the user-facing choice and reads/writes the native platform authority rather than presenting the native source as a competing mode.
+
+**Rationale.** A replacement settings application should not ask the user to choose between "System Settings" and "the OS" when both names refer to the same underlying preference. Doing so creates duplicate authorities and confusing states such as a visible `Standard time (OS locale)` beside explicit 12-hour and 24-hour choices.
+
+**Consequence.** Explicit conventional clock choices map to Cinnamon/GNOME's native 12/24-hour values. External changes to that native value are reconciled back into the equivalent explicit System Settings choice while a conventional mode is active. Extended clock systems retain their System Settings/Common policy; the native 12/24-hour value beneath them is only a compatibility fallback for software that cannot understand the richer policy.
+
+The Common identifier `standard` remains valid internally as a bootstrap/fallback for consumers that must operate without an installed System Settings authority. It is not a third user-facing conventional clock choice when System Settings is present.
+
+## ADR-023 — Built-in module extraction before freezing the public ABI
+
+**Decision.** Date & Time domain implementation is removed from the generic Linux shell now and built as a separate first-party module target. The current shell-to-panel bridge is private and GTK-specific; it is not the promised public module ABI.
+
+**Rationale.** Keeping a 2,000-line domain implementation in the shell violated ADR-001 and made every new settings page more likely to deepen the monolith. Conversely, forcing the first refactor through an unfinished dynamic ABI would freeze toolkit assumptions prematurely.
+
+**Consequence.** `src/shell/linux/main.c` owns lifecycle, common framing and navigation only. Date & Time owns its widgets, callbacks, backend coordination, async work and cleanup in `src/modules/date-time/linux-date-time-panel.c`. CMake rejects selected Date & Time backend/model symbols if they reappear in the generic shell. A later phase can wrap this module behind the versioned toolkit-neutral ABI without moving the domain policy back into the shell.

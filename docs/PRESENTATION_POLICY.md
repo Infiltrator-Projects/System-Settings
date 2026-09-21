@@ -161,7 +161,7 @@ Temporal Presentation uses stable clock-system identifiers supplied by Common ra
 
 Common 1.19.20 defines the complete current catalogue shared with Calendar: standard OS-locale time, explicit 12-hour and 24-hour time, Internet Time, Unix time, binary and hexadecimal clocks, Julian/MJD, sidereal/apparent/mean-solar time, French Republican decimal time, traditional Chinese double-hours and hundred-kè, Roman temporal time, Edo Japanese seasonal time, Italian hours, Babylonian hours, Indian ghaṭī time and Nuremberg hours.
 
-System Settings is the authority. Therefore the global catalogue contains **Standard time (OS locale)** rather than a self-referential **Follow system** choice. Explicit **Standard time (12-hour)** and **Standard time (24-hour)** entries are the user-facing conventional-format choices; the Cinnamon/GNOME 12/24-hour Boolean is only a compatibility mirror for those exact modes and is not exposed as a second control. Common-aware applications consume the System Settings policy directly rather than offering competing local clock/calendar choices.
+System Settings is the authority. The internal Common catalogue retains the `standard` identifier as a bootstrap/fallback for consumers that must run without System Settings, but System Settings itself does not present that identifier as a third conventional choice. Its user-facing conventional clock systems are **Standard time (12-hour)** and **Standard time (24-hour)**. The Cinnamon/GNOME 12/24-hour Boolean is the exact native compatibility backend for those modes, not another visible authority. Common-aware applications consume the System Settings policy directly rather than offering competing local clock/calendar choices.
 
 ### Decimal 10-hour profile
 

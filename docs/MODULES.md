@@ -20,6 +20,36 @@ The contract is intentionally small. A module must be able to describe itself wi
 
 **Backend** — authoritative native interface used by the module to read or change system state.
 
+## Current built-in bridge
+
+The first production-quality Date & Time slice is already separated from the
+generic shell, but the final dynamic module ABI is intentionally not frozen
+around that implementation.
+
+Current Linux wiring is:
+
+```text
+system-settings (shell executable)
+       |
+       +-- private linux-date-time-panel.h
+               |
+               +-- system-settings-date-time-linux (static first-party module)
+```
+
+That private header exposes a GTK panel only because both sides are currently
+one Linux product build. It is not installed as the public module contract and
+does not weaken the rule that ABI v1 must be toolkit-neutral.
+
+This staged arrangement has two purposes:
+
+1. enforce domain ownership now — Date & Time backends/callbacks no longer live
+   in `main.c`;
+2. avoid turning an expedient GTK widget pointer into a permanent ABI promise.
+
+When the loader/host API is implemented, the Date & Time module is the first
+real implementation to adapt to it. Domain code should not need to move back
+into the shell during that transition.
+
 ## Identity
 
 Each module has a stable reverse-DNS-style or project-style identifier. The final naming convention should be short and durable, for example:

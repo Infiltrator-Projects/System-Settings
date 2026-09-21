@@ -19,7 +19,7 @@ Current work:
 
 Phase 0 is complete when the documents agree and no core design question is hidden inside assumed implementation.
 
-**Current implementation note:** the Date & Time vertical slice has begun and now proves the shared semantic model, portable temporal policy, Linux/Windows persistence adapters, module metadata and cross-platform CI. The proper shell/panel presentation remains part of Phase 1 rather than being bypassed with a one-off toolkit window.
+**Current implementation note:** the Date & Time vertical slice now proves the shared semantic model, portable temporal policy, Linux/Windows persistence adapters, module metadata and cross-platform CI. Its Linux domain implementation has been extracted from the generic shell into a dedicated first-party module target. The current GTK bridge is private/transitional; the manifest-driven toolkit-neutral dynamic ABI/loader remains Phase 1 work.
 
 ## Phase 1 — Shell and module framework
 
@@ -40,6 +40,7 @@ Build the minimum real product skeleton:
 - module load diagnostics;
 - Linux and Windows CI from the first executable;
 - trusted shared-object/DLL loading fixtures;
+- adapt the already-separated Date & Time module from its private built-in bridge to the stable toolkit-neutral host/module ABI without moving domain policy back into the shell;
 - packaging foundations for both platforms.
 
 The phase should include at least one deliberately small real module so the ABI is validated by use rather than by headers alone.

@@ -8,6 +8,17 @@ All notable user-visible and architectural changes are recorded here.
 
 No unreleased changes.
 
+## 0.3.13 — 2026-09-21
+
+- Extract the complete Linux Date & Time implementation from the generic application shell into a dedicated first-party module target; `main.c` now owns application lifecycle, common framing and navigation rather than timedated, locality, temporal-policy and Date & Time widget logic.
+- Add a private built-in Linux module bridge and shared Linux UI helpers without exposing GTK through the future public module ABI.
+- Add a configure-time architecture guard that rejects Date & Time model/backend ownership if it leaks back into the generic Linux shell.
+- Stop presenting Common's internal `standard` bootstrap identifier as a third conventional clock choice. System Settings now exposes explicit 12-hour/24-hour systems while retaining `standard` internally for consumers that must operate without the settings authority.
+- Reconcile external Cinnamon 12/24-hour changes into the equivalent explicit System Settings conventional clock choice, while preserving extended clock systems such as decimal or sidereal.
+- Reconcile external Cinnamon seconds changes into the shared temporal policy instead of allowing native and Common-aware applications to drift.
+- Keep persisted locality metadata aligned with the actual system IANA zone when that zone changes, while preserving deliberate geographic coordinates.
+- Add unit coverage for native/conventional clock-policy mapping and document the control-authority versus native-backend model.
+
 ## 0.3.12 — 2026-09-21
 
 - Remove the redundant user-facing `Use 24-hour clock` switch from Desktop format. Explicit 12-hour and 24-hour presentation are already first-class Clock system choices, so exposing the Cinnamon compatibility Boolean as a second control created two UI authorities for the same choice.
