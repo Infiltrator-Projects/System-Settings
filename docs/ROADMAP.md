@@ -58,7 +58,9 @@ Implement settings that can establish the UX without broad system privilege:
 - Language & Region frontend foundations that read/write the native platform authorities rather than creating a shadow locale database;
 - Temporal Presentation policy foundation in Common plus the Date & Time UI for at least conventional 12/24-hour and decimal 10-hour profiles;
 - regional-context discovery that can use the system IANA time zone as an explicit approximate location hint without conflating time zone and physical position;
-- a proper named-locality search/selection provider before locality names are treated as authoritative geographic state.
+- named-locality search/selection with persisted locality identity and coordinates (implemented for the current Linux Date & Time slice);
+- complete replacement of the supported Mint/Cinnamon Date & Time frontend through native timedated/GSettings authorities (implemented for the current systemd-based path);
+- compatibility fallback research for legacy Mint installations that expose the Cinnamon Settings Daemon date/time mechanism instead of timedated.
 
 Requirements:
 

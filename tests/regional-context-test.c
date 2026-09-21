@@ -59,6 +59,34 @@ int main(void)
     CHECK(!ss_regional_context_city_name(
         "../bad", city, sizeof(city)));
 
+    {
+        g_autoptr(GPtrArray) zones =
+            ss_regional_context_list_timezones();
+        bool melbourne_found = false;
+        size_t index;
+
+        CHECK(zones != NULL);
+        CHECK(zones->len > 0U);
+        for (index = 0U; index < zones->len; ++index) {
+            const char *zone =
+                g_ptr_array_index(zones, (guint)index);
+            if (strcmp(zone, "Australia/Melbourne") == 0) {
+                melbourne_found = true;
+                break;
+            }
+        }
+        CHECK(melbourne_found);
+    }
+
+    {
+        char nearest[SS_TIMEZONE_ID_CAPACITY] = {0};
+
+        CHECK(ss_regional_context_nearest_timezone(
+            "AU", -36.3949, 145.3610,
+            nearest, sizeof(nearest)));
+        CHECK(strcmp(nearest, "Australia/Melbourne") == 0);
+    }
+
     CHECK(g_remove(path) == 0);
     return 0;
 }

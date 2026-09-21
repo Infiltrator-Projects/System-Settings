@@ -8,6 +8,18 @@ All notable user-visible and architectural changes are recorded here.
 
 No unreleased changes.
 
+## 0.3.10 — 2026-09-21
+
+- Turn Date & Time from a presentation-only companion into a functional replacement for Mint/Cinnamon's current Date & Time panel on the supported systemd/timedated path.
+- Replace the read-only operating-system time-zone display with a searchable IANA time-zone selector backed by installed tzdata; changes are applied to Linux itself through `org.freedesktop.timedate1` and remain visible to Cinnamon and ordinary applications.
+- Add native Network time control and protected manual date/time setting through asynchronous timedated D-Bus calls, leaving the GUI unprivileged and delegating authorisation to the operating system.
+- Remove the geographic-location `Not selected`/source-mode dropdown. The system time zone now always provides the initial geographic approximation until the user refines it.
+- Add asynchronous named-locality search through geocode-glib/Nominatim. Queries such as `Mooroopna` return named matches and coordinates; choosing one stores the selected locality/coordinates for location-dependent Common clocks and applies the nearest same-country IANA zone as a visible, editable system-time-zone suggestion.
+- Retain latitude/longitude as advanced overrides rather than the primary geographic interface.
+- Recreate Mint's native format controls in the same System Settings page: 12/24-hour clock, panel date visibility, seconds compatibility, and first day of week. Native Cinnamon/GNOME settings remain the source of truth where they already exist.
+- Harden asynchronous locality searches against stale completion after cancellation/window close and reconcile external timedated/GSettings changes while the panel is open.
+- Add the required geocode-glib dependency to Linux CI and release packaging; Linux and Windows CI remain mandatory before release.
+
 ## 0.3.9 — 2026-09-21
 
 - Separate operating-system time-zone identity from physical geographic location: a configured time zone is now treated as regional evidence, never silently promoted to the user's exact location.

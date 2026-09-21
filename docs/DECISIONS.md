@@ -172,3 +172,16 @@ See [MINT_COMPATIBILITY.md](MINT_COMPATIBILITY.md).
 **Rationale.** A time zone such as `Australia/Melbourne` spans a large area. The tzdata coordinate identifies a representative reference for the zone, not the machine's position. Conflating the two would create false precision and would make future Language & Region work architecturally ambiguous.
 
 **Consequence.** Geographic location has an explicit source: absent, time-zone reference, or user-selected/custom. The system time zone remains authoritative for civil-time rules. A future locality chooser may resolve a named place such as a town or suburb to coordinates, but that resolution is a separate location operation and must not rewrite language, regional formats or time zone unless the user explicitly requests it.
+
+
+## ADR-021 — Date & Time replaces the Mint frontend, not the native authorities
+
+**Decision.** The System Settings Date & Time module is the project-owned frontend for the complete supported Mint/Cinnamon Date & Time workflow. It directly edits the same native authorities Mint edits for system time zone, network time, manual clock setting and conventional desktop format preferences. Infiltrator-only clock/calendar/geographic presentation remains an extension beside those native values.
+
+**Rationale.** A replacement settings application is incomplete if it merely displays the operating-system value or asks the user to keep using the old Mint panel for ordinary operations. Conversely, inventing parallel storage for values already owned by timedated or Cinnamon would create conflicting sources of truth.
+
+**Consequence.** On current systemd-based Mint systems, System Settings uses `org.freedesktop.timedate1` for the real system time zone, NTP state and manual clock changes, and `org.cinnamon.desktop.interface` for the native format settings used by Cinnamon. The GUI remains unprivileged; timedated/polkit owns operation-scoped authorisation. The old Mint panel is no longer required for these supported operations.
+
+The world-map widget itself is not an authority. The replacement may use a searchable IANA selector and named-locality search instead of embedding Mint's GTK3-only `libtimezonemap` widget inside the GTK4 shell, provided all underlying system capabilities remain reachable.
+
+Named locality is distinct from time-zone identity. A locality search result supplies geographic coordinates for location-dependent presentation and may propose/apply the nearest plausible same-country IANA zone, but the explicit system time-zone selector remains authoritative and user-correctable.

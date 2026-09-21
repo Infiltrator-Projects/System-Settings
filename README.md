@@ -241,6 +241,8 @@ See [Platform Compatibility](docs/PLATFORM_COMPATIBILITY.md), [Mint/Cinnamon Com
 
 ## Mint/Cinnamon compatibility
 
+The Date & Time vertical slice now acts as a real replacement frontend on current systemd-based Mint: it can change the operating-system time zone, network-time state and manual system clock through timedated; edit Cinnamon's native format preferences; and resolve named localities into coordinates for richer Common-aware temporal presentation.
+
 System Settings is intended to be a compatible superset of the Mint/Cinnamon settings environment. When Mint/Cinnamon already has an authoritative setting for the same concept, System Settings should use that setting directly rather than create a duplicate. New Infiltrator policy is introduced only for concepts the existing desktop cannot represent faithfully.
 
 The rule is: **reuse what is already correct, extend what is missing, replace only when necessary.**

@@ -215,22 +215,11 @@ Time zone, locale and physical location are related inputs but are not the same 
 
 On Linux, System Settings may read the configured IANA time zone and the representative coordinate published by the installed tzdata database. That coordinate is useful as a starting approximation for location-dependent clock systems. It is not evidence that the computer is physically located at that coordinate.
 
-The location source is therefore explicit:
+The operating-system time zone always provides the initial regional approximation when tzdata publishes a reference coordinate. There is no user-facing "Not selected" pseudo-location: the application can start usefully from native system state without claiming that the reference point is the user's precise position.
 
-```text
-not selected
-    no latitude/longitude authority
+The user may refine that approximation by searching for a named locality. On Linux the current implementation uses geocode-glib's maintained geocoding service path and records the selected display name plus coordinates as geographic presentation metadata. The coordinates are the semantic input used by location-dependent clocks; the display name exists so the UI can continue to say "Mooroopna" rather than degrading the user's choice back into two unexplained numbers.
 
-system time-zone reference
-    representative tzdata coordinate
-    approximate regional hint only
-
-custom / future named locality
-    user-selected geographic authority
-    latitude/longitude published to Common Temporal
-```
-
-A future locality selector may resolve a named place such as a town, suburb or property-level location through a proper gazetteer/geocoding provider. System Settings must not ship an arbitrary hard-coded local-town list merely to make the UI appear complete. Until that provider is implemented, custom coordinates remain the precise path.
+Manual latitude/longitude remains available as an advanced override. A locality may also produce a best-effort same-country time-zone suggestion from installed tzdata, but geographic location never silently becomes the source of truth for the IANA time zone: the system time-zone selector remains independently visible and editable.
 
 Language, regional formats, time zone and geographic location will remain independently writable dimensions when the broader Language & Region module is implemented.
 

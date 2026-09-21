@@ -77,6 +77,30 @@ System Settings should read the native Mint/Linux values first and eventually re
 
 The installed IANA time zone may provide a representative tzdata coordinate. System Settings can offer that coordinate as an explicit approximation for location-dependent Infiltrator features, but must not infer that the user physically lives in the reference city. A more precise locality choice is a separate user action.
 
+## Date & Time replacement boundary
+
+The Date & Time module deliberately replaces the current Mint/Cinnamon frontend while retaining Mint/Linux native authorities underneath it.
+
+For the supported current systemd path:
+
+```text
+System Settings
+    ├── Time zone ───────────────→ org.freedesktop.timedate1.SetTimezone
+    ├── Network time ────────────→ org.freedesktop.timedate1.SetNTP
+    ├── Manual date/time ────────→ org.freedesktop.timedate1.SetTime
+    ├── 12/24-hour ──────────────→ org.cinnamon.desktop.interface
+    │                                + GNOME clock-format compatibility mirror
+    ├── Display date ────────────→ org.cinnamon.desktop.interface
+    ├── Display seconds ─────────→ temporal policy + exact Cinnamon fallback
+    └── First day of week ───────→ org.cinnamon.desktop.interface
+```
+
+The shell never becomes root. Protected timedated operations request policy authorisation through the system service only when the user performs the operation.
+
+The former Mint map/Region/City presentation is not itself a source of truth. System Settings exposes the authoritative IANA time zone directly and adds named-place search. A place such as Mooroopna resolves to a display name and coordinates; those coordinates feed location-dependent Common temporal presentation. A same-country nearest-zone lookup may update the system time zone, but the explicit IANA selector remains visible so a heuristic can always be corrected.
+
+Named-place lookup is asynchronous and network-dependent. Failure of the geocoder must not disable manual coordinates, the time-zone selector, NTP controls or other Date & Time settings.
+
 ## Compatible fallback
 
 An extended Infiltrator policy may have no exact representation in Mint.

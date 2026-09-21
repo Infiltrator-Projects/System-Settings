@@ -126,6 +126,31 @@ At minimum prove:
 
 Performance budgets can be made numeric once the initial implementation provides a baseline.
 
+## Date & Time replacement acceptance
+
+The Mint/Cinnamon Date & Time replacement is validated at separate evidence levels.
+
+Automated builds/tests must prove:
+
+- the full IANA zone catalogue can be built from installed tzdata;
+- regional coordinate parsing remains bounded and deterministic;
+- Linux builds link the maintained geocode-glib API and package its runtime dependency;
+- Windows remains buildable even though Linux-native timedated/geocoding UI is not compiled there;
+- strict warnings remain errors.
+
+Environment testing on a supported Mint/Cinnamon system must additionally prove:
+
+- opening Date & Time causes no authentication prompt;
+- selecting an IANA time zone changes the actual timedated `Timezone` property and external Cinnamon tools observe it;
+- enabling/disabling Network time changes timedated `NTP` and the panel reconciles the resulting property notification;
+- manual date/time is disabled while NTP is active and a protected manual change uses operation-scoped polkit authorisation;
+- native 12/24-hour, panel-date, seconds and first-day-of-week settings agree with Cinnamon when changed from either interface;
+- a locality query such as `Mooroopna` returns selectable named results when the geocoding service is reachable;
+- selecting a locality publishes its coordinates to the temporal policy without pretending that the locality name is an operating-system time-zone identifier;
+- closing the window or issuing a second search while a geocode request is outstanding cannot update destroyed/stale UI.
+
+The Mint GTK3 map is presentation, not authority. Functional replacement does not require embedding that widget in the GTK4 shell; it requires preserving or improving every underlying system operation it exposed.
+
 ## External-change tests
 
 For backends that provide notifications:

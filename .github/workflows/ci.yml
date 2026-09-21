@@ -51,6 +51,8 @@ jobs:
           test -f "$icon"
           grep -qx 'Icon=org.infiltrator.SystemSettings' "$desktop"
           grep -q '#00ADEF' "$icon"
+          depends="$(dpkg-deb --field "$deb" Depends)"
+          grep -Eq 'libgeocode-glib-2-0|libgeocode-glib0' <<<"$depends"
           rm -rf "$root"
       - name: Upload Debian package
         if: runner.os == 'Linux'

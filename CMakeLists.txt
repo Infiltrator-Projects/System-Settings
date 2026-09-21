@@ -125,6 +125,13 @@ if(BUILD_TESTING)
         target_link_libraries(regional-context-test PRIVATE
             system-settings-platform)
         add_test(NAME regional-context COMMAND regional-context-test)
+
+        add_executable(location-metadata-test
+            tests/location-metadata-test.c)
+        ss_configure(location-metadata-test)
+        target_link_libraries(location-metadata-test PRIVATE
+            system-settings-platform)
+        add_test(NAME location-metadata COMMAND location-metadata-test)
     endif()
 endif()
 
