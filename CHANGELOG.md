@@ -8,6 +8,13 @@ All notable user-visible and architectural changes are recorded here.
 
 No unreleased changes.
 
+## 0.3.7 — 2026-09-21
+
+- Repair GTK 4 switch rendering by replacing the broad widget background override that could hide the slider and reduce disabled switches to solid dark rectangles.
+- Give switches, drop-downs and spin controls explicit Common-aware input, border, hover, focus, checked and disabled states so controls remain legible in both Day and Night palettes.
+- Use more of Common's semantic colour roles without inventing product-local colours: accent for the live preview and clock controls, information for calendar, warning for geographic settings, and success for operating-system time.
+- Add coloured section edges and selected-navigation accenting to improve hierarchy while retaining the established graphite System Settings layout.
+
 ## 0.3.6 — 2026-09-21
 
 - Finish the Common-to-System-Settings design pass by consuming Common's canonical regular/bold typography weights instead of hard-coding the current numeric weight.

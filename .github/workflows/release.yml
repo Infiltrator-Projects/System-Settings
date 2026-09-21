@@ -80,5 +80,9 @@ jobs:
             echo "Release $tag already exists; verifying asset name."
             gh release view "$tag" --json assets --jq '.assets[].name' |               grep -qx "$(basename "$deb")"
           else
-            gh release create "$tag" "$deb"               --verify-tag               --target "$sha"               --title "System Settings $version"               --notes "System Settings $version consumes pinned Common 1.19.20 more completely: strict locale-independent coordinate parsing, canonical temporal ID handling, semantic status colours, deterministic ASCII matching, and shared project/build identity, while retaining Mint/Cinnamon compatibility and Windows support."
+            gh release create "$tag" "$deb" \
+              --verify-tag \
+              --target "$sha" \
+              --title "System Settings $version" \
+              --notes "See CHANGELOG.md for the complete user-visible and architectural changes in System Settings $version."
           fi
