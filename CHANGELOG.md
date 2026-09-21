@@ -8,6 +8,14 @@ All notable user-visible and architectural changes are recorded here.
 
 No unreleased changes.
 
+## 0.3.4 — 2026-09-21
+
+- Pin Common 1.19.20 with validated temporal-provider identity, symmetric coordinate validation and allocation-backed POSIX policy paths.
+- Recover from malformed or empty temporal policy by returning to Mint/Cinnamon defaults instead of refusing to open Date & Time.
+- Share one Cinnamon temporal-settings adapter between persistence and the GTK shell, and reconcile external 12/24-hour and seconds changes while Mint remains authoritative.
+- Make the Standard clock preview follow Cinnamon's actual 12/24-hour preference and stop labelling Gregorian preview text as though it were a converted non-Gregorian date.
+- Add Linux policy-store regression coverage for corrupt-policy recovery and valid-policy reload.
+
 ## 0.3.3 — 2026-09-21
 
 - Pin the final Common 1.19.19 release revision containing the shared POSIX temporal authority contract and release-build-safe contract test.
