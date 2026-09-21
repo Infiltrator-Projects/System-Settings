@@ -8,6 +8,15 @@ All notable user-visible and architectural changes are recorded here.
 
 No unreleased changes.
 
+## 0.3.11 — 2026-09-21
+
+- Hide manual date/time controls completely while Network time is enabled instead of leaving inactive-looking manual fields visible beside an authoritative NTP source.
+- Reorder Date & Time so location and the IANA time zone form one coherent settings card; a named locality drives coordinates and normally the matching zone, while an explicit zone remains available for correction.
+- Preserve the distinction between a precise named/custom location and a time-zone-derived regional reference. When location is still only the system reference, changing the real system zone moves the reference coordinates with it rather than leaving stale Melbourne coordinates behind.
+- Move Network time/manual setting below the selected Clock and Calendar systems so the source controls follow the presentation choices they govern.
+- Make reversible manual time entry follow Standard 12/24-hour or French Republican decimal clock presentation. Decimal input is converted exactly back to conventional microseconds before calling timedated.
+- Refuse to expose a misleading manual editor for clock/calendar combinations that cannot yet be safely converted back to a canonical system instant; Gregorian plus Standard/12h/24h/decimal is currently reversible and covered by unit tests.
+
 ## 0.3.10 — 2026-09-21
 
 - Turn Date & Time from a presentation-only companion into a functional replacement for Mint/Cinnamon's current Date & Time panel on the supported systemd/timedated path.

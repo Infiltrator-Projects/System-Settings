@@ -143,7 +143,8 @@ Environment testing on a supported Mint/Cinnamon system must additionally prove:
 - opening Date & Time causes no authentication prompt;
 - selecting an IANA time zone changes the actual timedated `Timezone` property and external Cinnamon tools observe it;
 - enabling/disabling Network time changes timedated `NTP` and the panel reconciles the resulting property notification;
-- manual date/time is disabled while NTP is active and a protected manual change uses operation-scoped polkit authorisation;
+- manual date/time is not displayed while NTP is active, because no competing manual source should be presented while network time is authoritative;
+- when manual setting is visible, its clock text matches the selected reversible clock representation and converts back to the same canonical instant before the protected timedated write;
 - native 12/24-hour, panel-date, seconds and first-day-of-week settings agree with Cinnamon when changed from either interface;
 - a locality query such as `Mooroopna` returns selectable named results when the geocoding service is reachable;
 - selecting a locality publishes its coordinates to the temporal policy without pretending that the locality name is an operating-system time-zone identifier;

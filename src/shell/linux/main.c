@@ -9,6 +9,7 @@
 #include "system-settings/cinnamon-interface.h"
 #include "system-settings/location-metadata.h"
 #include "system-settings/location-search.h"
+#include "system-settings/manual-time.h"
 #include "system-settings/project-info.h"
 #include "system-settings/regional-context.h"
 #include "system-settings/system-time-service.h"
@@ -41,6 +42,8 @@ typedef struct SettingsWindow {
     GtkEntry *manual_date;
     GtkEntry *manual_time;
     GtkButton *manual_set_time;
+    GtkWidget *manual_row;
+    GtkWidget *manual_unavailable;
     GtkSwitch *use_24h;
     GtkSwitch *show_date;
     GtkDropDown *first_day;
@@ -56,6 +59,7 @@ typedef struct SettingsWindow {
     guint timer_id;
     guint location_search_generation;
     bool location_metadata_present;
+    bool location_follows_timezone_reference;
     bool updating_controls;
     bool updating_system_controls;
 } SettingsWindow;
@@ -576,28 +580,93 @@ static void sync_native_format_controls(SettingsWindow *state)
     state->updating_system_controls = false;
 }
 
+static bool desktop_uses_24h(const SettingsWindow *state)
+{
+    bool value = true;
+
+    if (state != NULL &&
+        state->cinnamon_interface_settings != NULL) {
+        (void)ss_cinnamon_interface_get_boolean(
+            state->cinnamon_interface_settings,
+            "clock-use-24h",
+            &value);
+    }
+    return value;
+}
+
+static bool manual_representation_supported(
+    const SettingsWindow *state)
+{
+    const InfiltratrTemporalPolicyV3 *policy;
+
+    if (state == NULL) {
+        return false;
+    }
+
+    policy = ss_date_time_model_policy(&state->model);
+    return policy != NULL &&
+           strcmp(policy->calendar, "gregorian") == 0 &&
+           ss_manual_time_mode_supported(policy->clock_mode);
+}
+
+static bool location_policy_matches_reference(
+    const SettingsWindow *state)
+{
+    const InfiltratrTemporalPolicyV3 *policy;
+
+    if (state == NULL ||
+        !state->regional_context.has_reference_coordinates) {
+        return false;
+    }
+
+    policy = ss_date_time_model_policy(&state->model);
+    return policy != NULL &&
+           policy->location_configured &&
+           coordinate_close(
+               policy->latitude,
+               state->regional_context.reference_latitude) &&
+           coordinate_close(
+               policy->longitude,
+               state->regional_context.reference_longitude);
+}
+
 static void fill_manual_time_entries(SettingsWindow *state)
 {
+    const InfiltratrTemporalPolicyV3 *policy;
     g_autoptr(GDateTime) now = NULL;
     g_autofree gchar *date = NULL;
-    g_autofree gchar *time = NULL;
+    char time[64];
+    int64_t unix_microseconds;
+    gint64 offset_microseconds;
 
     if (state == NULL || state->manual_date == NULL ||
         state->manual_time == NULL) {
         return;
     }
 
+    policy = ss_date_time_model_policy(&state->model);
     now = g_date_time_new_now_local();
-    if (now == NULL) {
+    if (policy == NULL || now == NULL ||
+        !manual_representation_supported(state)) {
         return;
     }
+
     date = g_date_time_format(now, "%Y-%m-%d");
-    time = g_date_time_format(now, "%H:%M:%S");
+    unix_microseconds = g_get_real_time();
+    offset_microseconds = g_date_time_get_utc_offset(now);
+
     if (date != NULL) {
         gtk_editable_set_text(
             GTK_EDITABLE(state->manual_date), date);
     }
-    if (time != NULL) {
+    if (ss_manual_time_format(
+            policy->clock_mode,
+            desktop_uses_24h(state),
+            unix_microseconds,
+            (int32_t)(offset_microseconds / G_USEC_PER_SEC),
+            policy->show_seconds,
+            time,
+            sizeof(time))) {
         gtk_editable_set_text(
             GTK_EDITABLE(state->manual_time), time);
     }
@@ -607,6 +676,8 @@ static void sync_system_time_controls(SettingsWindow *state)
 {
     SsSystemTimeState system_state;
     guint zone_index;
+    bool manual_supported;
+    bool manual_visible;
 
     if (state == NULL) {
         return;
@@ -623,17 +694,12 @@ static void sync_system_time_controls(SettingsWindow *state)
             gtk_widget_set_sensitive(
                 GTK_WIDGET(state->network_time), FALSE);
         }
-        if (state->manual_date != NULL) {
-            gtk_widget_set_sensitive(
-                GTK_WIDGET(state->manual_date), FALSE);
+        if (state->manual_row != NULL) {
+            gtk_widget_set_visible(state->manual_row, FALSE);
         }
-        if (state->manual_time != NULL) {
-            gtk_widget_set_sensitive(
-                GTK_WIDGET(state->manual_time), FALSE);
-        }
-        if (state->manual_set_time != NULL) {
-            gtk_widget_set_sensitive(
-                GTK_WIDGET(state->manual_set_time), FALSE);
+        if (state->manual_unavailable != NULL) {
+            gtk_widget_set_visible(
+                state->manual_unavailable, FALSE);
         }
         return;
     }
@@ -659,20 +725,26 @@ static void sync_system_time_controls(SettingsWindow *state)
             system_state.can_ntp);
     }
 
-    if (state->manual_date != NULL) {
-        gtk_widget_set_sensitive(
-            GTK_WIDGET(state->manual_date),
-            !system_state.ntp_enabled);
+    manual_supported = manual_representation_supported(state);
+    manual_visible = !system_state.ntp_enabled && manual_supported;
+
+    if (state->manual_row != NULL) {
+        gtk_widget_set_visible(state->manual_row, manual_visible);
     }
-    if (state->manual_time != NULL) {
-        gtk_widget_set_sensitive(
-            GTK_WIDGET(state->manual_time),
-            !system_state.ntp_enabled);
+    if (state->manual_unavailable != NULL) {
+        gtk_widget_set_visible(
+            state->manual_unavailable,
+            !system_state.ntp_enabled && !manual_supported);
     }
-    if (state->manual_set_time != NULL) {
+
+    if (manual_visible) {
         gtk_widget_set_sensitive(
-            GTK_WIDGET(state->manual_set_time),
-            !system_state.ntp_enabled);
+            GTK_WIDGET(state->manual_date), TRUE);
+        gtk_widget_set_sensitive(
+            GTK_WIDGET(state->manual_time), TRUE);
+        gtk_widget_set_sensitive(
+            GTK_WIDGET(state->manual_set_time), TRUE);
+        fill_manual_time_entries(state);
     }
 
     state->updating_system_controls = false;
@@ -1015,19 +1087,32 @@ static void system_time_changed(
     }
 
     (void)ss_regional_context_detect(&state->regional_context);
-    sync_system_time_controls(state);
-    if (!ss_date_time_model_policy(&state->model)->location_configured) {
-        state->updating_controls = true;
-        if (state->regional_context.has_reference_coordinates) {
+
+    if (state->location_follows_timezone_reference &&
+        state->regional_context.has_reference_coordinates) {
+        if (ss_date_time_model_set_location(
+                &state->model,
+                true,
+                state->regional_context.reference_latitude,
+                state->regional_context.reference_longitude)) {
+            state->updating_controls = true;
             gtk_spin_button_set_value(
                 state->latitude,
                 state->regional_context.reference_latitude);
             gtk_spin_button_set_value(
                 state->longitude,
                 state->regional_context.reference_longitude);
+            if (state->location_search != NULL &&
+                state->regional_context.timezone_city[0] != '\0') {
+                gtk_editable_set_text(
+                    GTK_EDITABLE(state->location_search),
+                    state->regional_context.timezone_city);
+            }
+            state->updating_controls = false;
         }
-        state->updating_controls = false;
     }
+
+    sync_system_time_controls(state);
     update_location_summary(state);
     (void)refresh_preview(state);
 }
@@ -1138,54 +1223,64 @@ static void on_network_time_changed(GObject *object,
 }
 
 static bool parse_manual_datetime(
+    const SettingsWindow *state,
     const char *date_text,
     const char *time_text,
     int64_t *unix_time_usec)
 {
+    const InfiltratrTemporalPolicyV3 *policy;
     int year;
     int month;
     int day;
+    char trailing;
+    int64_t microseconds_of_day;
+    int64_t whole_seconds;
     int hour;
     int minute;
-    int second = 0;
-    char trailing;
+    double seconds;
     g_autoptr(GDateTime) value = NULL;
 
-    if (date_text == NULL || time_text == NULL ||
+    if (state == NULL || date_text == NULL || time_text == NULL ||
         unix_time_usec == NULL ||
+        !manual_representation_supported(state) ||
         sscanf(date_text,
                "%d-%d-%d%c",
                &year, &month, &day, &trailing) != 3) {
         return false;
     }
 
-    if (sscanf(time_text,
-               "%d:%d:%d%c",
-               &hour, &minute, &second, &trailing) != 3) {
-        second = 0;
-        if (sscanf(time_text,
-                   "%d:%d%c",
-                   &hour, &minute, &trailing) != 2) {
-            return false;
-        }
+    policy = ss_date_time_model_policy(&state->model);
+    if (policy == NULL ||
+        !ss_manual_time_parse(
+            policy->clock_mode,
+            desktop_uses_24h(state),
+            time_text,
+            &microseconds_of_day)) {
+        return false;
     }
 
     if (year < 1970 || year > 9999 ||
         month < 1 || month > 12 ||
-        day < 1 || day > 31 ||
-        hour < 0 || hour > 23 ||
-        minute < 0 || minute > 59 ||
-        second < 0 || second > 59) {
+        day < 1 || day > 31) {
         return false;
     }
 
+    whole_seconds = microseconds_of_day / G_USEC_PER_SEC;
+    hour = (int)(whole_seconds / INT64_C(3600));
+    minute = (int)((whole_seconds % INT64_C(3600)) / INT64_C(60));
+    seconds =
+        (double)(whole_seconds % INT64_C(60)) +
+        (double)(microseconds_of_day % G_USEC_PER_SEC) /
+            (double)G_USEC_PER_SEC;
+
     value = g_date_time_new_local(
-        year, month, day, hour, minute, (double)second);
+        year, month, day, hour, minute, seconds);
     if (value == NULL) {
         return false;
     }
     *unix_time_usec =
-        (int64_t)g_date_time_to_unix(value) * G_USEC_PER_SEC;
+        (int64_t)g_date_time_to_unix(value) * G_USEC_PER_SEC +
+        (microseconds_of_day % G_USEC_PER_SEC);
     return true;
 }
 
@@ -1205,10 +1300,10 @@ static void on_manual_set_time_clicked(
     date_text = gtk_editable_get_text(GTK_EDITABLE(state->manual_date));
     time_text = gtk_editable_get_text(GTK_EDITABLE(state->manual_time));
     if (!parse_manual_datetime(
-            date_text, time_text, &unix_time_usec)) {
+            state, date_text, time_text, &unix_time_usec)) {
         set_status(
             state,
-            "Enter a valid local date as YYYY-MM-DD and time as HH:MM[:SS].",
+            "Enter a valid Gregorian date and a time in the selected clock system.",
             true);
         return;
     }
@@ -1368,6 +1463,7 @@ static void on_location_result_activated(
 
     state->location_metadata_present =
         ss_location_metadata_save(&state->location_metadata);
+    state->location_follows_timezone_reference = false;
 
     state->updating_controls = true;
     gtk_editable_set_text(
@@ -1571,6 +1667,7 @@ static void on_location_coordinate_changed(
     state->location_metadata.longitude = longitude;
     state->location_metadata_present =
         ss_location_metadata_save(&state->location_metadata);
+    state->location_follows_timezone_reference = false;
     gtk_editable_set_text(
         GTK_EDITABLE(state->location_search),
         "Custom coordinates");
@@ -1584,10 +1681,10 @@ static GtkWidget *build_date_time_panel(SettingsWindow *state)
         "System Settings is the authoritative Date & Time frontend. It writes ordinary Mint/Linux settings through their native interfaces and adds richer Common-aware clock, calendar and geographic policy without maintaining a second copy of native system state.",
         "page-summary");
     GtkWidget *preview_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
-    GtkWidget *system_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
     GtkWidget *location_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
     GtkWidget *clock_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
     GtkWidget *calendar_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
+    GtkWidget *system_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
     GtkWidget *format_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
     GtkWidget *manual_box;
     GtkWidget *search_box;
@@ -1609,95 +1706,16 @@ static GtkWidget *build_date_time_panel(SettingsWindow *state)
     gtk_box_append(GTK_BOX(page), preview_card);
 
     /*
-     * Native system controls replace the functional scope of Mint's Date &
-     * Time panel. The shell remains unprivileged; timedated performs any
-     * required operation-scoped polkit authorisation.
-     */
-    gtk_widget_add_css_class(system_card, "settings-card");
-    gtk_widget_add_css_class(system_card, "system-card");
-    gtk_box_append(GTK_BOX(system_card),
-                   make_label("Operating-system date & time",
-                              "section-title"));
-
-    strings = timezone_strings(state);
-    state->timezone = GTK_DROP_DOWN(
-        gtk_drop_down_new(G_LIST_MODEL(strings), NULL));
-    g_object_unref(strings);
-    expression = gtk_property_expression_new(
-        GTK_TYPE_STRING_OBJECT, NULL, "string");
-    gtk_drop_down_set_expression(state->timezone, expression);
-    gtk_expression_unref(expression);
-    gtk_drop_down_set_enable_search(state->timezone, TRUE);
-    gtk_widget_add_css_class(
-        GTK_WIDGET(state->timezone), "setting-dropdown");
-    gtk_widget_set_size_request(
-        GTK_WIDGET(state->timezone), 360, -1);
-    gtk_box_append(
-        GTK_BOX(system_card),
-        make_setting_row(
-            "Time zone",
-            "Select the real operating-system IANA time zone. This changes Linux itself through systemd-timedated, so Cinnamon and ordinary applications see the same value.",
-            GTK_WIDGET(state->timezone)));
-
-    state->network_time = GTK_SWITCH(gtk_switch_new());
-    gtk_widget_add_css_class(
-        GTK_WIDGET(state->network_time), "setting-switch");
-    gtk_box_append(
-        GTK_BOX(system_card),
-        make_setting_row(
-            "Network time",
-            "Synchronise the system clock through the operating system's configured network-time service.",
-            GTK_WIDGET(state->network_time)));
-
-    manual_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-    state->manual_date = GTK_ENTRY(gtk_entry_new());
-    state->manual_time = GTK_ENTRY(gtk_entry_new());
-    state->manual_set_time =
-        GTK_BUTTON(gtk_button_new_with_label("Set"));
-    gtk_entry_set_placeholder_text(
-        state->manual_date, "YYYY-MM-DD");
-    gtk_entry_set_placeholder_text(
-        state->manual_time, "HH:MM:SS");
-    gtk_entry_set_max_length(state->manual_date, 10);
-    gtk_entry_set_max_length(state->manual_time, 8);
-    gtk_widget_set_size_request(
-        GTK_WIDGET(state->manual_date), 130, -1);
-    gtk_widget_set_size_request(
-        GTK_WIDGET(state->manual_time), 105, -1);
-    gtk_widget_add_css_class(
-        GTK_WIDGET(state->manual_date), "setting-entry");
-    gtk_widget_add_css_class(
-        GTK_WIDGET(state->manual_time), "setting-entry");
-    gtk_widget_add_css_class(
-        GTK_WIDGET(state->manual_set_time), "setting-button");
-    gtk_box_append(GTK_BOX(manual_box),
-                   GTK_WIDGET(state->manual_date));
-    gtk_box_append(GTK_BOX(manual_box),
-                   GTK_WIDGET(state->manual_time));
-    gtk_box_append(GTK_BOX(manual_box),
-                   GTK_WIDGET(state->manual_set_time));
-    gtk_box_append(
-        GTK_BOX(system_card),
-        make_setting_row(
-            "Manual date and time",
-            "Available when network time is off. Values are interpreted in the currently selected system time zone.",
-            manual_box));
-    fill_manual_time_entries(state);
-
-    state->status_label = make_label("", "status-ok");
-    gtk_label_set_wrap(GTK_LABEL(state->status_label), TRUE);
-    gtk_box_append(GTK_BOX(system_card), state->status_label);
-    gtk_box_append(GTK_BOX(page), system_card);
-
-    /*
-     * Geographic location is a first-class named location, not an optional
-     * 0,0 pair. A time-zone reference seeds the page until a locality is
-     * selected, but there is deliberately no "Not selected" pseudo-choice.
+     * Locality, coordinates and time zone are one coherent settings family.
+     * A named locality may propose the matching IANA zone, while the explicit
+     * zone selector remains visible for correction. If no precise locality has
+     * been selected, the system zone's tzdata reference follows zone changes.
      */
     gtk_widget_add_css_class(location_card, "settings-card");
     gtk_widget_add_css_class(location_card, "location-card");
-    gtk_box_append(GTK_BOX(location_card),
-                   make_label("Geographic location", "section-title"));
+    gtk_box_append(
+        GTK_BOX(location_card),
+        make_label("Location & time zone", "section-title"));
 
     state->location_summary = make_label("", "accent-note");
     gtk_label_set_wrap(GTK_LABEL(state->location_summary), TRUE);
@@ -1725,7 +1743,7 @@ static GtkWidget *build_date_time_panel(SettingsWindow *state)
         GTK_BOX(location_card),
         make_setting_row(
             "Locality",
-            "Search by town, suburb, city or place name. Selecting a result stores its coordinates for location-dependent clocks and applies the nearest matching IANA time zone to the operating system; the time-zone selector above remains available for correction.",
+            "Search by town, suburb, city or place name. Selecting a result stores its coordinates and applies the nearest matching IANA time zone to Linux.",
             search_box));
 
     state->location_results = GTK_LIST_BOX(gtk_list_box_new());
@@ -1736,6 +1754,26 @@ static GtkWidget *build_date_time_panel(SettingsWindow *state)
     gtk_box_append(
         GTK_BOX(location_card),
         GTK_WIDGET(state->location_results));
+
+    strings = timezone_strings(state);
+    state->timezone = GTK_DROP_DOWN(
+        gtk_drop_down_new(G_LIST_MODEL(strings), NULL));
+    g_object_unref(strings);
+    expression = gtk_property_expression_new(
+        GTK_TYPE_STRING_OBJECT, NULL, "string");
+    gtk_drop_down_set_expression(state->timezone, expression);
+    gtk_expression_unref(expression);
+    gtk_drop_down_set_enable_search(state->timezone, TRUE);
+    gtk_widget_add_css_class(
+        GTK_WIDGET(state->timezone), "setting-dropdown");
+    gtk_widget_set_size_request(
+        GTK_WIDGET(state->timezone), 360, -1);
+    gtk_box_append(
+        GTK_BOX(location_card),
+        make_setting_row(
+            "Time zone",
+            "The real operating-system IANA zone. Locality selection normally chooses it automatically; it remains editable for correction or deliberate overrides.",
+            GTK_WIDGET(state->timezone)));
 
     state->latitude = GTK_SPIN_BUTTON(
         gtk_spin_button_new_with_range(-90.0, 90.0, 0.0001));
@@ -1764,8 +1802,9 @@ static GtkWidget *build_date_time_panel(SettingsWindow *state)
 
     gtk_widget_add_css_class(clock_card, "settings-card");
     gtk_widget_add_css_class(clock_card, "clock-card");
-    gtk_box_append(GTK_BOX(clock_card),
-                   make_label("Clock system", "section-title"));
+    gtk_box_append(
+        GTK_BOX(clock_card),
+        make_label("Clock system", "section-title"));
 
     strings = clock_mode_strings();
     state->clock_mode = GTK_DROP_DOWN(
@@ -1779,7 +1818,7 @@ static GtkWidget *build_date_time_panel(SettingsWindow *state)
         GTK_BOX(clock_card),
         make_setting_row(
             "System clock",
-            "Choose the human clock representation used by Common-aware applications. Standard time follows the native desktop's 12/24-hour preference below; alternative clock systems remain an Infiltrator extension.",
+            "Choose the human clock representation used by Common-aware applications. Standard time follows the native desktop's 12/24-hour preference below.",
             GTK_WIDGET(state->clock_mode)));
 
     state->show_seconds = GTK_SWITCH(gtk_switch_new());
@@ -1795,8 +1834,9 @@ static GtkWidget *build_date_time_panel(SettingsWindow *state)
 
     gtk_widget_add_css_class(calendar_card, "settings-card");
     gtk_widget_add_css_class(calendar_card, "calendar-card");
-    gtk_box_append(GTK_BOX(calendar_card),
-                   make_label("Calendar system", "section-title"));
+    gtk_box_append(
+        GTK_BOX(calendar_card),
+        make_label("Calendar system", "section-title"));
 
     strings = calendar_strings();
     state->calendar = GTK_DROP_DOWN(
@@ -1815,13 +1855,83 @@ static GtkWidget *build_date_time_panel(SettingsWindow *state)
     gtk_box_append(GTK_BOX(page), calendar_card);
 
     /*
+     * Network/manual clock source belongs after the user's presentation
+     * choices. When NTP is enabled the manual controls do not merely become
+     * insensitive: they disappear because they are not an active source.
+     */
+    gtk_widget_add_css_class(system_card, "settings-card");
+    gtk_widget_add_css_class(system_card, "system-card");
+    gtk_box_append(
+        GTK_BOX(system_card),
+        make_label("System time", "section-title"));
+
+    state->network_time = GTK_SWITCH(gtk_switch_new());
+    gtk_widget_add_css_class(
+        GTK_WIDGET(state->network_time), "setting-switch");
+    gtk_box_append(
+        GTK_BOX(system_card),
+        make_setting_row(
+            "Network time",
+            "Synchronise the system clock through the operating system's configured network-time service.",
+            GTK_WIDGET(state->network_time)));
+
+    manual_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+    state->manual_date = GTK_ENTRY(gtk_entry_new());
+    state->manual_time = GTK_ENTRY(gtk_entry_new());
+    state->manual_set_time =
+        GTK_BUTTON(gtk_button_new_with_label("Set"));
+    gtk_entry_set_placeholder_text(
+        state->manual_date, "YYYY-MM-DD");
+    gtk_entry_set_placeholder_text(
+        state->manual_time, "Selected clock time");
+    gtk_entry_set_max_length(state->manual_date, 10);
+    gtk_entry_set_max_length(state->manual_time, 24);
+    gtk_widget_set_size_request(
+        GTK_WIDGET(state->manual_date), 130, -1);
+    gtk_widget_set_size_request(
+        GTK_WIDGET(state->manual_time), 150, -1);
+    gtk_widget_add_css_class(
+        GTK_WIDGET(state->manual_date), "setting-entry");
+    gtk_widget_add_css_class(
+        GTK_WIDGET(state->manual_time), "setting-entry");
+    gtk_widget_add_css_class(
+        GTK_WIDGET(state->manual_set_time), "setting-button");
+    gtk_box_append(
+        GTK_BOX(manual_box), GTK_WIDGET(state->manual_date));
+    gtk_box_append(
+        GTK_BOX(manual_box), GTK_WIDGET(state->manual_time));
+    gtk_box_append(
+        GTK_BOX(manual_box), GTK_WIDGET(state->manual_set_time));
+
+    state->manual_row = make_setting_row(
+        "Manual date and time",
+        "Shown only when Network time is off. The time entry follows the selected clock system above; the current reversible editor supports Gregorian dates with Standard, 12-hour, 24-hour and French Republican decimal time.",
+        manual_box);
+    gtk_box_append(GTK_BOX(system_card), state->manual_row);
+
+    state->manual_unavailable = make_label(
+        "Manual setting is hidden for this clock/calendar combination because System Settings will not reinterpret a presentation it cannot safely convert back to one canonical system instant.",
+        "accent-note");
+    gtk_label_set_wrap(
+        GTK_LABEL(state->manual_unavailable), TRUE);
+    gtk_widget_set_visible(state->manual_unavailable, FALSE);
+    gtk_box_append(
+        GTK_BOX(system_card), state->manual_unavailable);
+
+    state->status_label = make_label("", "status-ok");
+    gtk_label_set_wrap(GTK_LABEL(state->status_label), TRUE);
+    gtk_box_append(GTK_BOX(system_card), state->status_label);
+    gtk_box_append(GTK_BOX(page), system_card);
+
+    /*
      * These are ordinary Cinnamon authorities, not copies in the Infiltrator
      * policy. Writing them here has exactly the same system effect as Mint's
      * Date & Time format controls.
      */
     gtk_widget_add_css_class(format_card, "settings-card");
-    gtk_box_append(GTK_BOX(format_card),
-                   make_label("Desktop format", "section-title"));
+    gtk_box_append(
+        GTK_BOX(format_card),
+        make_label("Desktop format", "section-title"));
 
     state->use_24h = GTK_SWITCH(gtk_switch_new());
     gtk_widget_add_css_class(
@@ -2019,6 +2129,10 @@ static void on_activate(GtkApplication *application, gpointer user_data)
     (void)ss_regional_context_detect(&state->regional_context);
     state->location_metadata_present =
         ss_location_metadata_load(&state->location_metadata);
+    state->location_follows_timezone_reference =
+        !state->location_metadata_present &&
+        (!ss_date_time_model_policy(&state->model)->location_configured ||
+         location_policy_matches_reference(state));
 
     state->system_time_service =
         ss_system_time_service_new(&system_time_error);

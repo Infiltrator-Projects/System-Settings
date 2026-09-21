@@ -97,7 +97,7 @@ System Settings
 
 The shell never becomes root. Protected timedated operations request policy authorisation through the system service only when the user performs the operation.
 
-The former Mint map/Region/City presentation is not itself a source of truth. System Settings exposes the authoritative IANA time zone directly and adds named-place search. A place such as Mooroopna resolves to a display name and coordinates; those coordinates feed location-dependent Common temporal presentation. A same-country nearest-zone lookup may update the system time zone, but the explicit IANA selector remains visible so a heuristic can always be corrected.
+The former Mint map/Region/City presentation is not itself a source of truth. System Settings presents named locality, geographic coordinates and the authoritative IANA time zone together as one coherent settings family. A place such as Mooroopna resolves to a display name and coordinates; those coordinates feed location-dependent Common temporal presentation and normally select the nearest same-country IANA zone. The explicit IANA selector remains visible so a heuristic can always be corrected. Until the user chooses a precise locality or custom coordinates, the tzdata reference coordinate follows the real system zone rather than becoming stale independent state.
 
 Named-place lookup is asynchronous and network-dependent. Failure of the geocoder must not disable manual coordinates, the time-zone selector, NTP controls or other Date & Time settings.
 

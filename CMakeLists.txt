@@ -42,7 +42,8 @@ endfunction()
 
 add_library(system-settings-core STATIC
     src/app/project-info.c
-    src/modules/date-time/date-time-model.c)
+    src/modules/date-time/date-time-model.c
+    src/modules/date-time/manual-time.c)
 ss_configure(system-settings-core)
 target_compile_definitions(system-settings-core PUBLIC
     SYSTEM_SETTINGS_VERSION="${PROJECT_VERSION}"
@@ -105,6 +106,11 @@ if(BUILD_TESTING)
     ss_configure(date-time-model-test)
     target_link_libraries(date-time-model-test PRIVATE system-settings-core)
     add_test(NAME date-time-model COMMAND date-time-model-test)
+
+    add_executable(manual-time-test tests/manual-time-test.c)
+    ss_configure(manual-time-test)
+    target_link_libraries(manual-time-test PRIVATE system-settings-core)
+    add_test(NAME manual-time COMMAND manual-time-test)
 
     add_executable(project-info-test tests/project-info-test.c)
     ss_configure(project-info-test)
