@@ -159,7 +159,7 @@ Machine/export contexts may deliberately resolve to a fixed canonical representa
 
 Temporal Presentation uses stable clock-system identifiers supplied by Common rather than application-local conditionals.
 
-Common 1.19.18 defines the complete current catalogue shared with Calendar: standard OS-locale time, explicit 12-hour and 24-hour time, Internet Time, Unix time, binary and hexadecimal clocks, Julian/MJD, sidereal/apparent/mean-solar time, French Republican decimal time, traditional Chinese double-hours and hundred-kè, Roman temporal time, Edo Japanese seasonal time, Italian hours, Babylonian hours, Indian ghaṭī time and Nuremberg hours.
+Common 1.19.20 defines the complete current catalogue shared with Calendar: standard OS-locale time, explicit 12-hour and 24-hour time, Internet Time, Unix time, binary and hexadecimal clocks, Julian/MJD, sidereal/apparent/mean-solar time, French Republican decimal time, traditional Chinese double-hours and hundred-kè, Roman temporal time, Edo Japanese seasonal time, Italian hours, Babylonian hours, Indian ghaṭī time and Nuremberg hours.
 
 System Settings is the authority. Therefore the global catalogue contains **Standard time (OS locale)** rather than a self-referential **Follow system** choice. Common-aware applications consume the System Settings policy directly rather than offering competing local clock/calendar choices.
 
