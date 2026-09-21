@@ -6,6 +6,7 @@
 
 #include "system-settings/date-time-model.h"
 #include "system-settings/temporal-policy-store.h"
+#include "system-settings/cinnamon-interface.h"
 
 #include <gtk/gtk.h>
 #include <infiltratr/design.h>
@@ -28,6 +29,7 @@ typedef struct SettingsWindow {
     GtkSpinButton *latitude;
     GtkSpinButton *longitude;
     GtkWidget *status_label;
+    GSettings *cinnamon_interface_settings;
     SsDateTimeModel model;
     guint timer_id;
     bool updating_controls;
@@ -333,13 +335,15 @@ static bool format_preview(const SettingsWindow *state,
     }
 
     if (strcmp(policy->clock_mode, "standard") == 0) {
-        g_autofree gchar *formatted =
-            g_date_time_format(now, policy->show_seconds ? "%X" : "%H:%M");
-        return formatted != NULL &&
-               g_strlcpy(buffer, formatted, capacity) < capacity;
-    }
-
-    if (strcmp(policy->clock_mode, "standard-12") == 0) {
+        const gboolean use_24h =
+            state->cinnamon_interface_settings != NULL
+                ? g_settings_get_boolean(
+                    state->cinnamon_interface_settings, "clock-use-24h")
+                : TRUE;
+        conventional = use_24h
+            ? INFILTRATR_CLOCK_PROFILE_CONVENTIONAL_24
+            : INFILTRATR_CLOCK_PROFILE_CONVENTIONAL_12;
+    } else if (strcmp(policy->clock_mode, "standard-12") == 0) {
         conventional = INFILTRATR_CLOCK_PROFILE_CONVENTIONAL_12;
     } else if (strcmp(policy->clock_mode, "standard-24") == 0) {
         conventional = INFILTRATR_CLOCK_PROFILE_CONVENTIONAL_24;
@@ -387,8 +391,14 @@ static gboolean refresh_preview(gpointer user_data)
         const gchar *zone = g_date_time_get_timezone_abbreviation(now);
 
         if (calendar != NULL) {
-            summary = g_strdup_printf(
-                "%s • %s", calendar->name, date != NULL ? date : "");
+            if (strcmp(policy->calendar, "gregorian") == 0) {
+                summary = g_strdup_printf(
+                    "%s • %s", calendar->name, date != NULL ? date : "");
+            } else {
+                summary = g_strdup_printf(
+                    "Selected calendar: %s • local Gregorian date: %s",
+                    calendar->name, date != NULL ? date : "");
+            }
         }
         if (summary != NULL) {
             gtk_label_set_text(GTK_LABEL(state->date_preview), summary);
@@ -423,6 +433,31 @@ static void sync_controls(SettingsWindow *state)
     state->updating_controls = false;
     update_control_capabilities(state);
     (void)refresh_preview(state);
+}
+
+static void on_cinnamon_temporal_changed(
+    GSettings *settings G_GNUC_UNUSED,
+    gchar *key G_GNUC_UNUSED,
+    gpointer user_data)
+{
+    SettingsWindow *state = user_data;
+
+    if (state == NULL || state->model.persisted_policy_present) {
+        return;
+    }
+
+    if (!ss_date_time_model_reload(&state->model)) {
+        set_status(state,
+                   "Mint/Cinnamon temporal preferences changed, but could not be reloaded.",
+                   true);
+        return;
+    }
+
+    sync_controls(state);
+    set_status(
+        state,
+        "Using Mint/Cinnamon temporal preferences until an Infiltrator policy is saved.",
+        false);
 }
 
 static void policy_saved(SettingsWindow *state)
@@ -702,6 +737,24 @@ static GtkWidget *build_header(void)
     return header;
 }
 
+static void settings_window_free(gpointer data)
+{
+    SettingsWindow *state = data;
+
+    if (state == NULL) {
+        return;
+    }
+    if (state->timer_id != 0U) {
+        g_source_remove(state->timer_id);
+        state->timer_id = 0U;
+    }
+    if (state->cinnamon_interface_settings != NULL) {
+        g_object_unref(state->cinnamon_interface_settings);
+        state->cinnamon_interface_settings = NULL;
+    }
+    g_free(state);
+}
+
 static gboolean on_close_request(GtkWindow *window, gpointer user_data)
 {
     SettingsWindow *state = user_data;
@@ -728,6 +781,21 @@ static void on_activate(GtkApplication *application, gpointer user_data)
         g_printerr("Unable to initialise Date & Time settings.\n");
         g_free(state);
         return;
+    }
+
+    state->cinnamon_interface_settings =
+        ss_cinnamon_interface_settings_new();
+    if (state->cinnamon_interface_settings != NULL) {
+        g_signal_connect(
+            state->cinnamon_interface_settings,
+            "changed::clock-use-24h",
+            G_CALLBACK(on_cinnamon_temporal_changed),
+            state);
+        g_signal_connect(
+            state->cinnamon_interface_settings,
+            "changed::clock-show-seconds",
+            G_CALLBACK(on_cinnamon_temporal_changed),
+            state);
     }
 
     install_common_theme();
@@ -768,7 +836,8 @@ static void on_activate(GtkApplication *application, gpointer user_data)
     g_signal_connect(state->window, "close-request",
                      G_CALLBACK(on_close_request), state);
     g_object_set_data_full(G_OBJECT(state->window),
-                           "system-settings-state", state, g_free);
+                           "system-settings-state", state,
+                           settings_window_free);
     gtk_window_present(state->window);
 }
 
