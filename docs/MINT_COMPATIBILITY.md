@@ -65,6 +65,10 @@ For example, a file manager could continue reading the filesystem's canonical ti
 
 Enhanced integration is optional. The core System Settings design must remain correct even when an unmodified third-party/Mint application understands only the ordinary Mint setting.
 
+## Provider capability
+
+On Mint/Linux, the System Settings package publishes the canonical `/usr/share/infiltrator/policy-providers/temporal-v3` capability marker defined by Common. Consumers use that marker rather than executable-name/PATH probing. The marker means the richer provider is installed; it does not by itself mean a user policy exists. Until a valid policy is present, native Cinnamon settings remain authoritative.
+
 ## Compatible fallback
 
 An extended Infiltrator policy may have no exact representation in Mint.
