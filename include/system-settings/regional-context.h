@@ -2,6 +2,7 @@
 #ifndef SYSTEM_SETTINGS_REGIONAL_CONTEXT_H
 #define SYSTEM_SETTINGS_REGIONAL_CONTEXT_H
 
+#include <glib.h>
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -44,6 +45,27 @@ bool ss_regional_context_lookup_timezone_reference(
 bool ss_regional_context_city_name(const char *timezone_id,
                                    char *buffer,
                                    size_t capacity);
+
+/**
+ * Return canonical IANA time-zone identifiers from installed tzdata.
+ *
+ * Returns: (transfer full) (element-type utf8): strings owned by the array.
+ */
+GPtrArray *ss_regional_context_list_timezones(void);
+
+/**
+ * Find the nearest representative IANA zone within a country.
+ *
+ * This is intentionally a best-effort locality-to-zone hint based on tzdata
+ * reference points, not a polygon boundary oracle. The resulting zone remains
+ * user-visible and editable before/after it is applied to the system.
+ */
+bool ss_regional_context_nearest_timezone(
+    const char *country_code,
+    double latitude,
+    double longitude,
+    char *timezone_id,
+    size_t capacity);
 
 #ifdef __cplusplus
 }

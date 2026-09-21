@@ -257,6 +257,231 @@ bool ss_regional_context_city_name(const char *timezone_id,
     return true;
 }
 
+static bool country_field_matches(const char *field,
+                                  const char *country_code)
+{
+    gchar **parts;
+    size_t index;
+    bool match = false;
+
+    if (field == NULL || country_code == NULL ||
+        country_code[0] == '\0') {
+        return false;
+    }
+
+    parts = g_strsplit(field, ",", -1);
+    for (index = 0U; parts[index] != NULL; ++index) {
+        if (g_ascii_strcasecmp(parts[index], country_code) == 0) {
+            match = true;
+            break;
+        }
+    }
+    g_strfreev(parts);
+    return match;
+}
+
+static double longitude_distance(double left, double right)
+{
+    double distance = left - right;
+    if (distance < 0.0) {
+        distance = -distance;
+    }
+    if (distance > 180.0) {
+        distance = 360.0 - distance;
+    }
+    return distance;
+}
+
+static bool nearest_timezone_in_file(const char *path,
+                                     const char *country_code,
+                                     double latitude,
+                                     double longitude,
+                                     char *timezone_id,
+                                     size_t capacity)
+{
+    gchar *contents = NULL;
+    gchar **lines = NULL;
+    bool found = false;
+    double best_score = 0.0;
+    size_t index;
+
+    if (path == NULL || country_code == NULL ||
+        timezone_id == NULL || capacity == 0U ||
+        !g_file_get_contents(path, &contents, NULL, NULL)) {
+        return false;
+    }
+
+    lines = g_strsplit(contents, "\n", -1);
+    for (index = 0U; lines[index] != NULL; ++index) {
+        gchar **fields;
+        double candidate_latitude;
+        double candidate_longitude;
+        double latitude_distance_value;
+        double longitude_distance_value;
+        double score;
+
+        if (lines[index][0] == '\0' || lines[index][0] == '#') {
+            continue;
+        }
+
+        fields = g_strsplit(lines[index], "\t", 4);
+        if (fields[0] == NULL || fields[1] == NULL ||
+            fields[2] == NULL ||
+            !country_field_matches(fields[0], country_code) ||
+            !parse_zone_coordinate(fields[1],
+                                   &candidate_latitude,
+                                   &candidate_longitude)) {
+            g_strfreev(fields);
+            continue;
+        }
+
+        g_strchomp(fields[2]);
+        if (!timezone_id_valid(fields[2])) {
+            g_strfreev(fields);
+            continue;
+        }
+
+        latitude_distance_value = candidate_latitude - latitude;
+        if (latitude_distance_value < 0.0) {
+            latitude_distance_value = -latitude_distance_value;
+        }
+        longitude_distance_value =
+            longitude_distance(candidate_longitude, longitude);
+
+        /*
+         * The zone.tab coordinate is only a representative point. A simple
+         * bounded angular distance is deliberately used here as a hint rather
+         * than pretending these points describe political/time-zone polygons.
+         */
+        score = latitude_distance_value + longitude_distance_value;
+        if (!found || score < best_score) {
+            best_score = score;
+            if (g_strlcpy(timezone_id,
+                          fields[2],
+                          capacity) >= capacity) {
+                g_strfreev(fields);
+                found = false;
+                break;
+            }
+            found = true;
+        }
+        g_strfreev(fields);
+    }
+
+    g_strfreev(lines);
+    g_free(contents);
+    return found;
+}
+
+bool ss_regional_context_nearest_timezone(
+    const char *country_code,
+    double latitude,
+    double longitude,
+    char *timezone_id,
+    size_t capacity)
+{
+    static const char *const paths[] = {
+        "/usr/share/zoneinfo/zone1970.tab",
+        "/usr/share/zoneinfo/zone.tab"
+    };
+    size_t index;
+
+    if (country_code == NULL || timezone_id == NULL ||
+        capacity == 0U ||
+        latitude < -90.0 || latitude > 90.0 ||
+        longitude < -180.0 || longitude > 180.0) {
+        return false;
+    }
+
+    for (index = 0U; index < sizeof(paths) / sizeof(paths[0]); ++index) {
+        if (nearest_timezone_in_file(paths[index],
+                                     country_code,
+                                     latitude,
+                                     longitude,
+                                     timezone_id,
+                                     capacity)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static gint timezone_compare(gconstpointer left, gconstpointer right)
+{
+    const char *const *left_text = left;
+    const char *const *right_text = right;
+    return g_strcmp0(*left_text, *right_text);
+}
+
+GPtrArray *ss_regional_context_list_timezones(void)
+{
+    static const char *const paths[] = {
+        "/usr/share/zoneinfo/zone.tab",
+        "/usr/share/zoneinfo/zone1970.tab"
+    };
+    GPtrArray *zones =
+        g_ptr_array_new_with_free_func(g_free);
+    GHashTable *seen =
+        g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
+    size_t path_index;
+
+    g_hash_table_add(seen, g_strdup("Etc/UTC"));
+    g_ptr_array_add(zones, g_strdup("Etc/UTC"));
+
+    for (path_index = 0U;
+         path_index < sizeof(paths) / sizeof(paths[0]);
+         ++path_index) {
+        gchar *contents = NULL;
+        gchar **lines = NULL;
+        size_t line_index;
+
+        if (!g_file_get_contents(
+                paths[path_index], &contents, NULL, NULL)) {
+            continue;
+        }
+
+        lines = g_strsplit(contents, "\n", -1);
+        for (line_index = 0U;
+             lines[line_index] != NULL;
+             ++line_index) {
+            gchar **fields;
+            gchar *zone_copy;
+
+            if (lines[line_index][0] == '\0' ||
+                lines[line_index][0] == '#') {
+                continue;
+            }
+
+            fields = g_strsplit(lines[line_index], "\t", 4);
+            if (fields[2] == NULL) {
+                g_strfreev(fields);
+                continue;
+            }
+            g_strchomp(fields[2]);
+            if (!timezone_id_valid(fields[2]) ||
+                g_hash_table_contains(seen, fields[2])) {
+                g_strfreev(fields);
+                continue;
+            }
+
+            zone_copy = g_strdup(fields[2]);
+            g_hash_table_add(seen, g_strdup(zone_copy));
+            g_ptr_array_add(zones, zone_copy);
+            g_strfreev(fields);
+        }
+
+        g_strfreev(lines);
+        g_free(contents);
+        if (zones->len > 1U) {
+            break;
+        }
+    }
+
+    g_hash_table_unref(seen);
+    g_ptr_array_sort(zones, timezone_compare);
+    return zones;
+}
+
 bool ss_regional_context_detect(SsRegionalContext *context)
 {
     static const char *const zone_tables[] = {

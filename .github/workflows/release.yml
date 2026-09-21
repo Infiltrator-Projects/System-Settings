@@ -30,7 +30,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake libgtk-4-dev pkg-config
+          sudo apt-get install -y cmake libgtk-4-dev libgeocode-glib-dev pkg-config
 
       - name: Verify release identity
         shell: bash

@@ -58,22 +58,27 @@ elseif(UNIX)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(GIO2 REQUIRED IMPORTED_TARGET gio-2.0)
     pkg_check_modules(GTK4 REQUIRED IMPORTED_TARGET gtk4>=4.6)
+    pkg_check_modules(GEOCODE REQUIRED IMPORTED_TARGET geocode-glib-2.0)
 
     add_library(system-settings-platform STATIC
         src/platform/linux/cinnamon-interface.c
+        src/platform/linux/location-metadata.c
         src/platform/linux/regional-context.c
+        src/platform/linux/system-time-service.c
         src/platform/linux/temporal-policy-store.c)
     target_link_libraries(system-settings-platform
         PUBLIC InfiltratrCommon::Common PkgConfig::GIO2)
 
     add_executable(system-settings
-        src/shell/linux/main.c)
+        src/shell/linux/main.c
+        src/platform/linux/location-search.c)
     ss_configure(system-settings)
     target_link_libraries(system-settings PRIVATE
         system-settings-core
         system-settings-platform
         InfiltratrCommon::Portable
-        PkgConfig::GTK4)
+        PkgConfig::GTK4
+        PkgConfig::GEOCODE)
 
     install(TARGETS system-settings
         RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
