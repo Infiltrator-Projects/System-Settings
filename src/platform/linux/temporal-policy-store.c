@@ -1,38 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "system-settings/temporal-policy-store.h"
+#include "system-settings/cinnamon-interface.h"
 
 #include <infiltratr/temporal_posix.h>
-#include <gio/gio.h>
 #include <string.h>
-
-static GSettings *cinnamon_interface_settings(void)
-{
-    GSettingsSchemaSource *source = g_settings_schema_source_get_default();
-    GSettingsSchema *schema;
-    GSettings *settings;
-
-    if (source == NULL)
-        return NULL;
-
-    schema = g_settings_schema_source_lookup(
-        source, "org.cinnamon.desktop.interface", TRUE);
-    if (schema == NULL)
-        return NULL;
-
-    if (!g_settings_schema_has_key(schema, "clock-use-24h") ||
-        !g_settings_schema_has_key(schema, "clock-show-seconds")) {
-        g_settings_schema_unref(schema);
-        return NULL;
-    }
-
-    settings = g_settings_new_full(schema, NULL, NULL);
-    g_settings_schema_unref(schema);
-    return settings;
-}
 
 static void load_cinnamon_defaults(InfiltratrTemporalPolicyV3 *policy)
 {
-    GSettings *settings = cinnamon_interface_settings();
+    GSettings *settings = ss_cinnamon_interface_settings_new();
     const char *mode;
 
     if (policy == NULL || settings == NULL)
@@ -50,7 +25,7 @@ static void load_cinnamon_defaults(InfiltratrTemporalPolicyV3 *policy)
 static void mirror_cinnamon_compatibility(
     const InfiltratrTemporalPolicyV3 *policy)
 {
-    GSettings *settings = cinnamon_interface_settings();
+    GSettings *settings = ss_cinnamon_interface_settings_new();
     gboolean ok = TRUE;
 
     if (policy == NULL || settings == NULL)
@@ -77,6 +52,14 @@ static bool platform_load(InfiltratrTemporalPolicyV3 *policy, bool *found)
     const InfiltratrIoResult result =
         infiltratr_temporal_posix_policy_load(policy, found);
 
+    if (result == INFILTRATR_IO_INVALID_VALUE ||
+        result == INFILTRATR_IO_EMPTY) {
+        *found = false;
+        if (!infiltratr_temporal_policy_v3_default(policy))
+            return false;
+        load_cinnamon_defaults(policy);
+        return true;
+    }
     if (result != INFILTRATR_IO_OK)
         return false;
 
