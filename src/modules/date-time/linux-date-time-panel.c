@@ -11,6 +11,7 @@
 
 #include "linux-date-time-panel.h"
 #include "linux-ui-helpers.h"
+#include "calendar-preview-provider.h"
 
 #include "system-settings/cinnamon-interface.h"
 #include "system-settings/date-time-model.h"
@@ -59,6 +60,7 @@ struct SsLinuxDateTimePanel {
     SsRegionalContext regional_context;
     SsLocationMetadata location_metadata;
     SsSystemTimeService *system_time_service;
+    SsCalendarPreviewProvider *calendar_preview_provider;
     GPtrArray *clock_mode_ids;
     GPtrArray *timezone_ids;
     GCancellable *location_search_cancellable;
@@ -100,6 +102,9 @@ static GtkStringList *clock_mode_strings(
         return list;
     }
 
+    ss_calendar_preview_provider_free(
+        state->calendar_preview_provider);
+    state->calendar_preview_provider = NULL;
     g_clear_pointer(&state->clock_mode_ids, g_ptr_array_unref);
     state->clock_mode_ids = g_ptr_array_new_with_free_func(g_free);
 
@@ -615,6 +620,33 @@ static void update_control_capabilities(SsLinuxDateTimePanel *state)
     }
 }
 
+static bool preview_coordinates(
+    const SsLinuxDateTimePanel *state,
+    double *latitude,
+    double *longitude)
+{
+    const InfiltratrTemporalPolicyV3 *policy;
+
+    if (state == NULL || latitude == NULL || longitude == NULL) {
+        return false;
+    }
+
+    policy = ss_date_time_model_policy(&state->model);
+    if (policy != NULL && policy->location_configured) {
+        *latitude = policy->latitude;
+        *longitude = policy->longitude;
+        return true;
+    }
+
+    if (state->regional_context.has_reference_coordinates) {
+        *latitude = state->regional_context.reference_latitude;
+        *longitude = state->regional_context.reference_longitude;
+        return true;
+    }
+
+    return false;
+}
+
 static bool format_preview(const SsLinuxDateTimePanel *state,
                            char *buffer,
                            size_t capacity)
@@ -623,9 +655,13 @@ static bool format_preview(const SsLinuxDateTimePanel *state,
         ss_date_time_model_policy(&state->model);
     const InfiltratrTemporalClockModeInfo *mode;
     g_autoptr(GDateTime) now = g_date_time_new_now_local();
+    g_autofree gchar *native_text = NULL;
     int64_t unix_us;
     gint64 offset_us;
     InfiltratrClockProfile conventional;
+    double latitude = 0.0;
+    double longitude = 0.0;
+    bool has_location;
 
     if (policy == NULL || now == NULL || buffer == NULL || capacity == 0U) {
         return false;
@@ -648,8 +684,46 @@ static bool format_preview(const SsLinuxDateTimePanel *state,
         conventional = INFILTRATR_CLOCK_PROFILE_DECIMAL_10;
     } else {
         mode = infiltratr_temporal_clock_mode_find(policy->clock_mode);
-        return mode != NULL &&
-               g_strlcpy(buffer, mode->name, capacity) < capacity;
+        if (mode == NULL) {
+            return false;
+        }
+
+        has_location = preview_coordinates(
+            state, &latitude, &longitude);
+        if ((mode->requires_latitude || mode->requires_longitude) &&
+            !has_location) {
+            return g_snprintf(
+                       buffer,
+                       capacity,
+                       "%s — location required",
+                       mode->name) > 0;
+        }
+
+        /*
+         * Calendar owns the specialised clock algorithms. Do not fake a
+         * preview by displaying the mode's label: ask Calendar's stable
+         * runtime ABI for the same formatter the panel clock uses.
+         */
+        unix_us = g_get_real_time();
+        offset_us = g_date_time_get_utc_offset(now);
+        native_text = ss_calendar_preview_provider_format_clock(
+            state->calendar_preview_provider,
+            policy->clock_mode,
+            unix_us,
+            (int)(offset_us / G_USEC_PER_SEC),
+            policy->show_seconds,
+            latitude,
+            longitude);
+        if (native_text != NULL) {
+            return g_strlcpy(
+                       buffer, native_text, capacity) < capacity;
+        }
+
+        return g_snprintf(
+                   buffer,
+                   capacity,
+                   "%s — preview unavailable",
+                   mode->name) > 0;
     }
 
     unix_us = g_get_real_time();
@@ -683,24 +757,41 @@ static gboolean refresh_preview(gpointer user_data)
 
     calendar = infiltratr_temporal_calendar_find(policy->calendar);
     {
-        g_autofree gchar *date = g_date_time_format(now, "%A, %e %B %Y");
+        g_autofree gchar *gregorian =
+            g_date_time_format(now, "%A, %e %B %Y");
+        g_autofree gchar *selected_date = NULL;
         g_autofree gchar *summary = NULL;
-        const gchar *zone = g_date_time_get_timezone_abbreviation(now);
 
         if (calendar != NULL) {
             if (strcmp(policy->calendar, "gregorian") == 0) {
                 summary = g_strdup_printf(
-                    "%s • %s", calendar->name, date != NULL ? date : "");
+                    "%s • %s",
+                    calendar->name,
+                    gregorian != NULL ? gregorian : "");
             } else {
-                summary = g_strdup_printf(
-                    "Selected calendar: %s • local Gregorian date: %s",
-                    calendar->name, date != NULL ? date : "");
+                selected_date =
+                    ss_calendar_preview_provider_format_date(
+                        state->calendar_preview_provider,
+                        policy->calendar,
+                        g_date_time_get_year(now),
+                        g_date_time_get_month(now),
+                        g_date_time_get_day_of_month(now));
+                if (selected_date != NULL) {
+                    summary = g_strdup_printf(
+                        "%s • %s",
+                        calendar->name,
+                        selected_date);
+                } else {
+                    summary = g_strdup_printf(
+                        "%s • preview unavailable",
+                        calendar->name);
+                }
             }
         }
         if (summary != NULL) {
-            gtk_label_set_text(GTK_LABEL(state->date_preview), summary);
+            gtk_label_set_text(
+                GTK_LABEL(state->date_preview), summary);
         }
-        (void)zone;
     }
 
     return G_SOURCE_CONTINUE;
@@ -900,6 +991,9 @@ static void system_time_changed(
     if (state == NULL || system_state == NULL) {
         return;
     }
+
+    state->calendar_preview_provider =
+        ss_calendar_preview_provider_new();
 
     (void)ss_regional_context_detect(&state->regional_context);
 

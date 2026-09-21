@@ -132,6 +132,35 @@ must remain toolkit-neutral.
 This distinction lets the project fix the immediate monolith problem without
 prematurely freezing an ABI around GTK widgets.
 
+### Specialised temporal preview provider
+
+System Settings owns the temporal **selection**, not every algorithm used to
+render that selection. Calendar remains the implementation owner for the
+specialised clock and chronology engines.
+
+The Date & Time module therefore discovers Calendar's versioned runtime C ABI
+dynamically for preview rendering:
+
+```text
+System Settings policy
+        |
+        +-- conventional 12/24 + decimal --> Common formatter
+        |
+        +-- Internet / Roman / sidereal / solar / ...
+        |       --> libcalendar-plus.so.0 formatter
+        |
+        +-- Gregorian date --> native local Gregorian presentation
+        |
+        +-- Positivist / Hebrew / Persian / ...
+                --> libcalendar-plus.so.0 chronology formatter
+```
+
+This is deliberately a presentation dependency rather than a policy
+dependency. If Calendar is absent, System Settings remains fully usable and can
+still save the selected policy; a specialised preview is shown as unavailable
+rather than reimplementing Calendar's algorithms or substituting a misleading
+label/Gregorian date.
+
 ### Settings authority versus storage authority
 
 System Settings is the user-facing control authority. That does not mean it

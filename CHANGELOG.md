@@ -8,6 +8,13 @@ All notable user-visible and architectural changes are recorded here.
 
 No unreleased changes.
 
+## 0.3.14 — 2026-09-21
+
+- Fix the Date & Time live preview for specialised clock systems. Internet Time, Roman temporal time, sidereal/solar clocks and the other Calendar-owned modes now use Calendar's actual formatter instead of displaying the clock-mode name as if it were a value.
+- Fix non-Gregorian calendar preview. Positivist and every other supported calendar now render today's date through Calendar's chronology engine instead of showing a Gregorian date with a "selected calendar" label.
+- Add a small optional runtime bridge to Calendar's versioned C ABI. System Settings still owns policy while Calendar remains the implementation owner of specialised clock and chronology algorithms; no duplicate algorithms were copied into System Settings.
+- Keep System Settings usable without Calendar installed. Conventional 12/24-hour and decimal previews remain available from Common; specialised previews explicitly report unavailable instead of fabricating a value when the Calendar runtime is absent.
+
 ## 0.3.13 — 2026-09-21
 
 - Extract the complete Linux Date & Time implementation from the generic application shell into a dedicated first-party module target; `main.c` now owns application lifecycle, common framing and navigation rather than timedated, locality, temporal-policy and Date & Time widget logic.

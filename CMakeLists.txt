@@ -104,6 +104,7 @@ elseif(UNIX)
         PkgConfig::GTK4)
 
     add_library(system-settings-date-time-linux STATIC
+        src/modules/date-time/calendar-preview-provider.c
         src/modules/date-time/linux-date-time-panel.c
         src/platform/linux/location-search.c)
     ss_configure(system-settings-date-time-linux)
@@ -114,6 +115,7 @@ elseif(UNIX)
         system-settings-core
         system-settings-platform
         system-settings-linux-ui
+        InfiltratrCommon::Common
         InfiltratrCommon::Portable
         PkgConfig::GTK4
         PkgConfig::GEOCODE)

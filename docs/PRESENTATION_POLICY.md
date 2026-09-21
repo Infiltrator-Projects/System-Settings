@@ -185,6 +185,21 @@ next midnight     → 0:00:00 next day
 
 Daylight-saving transition semantics must be specified and regression-tested before the profile is considered complete. The implementation must not invent ambiguous behaviour at repeated or skipped local times.
 
+## Preview ownership
+
+The Date & Time preview must render the **actual selected representation**.
+Showing a clock-system name (for example, `Internet Time (@000 to @999)`) in
+the live-value position is not a preview, and labelling a Gregorian date as a
+selected non-Gregorian calendar is misleading.
+
+Common provides the exact generic conventional/decimal formatter. Calendar owns
+the specialised clock and chronology implementations. System Settings may
+consume Calendar's stable runtime ABI for previewing those modes, while
+remaining the authority for which mode/calendar is selected.
+
+If the provider is unavailable, the preview must say so explicitly rather than
+inventing an approximation.
+
 ## Calendar profiles
 
 Clock representation and calendar representation are independent policy dimensions.

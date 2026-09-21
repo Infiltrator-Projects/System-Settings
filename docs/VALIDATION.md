@@ -91,7 +91,13 @@ The replacement Date & Time module adds specific invariants:
 - asynchronous searches and timedated writes cannot outlive the host window's
   module instance;
 - closing the window cancels outstanding module work and removes periodic
-  sources before module destruction.
+  sources before module destruction;
+- specialised clock previews use Calendar's real runtime formatter rather than
+  the catalogue display name;
+- non-Gregorian previews use Calendar's chronology formatter rather than
+  relabelling the Gregorian date;
+- missing Calendar runtime support degrades to an explicit unavailable preview
+  without preventing policy editing or conventional previews.
 
 The build contains an architectural CMake guard for the first invariant and
 unit coverage for the conventional/native clock-policy mapping.
