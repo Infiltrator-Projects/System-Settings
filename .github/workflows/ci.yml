@@ -33,7 +33,7 @@ jobs:
         run: |
           cd build
           cpack -G DEB
-      - name: Validate Debian temporal provider capability
+      - name: Validate Debian integration assets
         if: runner.os == 'Linux'
         run: |
           deb="$(find build -maxdepth 1 -type f -name '*.deb' -print -quit)"
@@ -45,6 +45,12 @@ jobs:
           grep -qx 'provider=infiltrator-system-settings' "$marker"
           grep -qx 'policy-version=3' "$marker"
           grep -qx 'contract=infiltratr-temporal-v3' "$marker"
+          desktop="$root/usr/share/applications/org.infiltrator.SystemSettings.desktop"
+          icon="$root/usr/share/icons/hicolor/scalable/apps/org.infiltrator.SystemSettings.svg"
+          test -f "$desktop"
+          test -f "$icon"
+          grep -qx 'Icon=org.infiltrator.SystemSettings' "$desktop"
+          grep -q '#00ADEF' "$icon"
           rm -rf "$root"
       - name: Upload Debian package
         if: runner.os == 'Linux'

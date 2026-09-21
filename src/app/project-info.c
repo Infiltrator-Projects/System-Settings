@@ -23,7 +23,7 @@ static const InfiltratrProjectInfo project_info = {
     .website = "https://github.com/Infiltrator-Projects/System-Settings",
     .license_id = "GPL-3.0-or-later",
     .comments = "Native system-wide settings shell for Infiltrator applications.",
-    .icon_name = "preferences-system",
+    .icon_name = "org.infiltrator.SystemSettings",
     .copyright_text = "Copyright © 2000-2026 Shannon Smith"
 };
 const InfiltratrProjectInfo *ss_project_info(void)

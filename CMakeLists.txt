@@ -78,6 +78,8 @@ elseif(UNIX)
         RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
     install(FILES data/org.infiltrator.SystemSettings.desktop
         DESTINATION "${CMAKE_INSTALL_DATADIR}/applications")
+    install(FILES data/org.infiltrator.SystemSettings.svg
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps")
     install(FILES data/temporal-v3.provider
         DESTINATION "${CMAKE_INSTALL_DATADIR}/infiltrator/policy-providers"
         RENAME temporal-v3)

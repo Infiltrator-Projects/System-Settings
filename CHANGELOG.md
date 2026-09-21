@@ -8,6 +8,12 @@ All notable user-visible and architectural changes are recorded here.
 
 No unreleased changes.
 
+## 0.3.8 — 2026-09-21
+
+- Replace the inherited Mint `preferences-system` launcher icon with a first-party System Settings icon using the same graphite, black and cyan visual language as the other Infiltrator desktop applications.
+- Install the scalable icon under the freedesktop hicolor application-icon path and bind the desktop launcher and project identity to `org.infiltrator.SystemSettings`.
+- Extend Debian-package validation so CI verifies both the installed icon asset and the desktop-file icon identity, preventing a regression to the generic system icon.
+
 ## 0.3.7 — 2026-09-21
 
 - Repair GTK 4 switch rendering by replacing the broad widget background override that could hide the slider and reduce disabled switches to solid dark rectangles.
