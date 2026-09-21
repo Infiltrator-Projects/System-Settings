@@ -8,6 +8,12 @@ All notable user-visible and architectural changes are recorded here.
 
 No unreleased changes.
 
+## 0.3.2 — 2026-09-21
+
+- Publish the explicit `temporal-v3` provider capability marker so consumers can detect the installed System Settings authority without probing executable names or PATH.
+- Replace the Linux Date & Time module's duplicated XDG path, policy parsing and atomic-write code with Common 1.19.19's shared POSIX temporal store.
+- Preserve Mint/Cinnamon as the initial/default authority until the user actually saves an Infiltrator temporal policy.
+
 ## 0.3.1 — 2026-09-21
 
 - Seed the first Linux Date & Time policy from Cinnamon's native 12/24-hour and seconds preferences when no Infiltrator policy has been saved yet.
