@@ -33,6 +33,24 @@ jobs:
         run: |
           cd build
           cpack -G DEB
+      - name: Validate Debian temporal provider capability
+        if: runner.os == 'Linux'
+        run: |
+          deb="$(find build -maxdepth 1 -type f -name '*.deb' -print -quit)"
+          test -n "$deb"
+          dpkg-deb -c "$deb" | grep -q 'usr/share/infiltrator/policy-providers/temporal-v3
+        with:
+          name: infiltrator-system-settings-deb
+          path: build/*.deb
+          if-no-files-found: error
+
+          root="$(mktemp -d)"
+          dpkg-deb -x "$deb" "$root"
+          test -f "$root/usr/share/infiltrator/policy-providers/temporal-v3"
+          grep -qx 'provider=infiltrator-system-settings'             "$root/usr/share/infiltrator/policy-providers/temporal-v3"
+          grep -qx 'policy-version=3'             "$root/usr/share/infiltrator/policy-providers/temporal-v3"
+          grep -qx 'contract=infiltratr-temporal-v3'             "$root/usr/share/infiltrator/policy-providers/temporal-v3"
+          rm -rf "$root"
       - name: Upload Debian package
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
