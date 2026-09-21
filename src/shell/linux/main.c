@@ -78,15 +78,23 @@ static void install_common_theme(void)
     gchar *panel;
     gchar *card;
     gchar *surface;
+    gchar *input;
     gchar *border;
     gchar *text;
     gchar *title;
     gchar *muted;
+    gchar *subtle;
     gchar *accent;
+    gchar *accent_foreground;
+    gchar *accent_hover;
     gchar *selected;
     gchar *titlebar;
     gchar *success;
+    gchar *warning;
     gchar *fault;
+    gchar *info;
+    gchar *surface_hover;
+    gchar *status_border;
 
     if (palette == NULL || metrics == NULL || type == NULL) {
         return;
@@ -96,15 +104,23 @@ static void install_common_theme(void)
     panel = rgb_css(palette->panel_rgb);
     card = rgb_css(palette->card_rgb);
     surface = rgb_css(palette->surface_rgb);
+    input = rgb_css(palette->input_rgb);
     border = rgb_css(palette->border_rgb);
     text = rgb_css(palette->text_rgb);
     title = rgb_css(palette->title_rgb);
     muted = rgb_css(palette->muted_rgb);
+    subtle = rgb_css(palette->subtle_rgb);
     accent = rgb_css(palette->neutral_accent_rgb);
+    accent_foreground = rgb_css(palette->accent_foreground_rgb);
+    accent_hover = rgb_css(palette->accent_hover_rgb);
     selected = rgb_css(palette->selection_background_rgb);
     titlebar = rgb_css(palette->titlebar_rgb);
     success = rgb_css(palette->success_rgb);
+    warning = rgb_css(palette->warning_rgb);
     fault = rgb_css(palette->fault_rgb);
+    info = rgb_css(palette->info_rgb);
+    surface_hover = rgb_css(palette->surface_hover_rgb);
+    status_border = rgb_css(palette->status_border_rgb);
 
     css = g_string_new(NULL);
     g_string_append_printf(
@@ -130,8 +146,7 @@ static void install_common_theme(void)
         ".divider { background: %s; min-height: 1px; }\n"
         ".accent-note { color: %s; font-size: 12px; }\n"
         ".status-ok { color: %s; font-size: 12px; }\n"
-        ".error { color: %s; font-size: 12px; }\n"
-        "dropdown, switch, spinbutton { background: %s; }\n",
+        ".error { color: %s; font-size: 12px; }\n",
         background, text, type->ui_family, type->gtk_fallback,
         (unsigned int)type->ui_regular_weight,
         titlebar, border,
@@ -150,7 +165,49 @@ static void install_common_theme(void)
         muted,
         title, (unsigned int)type->ui_bold_weight,
         text, (unsigned int)type->ui_bold_weight,
-        muted, border, accent, success, fault, surface);
+        muted, border, accent, success, fault);
+
+    /*
+     * Controls deliberately use the richer Common semantic palette rather than
+     * flattening GTK's internal widgets to one surface colour. In particular,
+     * the old generic "switch { background: ... }" rule obscured the slider
+     * on GTK 4 themes and made disabled switches look like solid black blocks.
+     */
+    g_string_append_printf(
+        css,
+        ".preview-card { border-color: %s; }\n"
+        ".preview-time { color: %s; }\n"
+        ".clock-card { border-left: 3px solid %s; }\n"
+        ".calendar-card { border-left: 3px solid %s; }\n"
+        ".location-card { border-left: 3px solid %s; }\n"
+        ".system-card { border-left: 3px solid %s; }\n"
+        ".nav-row:selected { border-left: 3px solid %s; }\n"
+        ".setting-dropdown, .setting-spin { background: %s; color: %s; border: 1px solid %s; border-radius: %upx; box-shadow: none; }\n"
+        ".setting-dropdown:hover, .setting-spin:hover { background: %s; border-color: %s; }\n"
+        ".setting-dropdown:focus, .setting-spin:focus { border-color: %s; }\n"
+        ".setting-dropdown button { background: transparent; color: %s; border: none; box-shadow: none; }\n"
+        ".setting-spin text { background: transparent; color: %s; }\n"
+        ".setting-spin button { background: %s; color: %s; border-color: %s; box-shadow: none; }\n"
+        ".setting-switch { min-width: 46px; min-height: 26px; background: %s; border: 1px solid %s; border-radius: 13px; box-shadow: none; }\n"
+        ".setting-switch:hover { background: %s; border-color: %s; }\n"
+        ".setting-switch:checked { background: %s; border-color: %s; }\n"
+        ".setting-switch:checked:hover { background: %s; border-color: %s; }\n"
+        ".setting-switch slider { min-width: 20px; min-height: 20px; margin: 2px; background: %s; border: none; border-radius: 10px; box-shadow: none; }\n"
+        ".setting-switch:checked slider { background: %s; }\n"
+        ".setting-switch:disabled { opacity: 0.52; }\n",
+        accent, accent,
+        accent, info, warning, success, accent,
+        input, text, status_border, (unsigned int)metrics->control_radius,
+        surface_hover, subtle,
+        accent,
+        text,
+        text,
+        surface, text, status_border,
+        surface, status_border,
+        surface_hover, subtle,
+        accent, accent,
+        accent_hover, accent_hover,
+        title, accent_foreground);
 
     provider = gtk_css_provider_new();
 #if GTK_CHECK_VERSION(4, 12, 0)
@@ -169,15 +226,23 @@ static void install_common_theme(void)
     g_free(panel);
     g_free(card);
     g_free(surface);
+    g_free(input);
     g_free(border);
     g_free(text);
     g_free(title);
     g_free(muted);
+    g_free(subtle);
     g_free(accent);
+    g_free(accent_foreground);
+    g_free(accent_hover);
     g_free(selected);
     g_free(titlebar);
     g_free(success);
+    g_free(warning);
     g_free(fault);
+    g_free(info);
+    g_free(surface_hover);
+    g_free(status_border);
 }
 
 static GtkWidget *make_label(const char *text, const char *css_class)
@@ -614,6 +679,7 @@ static GtkWidget *build_date_time_panel(SettingsWindow *state)
     gtk_box_append(GTK_BOX(page), preview_card);
 
     gtk_widget_add_css_class(clock_card, "settings-card");
+    gtk_widget_add_css_class(clock_card, "clock-card");
     gtk_box_append(GTK_BOX(clock_card),
                    make_label("Clock system", "section-title"));
 
@@ -621,6 +687,8 @@ static GtkWidget *build_date_time_panel(SettingsWindow *state)
     state->clock_mode = GTK_DROP_DOWN(
         gtk_drop_down_new(G_LIST_MODEL(strings), NULL));
     g_object_unref(strings);
+    gtk_widget_add_css_class(GTK_WIDGET(state->clock_mode),
+                             "setting-dropdown");
     gtk_widget_set_size_request(GTK_WIDGET(state->clock_mode), 360, -1);
     gtk_box_append(GTK_BOX(clock_card),
                    make_setting_row(
@@ -629,6 +697,8 @@ static GtkWidget *build_date_time_panel(SettingsWindow *state)
                        GTK_WIDGET(state->clock_mode)));
 
     state->show_seconds = GTK_SWITCH(gtk_switch_new());
+    gtk_widget_add_css_class(GTK_WIDGET(state->show_seconds),
+                             "setting-switch");
     gtk_box_append(GTK_BOX(clock_card),
                    make_setting_row(
                        "Show seconds",
@@ -637,6 +707,7 @@ static GtkWidget *build_date_time_panel(SettingsWindow *state)
     gtk_box_append(GTK_BOX(page), clock_card);
 
     gtk_widget_add_css_class(calendar_card, "settings-card");
+    gtk_widget_add_css_class(calendar_card, "calendar-card");
     gtk_box_append(GTK_BOX(calendar_card),
                    make_label("Calendar system", "section-title"));
 
@@ -644,6 +715,8 @@ static GtkWidget *build_date_time_panel(SettingsWindow *state)
     state->calendar = GTK_DROP_DOWN(
         gtk_drop_down_new(G_LIST_MODEL(strings), NULL));
     g_object_unref(strings);
+    gtk_widget_add_css_class(GTK_WIDGET(state->calendar),
+                             "setting-dropdown");
     gtk_widget_set_size_request(GTK_WIDGET(state->calendar), 360, -1);
     gtk_box_append(GTK_BOX(calendar_card),
                    make_setting_row(
@@ -653,10 +726,13 @@ static GtkWidget *build_date_time_panel(SettingsWindow *state)
     gtk_box_append(GTK_BOX(page), calendar_card);
 
     gtk_widget_add_css_class(location_card, "settings-card");
+    gtk_widget_add_css_class(location_card, "location-card");
     gtk_box_append(GTK_BOX(location_card),
                    make_label("Geographic location", "section-title"));
 
     state->location_configured = GTK_SWITCH(gtk_switch_new());
+    gtk_widget_add_css_class(GTK_WIDGET(state->location_configured),
+                             "setting-switch");
     gtk_box_append(GTK_BOX(location_card),
                    make_setting_row(
                        "Use geographic location",
@@ -665,6 +741,7 @@ static GtkWidget *build_date_time_panel(SettingsWindow *state)
 
     state->latitude = GTK_SPIN_BUTTON(
         gtk_spin_button_new_with_range(-90.0, 90.0, 0.01));
+    gtk_widget_add_css_class(GTK_WIDGET(state->latitude), "setting-spin");
     gtk_spin_button_set_digits(state->latitude, 2U);
     gtk_box_append(GTK_BOX(location_card),
                    make_setting_row(
@@ -674,6 +751,7 @@ static GtkWidget *build_date_time_panel(SettingsWindow *state)
 
     state->longitude = GTK_SPIN_BUTTON(
         gtk_spin_button_new_with_range(-180.0, 180.0, 0.01));
+    gtk_widget_add_css_class(GTK_WIDGET(state->longitude), "setting-spin");
     gtk_spin_button_set_digits(state->longitude, 2U);
     gtk_box_append(GTK_BOX(location_card),
                    make_setting_row(
@@ -683,6 +761,7 @@ static GtkWidget *build_date_time_panel(SettingsWindow *state)
     gtk_box_append(GTK_BOX(page), location_card);
 
     gtk_widget_add_css_class(system_card, "settings-card");
+    gtk_widget_add_css_class(system_card, "system-card");
     gtk_box_append(GTK_BOX(system_card),
                    make_label("Operating-system time", "section-title"));
     state->timezone_value = make_label("Local time", "accent-note");
