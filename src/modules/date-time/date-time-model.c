@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "system-settings/date-time-model.h"
 
-#include <string.h>
+#include <infiltratr/core.h>
 
 static bool save_candidate(SsDateTimeModel *model,
                            const InfiltratrTemporalPolicyV3 *candidate)
@@ -53,34 +53,42 @@ ss_date_time_model_policy(const SsDateTimeModel *model)
 bool ss_date_time_model_set_clock_mode(SsDateTimeModel *model,
                                        const char *clock_mode)
 {
+    const InfiltratrTemporalClockModeInfo *info;
     InfiltratrTemporalPolicyV3 candidate;
 
-    if (model == NULL ||
-        infiltratr_temporal_clock_mode_find(clock_mode) == NULL) {
+    if (model == NULL) {
         return false;
     }
+    info = infiltratr_temporal_clock_mode_find(clock_mode);
+    if (info == NULL) {
+        return false;
+    }
+
     candidate = model->policy;
-    if (strlen(clock_mode) >= sizeof(candidate.clock_mode)) {
-        return false;
-    }
-    strcpy(candidate.clock_mode, clock_mode);
+    infiltratr_copy_string(candidate.clock_mode,
+                           sizeof(candidate.clock_mode),
+                           info->id);
     return save_candidate(model, &candidate);
 }
 
 bool ss_date_time_model_set_calendar(SsDateTimeModel *model,
                                      const char *calendar_id)
 {
+    const InfiltratrTemporalCalendarInfo *info;
     InfiltratrTemporalPolicyV3 candidate;
 
-    if (model == NULL || calendar_id == NULL ||
-        infiltratr_temporal_calendar_find(calendar_id) == NULL) {
+    if (model == NULL) {
         return false;
     }
+    info = infiltratr_temporal_calendar_find(calendar_id);
+    if (info == NULL) {
+        return false;
+    }
+
     candidate = model->policy;
-    if (strlen(calendar_id) >= sizeof(candidate.calendar)) {
-        return false;
-    }
-    strcpy(candidate.calendar, calendar_id);
+    infiltratr_copy_string(candidate.calendar,
+                           sizeof(candidate.calendar),
+                           info->id);
     return save_candidate(model, &candidate);
 }
 

@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "system-settings/date-time-model.h"
 
+#include <infiltratr/core.h>
+
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 static void print_usage(const char *program)
@@ -53,15 +54,15 @@ int main(int argc, char **argv)
             }
         } else if (strcmp(argv[index], "--location") == 0 &&
                    index + 2 < argc) {
-            char *end = NULL;
-            double latitude = strtod(argv[++index], &end);
-            if (end == NULL || *end != '\0') {
-                print_usage(argv[0]);
-                return 2;
-            }
-            end = NULL;
-            double longitude = strtod(argv[++index], &end);
-            if (end == NULL || *end != '\0' ||
+            const char *latitude_text = argv[++index];
+            const char *longitude_text = argv[++index];
+            double latitude;
+            double longitude;
+
+            if (!infiltratr_parse_double_range(
+                    latitude_text, -90.0, 90.0, &latitude) ||
+                !infiltratr_parse_double_range(
+                    longitude_text, -180.0, 180.0, &longitude) ||
                 !ss_date_time_model_set_location(
                     &model, true, latitude, longitude)) {
                 fputs("Unable to set geographic location.\n", stderr);

@@ -269,6 +269,8 @@ System Settings retains settings-domain policy. Network configuration logic does
 
 The repository consumes an exact Common revision when source implementation begins.
 
+System Settings consumes Common's canonical project-identity/build-profile contract, strict locale-independent numeric parsing, deterministic ASCII matching and semantic design palette directly. Product-specific GTK composition and platform authority detection remain local; System Settings does not duplicate Common's generic parsing or identity rules.
+
 ## Cross-application presentation policy
 
 Some System Settings choices are not settings for one backend; they are user-wide presentation policy consumed by many applications.

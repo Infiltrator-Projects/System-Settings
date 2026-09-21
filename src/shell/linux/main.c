@@ -7,8 +7,10 @@
 #include "system-settings/date-time-model.h"
 #include "system-settings/temporal-policy-store.h"
 #include "system-settings/cinnamon-interface.h"
+#include "system-settings/project-info.h"
 
 #include <gtk/gtk.h>
+#include <infiltratr/core.h>
 #include <infiltratr/design.h>
 #include <infiltratr/temporal.h>
 
@@ -57,9 +59,7 @@ static bool system_prefers_dark(void)
                  NULL);
     dark = prefer_dark != FALSE;
     if (!dark && theme_name != NULL) {
-        gchar *folded = g_ascii_strdown(theme_name, -1);
-        dark = folded != NULL && strstr(folded, "dark") != NULL;
-        g_free(folded);
+        dark = infiltratr_ascii_contains_ci(theme_name, "dark");
     }
     g_free(theme_name);
     return dark;
@@ -85,6 +85,8 @@ static void install_common_theme(void)
     gchar *accent;
     gchar *selected;
     gchar *titlebar;
+    gchar *success;
+    gchar *fault;
 
     if (palette == NULL || metrics == NULL || type == NULL) {
         return;
@@ -101,6 +103,8 @@ static void install_common_theme(void)
     accent = rgb_css(palette->neutral_accent_rgb);
     selected = rgb_css(palette->selection_background_rgb);
     titlebar = rgb_css(palette->titlebar_rgb);
+    success = rgb_css(palette->success_rgb);
+    fault = rgb_css(palette->fault_rgb);
 
     css = g_string_new(NULL);
     g_string_append_printf(
@@ -126,13 +130,14 @@ static void install_common_theme(void)
         ".divider { background: %s; min-height: 1px; }\n"
         ".accent-note { color: %s; font-size: 12px; }\n"
         ".status-ok { color: %s; font-size: 12px; }\n"
+        ".error { color: %s; font-size: 12px; }\n"
         "dropdown, switch, spinbutton { background: %s; }\n",
         background, text, type->ui_family, type->gtk_fallback,
         titlebar, border, title, muted, panel, border, muted,
         metrics->control_radius, selected, metrics->screen_padding,
         title, muted, card, border, metrics->card_radius, title, muted,
         title, text, muted, border, accent,
-        palette->success_rgb == 0U ? accent : "#63ab7c", surface);
+        success, fault, surface);
 
     provider = gtk_css_provider_new();
 #if GTK_CHECK_VERSION(4, 12, 0)
@@ -158,6 +163,8 @@ static void install_common_theme(void)
     g_free(accent);
     g_free(selected);
     g_free(titlebar);
+    g_free(success);
+    g_free(fault);
 }
 
 static GtkWidget *make_label(const char *text, const char *css_class)
@@ -721,6 +728,7 @@ static GtkWidget *build_sidebar(void)
 
 static GtkWidget *build_header(void)
 {
+    const InfiltratrProjectInfo *info = ss_project_info();
     GtkWidget *header = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
     GtkWidget *icon = gtk_image_new_from_icon_name("preferences-system-symbolic");
     GtkWidget *identity = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
@@ -729,7 +737,7 @@ static GtkWidget *build_header(void)
     gtk_image_set_pixel_size(GTK_IMAGE(icon), 24);
     gtk_box_append(GTK_BOX(header), icon);
     gtk_box_append(GTK_BOX(identity),
-                   make_label("System Settings", "app-title"));
+                   make_label(info->program_name, "app-title"));
     gtk_box_append(GTK_BOX(identity),
                    make_label("One place for system-wide preferences",
                               "app-subtitle"));
@@ -769,6 +777,7 @@ static gboolean on_close_request(GtkWindow *window, gpointer user_data)
 
 static void on_activate(GtkApplication *application, gpointer user_data)
 {
+    const InfiltratrProjectInfo *info = ss_project_info();
     SettingsWindow *state = g_new0(SettingsWindow, 1);
     GtkWidget *root;
     GtkWidget *body;
@@ -801,7 +810,7 @@ static void on_activate(GtkApplication *application, gpointer user_data)
     install_common_theme();
 
     state->window = GTK_WINDOW(gtk_application_window_new(application));
-    gtk_window_set_title(state->window, "System Settings");
+    gtk_window_set_title(state->window, info->program_name);
     gtk_window_set_default_size(state->window, 1040, 760);
     gtk_window_set_resizable(state->window, TRUE);
 
@@ -843,8 +852,9 @@ static void on_activate(GtkApplication *application, gpointer user_data)
 
 int main(int argc, char **argv)
 {
+    const InfiltratrProjectInfo *info = ss_project_info();
     g_autoptr(GtkApplication) application =
-        gtk_application_new("org.infiltrator.SystemSettings",
+        gtk_application_new(info->application_id,
                             G_APPLICATION_DEFAULT_FLAGS);
 
     g_signal_connect(application, "activate", G_CALLBACK(on_activate), NULL);

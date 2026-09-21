@@ -34,8 +34,12 @@ function(ss_configure target)
 endfunction()
 
 add_library(system-settings-core STATIC
+    src/app/project-info.c
     src/modules/date-time/date-time-model.c)
 ss_configure(system-settings-core)
+target_compile_definitions(system-settings-core PUBLIC
+    SYSTEM_SETTINGS_VERSION="${PROJECT_VERSION}"
+    SYSTEM_SETTINGS_BUILD_PROFILE="cmake")
 target_link_libraries(system-settings-core PUBLIC InfiltratrCommon::Portable)
 
 if(WIN32)
@@ -86,6 +90,11 @@ if(BUILD_TESTING)
     ss_configure(date-time-model-test)
     target_link_libraries(date-time-model-test PRIVATE system-settings-core)
     add_test(NAME date-time-model COMMAND date-time-model-test)
+
+    add_executable(project-info-test tests/project-info-test.c)
+    ss_configure(project-info-test)
+    target_link_libraries(project-info-test PRIVATE system-settings-core)
+    add_test(NAME project-info COMMAND project-info-test)
 
     if(UNIX)
         add_executable(temporal-policy-store-test
