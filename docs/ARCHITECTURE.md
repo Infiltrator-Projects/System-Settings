@@ -267,7 +267,7 @@ Common owns reusable generic implementation when it is at least as strong as the
 
 System Settings retains settings-domain policy. Network configuration logic does not move into Common simply because more than one project may eventually need networking.
 
-The repository consumes an exact Common revision when source implementation begins.
+The repository consumes an exact pinned Common revision so every build has a reproducible shared foundation.
 
 System Settings consumes Common's canonical project-identity/build-profile contract, strict locale-independent numeric parsing, deterministic ASCII matching and semantic design palette directly. Product-specific GTK composition and platform authority detection remain local; System Settings does not duplicate Common's generic parsing or identity rules.
 

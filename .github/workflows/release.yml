@@ -80,5 +80,5 @@ jobs:
             echo "Release $tag already exists; verifying asset name."
             gh release view "$tag" --json assets --jq '.assets[].name' |               grep -qx "$(basename "$deb")"
           else
-            gh release create "$tag" "$deb"               --verify-tag               --target "$sha"               --title "System Settings $version"               --notes "System Settings $version strengthens Mint/Cinnamon temporal interoperability: first-run state is seeded from Cinnamon's 12/24-hour and seconds preferences, exact conventional choices are mirrored back to Cinnamon, and the richer Infiltrator policy remains optional for standalone Calendar use."
+            gh release create "$tag" "$deb"               --verify-tag               --target "$sha"               --title "System Settings $version"               --notes "System Settings $version consumes pinned Common 1.19.20 more completely: strict locale-independent coordinate parsing, canonical temporal ID handling, semantic status colours, deterministic ASCII matching, and shared project/build identity, while retaining Mint/Cinnamon compatibility and Windows support."
           fi

@@ -8,6 +8,14 @@ All notable user-visible and architectural changes are recorded here.
 
 No unreleased changes.
 
+## 0.3.5 — 2026-09-21
+
+- Consume Common 1.19.20's strict locale-independent ranged double parser for command-line geographic coordinates instead of libc `strtod()`.
+- Use Common's canonical temporal catalogue IDs and bounded string copy in the Date & Time model and Linux Cinnamon compatibility adapter instead of private length/copy logic.
+- Use Common's allocation-free deterministic ASCII matching for GTK dark-theme detection and Common's semantic success/fault palette roles for status presentation.
+- Adopt Common's canonical `InfiltratrProjectInfo` and build-profile vocabulary as System Settings' single runtime identity source; published packages identify as `Generic / APT package` while source builds identify as `Source / CMake build`.
+- Add release-build-safe identity regression coverage on Linux and Windows and document the strengthened Common ownership boundary.
+
 ## 0.3.4 — 2026-09-21
 
 - Pin Common 1.19.20 with validated temporal-provider identity, symmetric coordinate validation and allocation-backed POSIX policy paths.
