@@ -161,6 +161,13 @@ still save the selected policy; a specialised preview is shown as unavailable
 rather than reimplementing Calendar's algorithms or substituting a misleading
 label/Gregorian date.
 
+Runtime discovery is resilient but bounded. On Linux the module first checks
+trusted system library locations, including the build platform's Debian/Mint
+multiarch directory, then bounded root-owned library subdirectories, and only
+then falls back to normal loader soname resolution. Discovery is retried at a
+low frequency while the panel is alive so an installed/upgraded Calendar
+runtime can become available without restarting System Settings.
+
 ### Settings authority versus storage authority
 
 System Settings is the user-facing control authority. That does not mean it

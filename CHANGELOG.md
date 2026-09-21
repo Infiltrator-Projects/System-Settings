@@ -8,6 +8,13 @@ All notable user-visible and architectural changes are recorded here.
 
 No unreleased changes.
 
+## 0.3.15 — 2026-09-21
+
+- Fix Calendar runtime discovery for the Date & Time live preview. The bridge now prefers trusted system library locations, including Debian/Mint multiarch directories, instead of relying only on the process loader finding `libcalendar-plus.so.0` by bare soname.
+- Retry Calendar runtime discovery while System Settings remains open, so installing or upgrading Calendar no longer leaves specialised clock/calendar previews permanently unavailable until the settings application is restarted.
+- Treat specialised clock and chronology capabilities independently, so a missing chronology entry point cannot unnecessarily disable an otherwise valid clock-preview runtime, and vice versa.
+- Add an executable runtime-bridge fixture test covering Internet Time and Positivist date rendering through the same dynamic ABI used by the real application.
+
 ## 0.3.14 — 2026-09-21
 
 - Fix the Date & Time live preview for specialised clock systems. Internet Time, Roman temporal time, sidereal/solar clocks and the other Calendar-owned modes now use Calendar's actual formatter instead of displaying the clock-mode name as if it were a value.

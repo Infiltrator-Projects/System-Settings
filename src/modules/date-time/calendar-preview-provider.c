@@ -3,13 +3,20 @@
 
 #include <infiltratr/dynlib.h>
 
+#include <glib.h>
 #include <glib-object.h>
 
 #include <stddef.h>
 #include <string.h>
 
 #define CALENDAR_RUNTIME_SONAME "libcalendar-plus.so.0"
+#define CALENDAR_RUNTIME_REALNAME "libcalendar-plus.so.0.0.0"
 #define CALENDAR_ID_CAPACITY 64U
+#define DISCOVERY_RETRY_USEC (5 * G_USEC_PER_SEC)
+
+#ifndef SYSTEM_SETTINGS_LIBRARY_ARCHITECTURE
+#define SYSTEM_SETTINGS_LIBRARY_ARCHITECTURE ""
+#endif
 
 typedef int (*TimeModeFromStringFn)(const char *mode);
 typedef char *(*FormatTimeAtLocationFn)(
@@ -20,9 +27,9 @@ typedef char *(*FormatTimeAtLocationFn)(
     int vertical,
     double latitude,
     double longitude);
-typedef void *(*CalendarSystemNewFn)(const char *calendar_id);
+typedef GObject *(*CalendarSystemNewFn)(const char *calendar_id);
 typedef char *(*CalendarSystemFormatDateFn)(
-    void *calendar,
+    GObject *calendar,
     int gregorian_year,
     int gregorian_month,
     int gregorian_day,
@@ -34,9 +41,35 @@ struct SsCalendarPreviewProvider {
     FormatTimeAtLocationFn format_time_at_location;
     CalendarSystemNewFn calendar_system_new;
     CalendarSystemFormatDateFn calendar_system_format_date;
-    void *calendar;
+    GObject *calendar;
     char calendar_id[CALENDAR_ID_CAPACITY];
+    bool discover_default_runtime;
+    gint64 retry_after_monotonic_us;
 };
+
+static void reset_bindings(SsCalendarPreviewProvider *provider)
+{
+    provider->time_mode_from_string = NULL;
+    provider->format_time_at_location = NULL;
+    provider->calendar_system_new = NULL;
+    provider->calendar_system_format_date = NULL;
+}
+
+static bool has_clock_runtime(const SsCalendarPreviewProvider *provider)
+{
+    return provider != NULL &&
+           infiltratr_dynlib_is_open(&provider->library) &&
+           provider->time_mode_from_string != NULL &&
+           provider->format_time_at_location != NULL;
+}
+
+static bool has_calendar_runtime(const SsCalendarPreviewProvider *provider)
+{
+    return provider != NULL &&
+           infiltratr_dynlib_is_open(&provider->library) &&
+           provider->calendar_system_new != NULL &&
+           provider->calendar_system_format_date != NULL;
+}
 
 static bool bind_runtime(SsCalendarPreviewProvider *provider)
 {
@@ -45,32 +78,206 @@ static bool bind_runtime(SsCalendarPreviewProvider *provider)
             .name = "calendar_plus_time_mode_from_string",
             .destination = &provider->time_mode_from_string,
             .destination_size = sizeof(provider->time_mode_from_string),
-            .required = true
+            .required = false
         },
         {
             .name = "calendar_plus_format_time_at_location",
             .destination = &provider->format_time_at_location,
             .destination_size = sizeof(provider->format_time_at_location),
-            .required = true
+            .required = false
         },
         {
             .name = "calendar_plus_calendar_system_new",
             .destination = &provider->calendar_system_new,
             .destination_size = sizeof(provider->calendar_system_new),
-            .required = true
+            .required = false
         },
         {
             .name = "calendar_plus_calendar_system_format_date",
             .destination = &provider->calendar_system_format_date,
             .destination_size = sizeof(provider->calendar_system_format_date),
-            .required = true
+            .required = false
         }
     };
 
-    return infiltratr_dynlib_bind_symbols(
-        &provider->library,
-        bindings,
-        sizeof(bindings) / sizeof(bindings[0]));
+    reset_bindings(provider);
+    if (!infiltratr_dynlib_bind_symbols(
+            &provider->library,
+            bindings,
+            sizeof(bindings) / sizeof(bindings[0]))) {
+        reset_bindings(provider);
+        return false;
+    }
+
+    if (!has_clock_runtime(provider) && !has_calendar_runtime(provider)) {
+        reset_bindings(provider);
+        return false;
+    }
+    return true;
+}
+
+static bool open_runtime(
+    SsCalendarPreviewProvider *provider,
+    const char *library_name)
+{
+    if (library_name == NULL || library_name[0] == '\0') {
+        return false;
+    }
+
+    if (infiltratr_dynlib_is_open(&provider->library)) {
+        infiltratr_dynlib_close(&provider->library);
+    }
+    reset_bindings(provider);
+
+    if (!infiltratr_dynlib_open(&provider->library, library_name)) {
+        return false;
+    }
+    if (!bind_runtime(provider)) {
+        infiltratr_dynlib_close(&provider->library);
+        return false;
+    }
+    return true;
+}
+
+static bool try_directory(
+    SsCalendarPreviewProvider *provider,
+    const char *directory)
+{
+    static const char *const names[] = {
+        CALENDAR_RUNTIME_SONAME,
+        CALENDAR_RUNTIME_REALNAME
+    };
+
+    if (directory == NULL || directory[0] == '\0') {
+        return false;
+    }
+
+    for (size_t index = 0U;
+         index < sizeof(names) / sizeof(names[0]);
+         ++index) {
+        g_autofree gchar *candidate =
+            g_build_filename(directory, names[index], NULL);
+
+        if (g_file_test(candidate, G_FILE_TEST_EXISTS) &&
+            open_runtime(provider, candidate)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool try_arch_directory(
+    SsCalendarPreviewProvider *provider,
+    const char *root)
+{
+    const char *architecture = SYSTEM_SETTINGS_LIBRARY_ARCHITECTURE;
+
+    if (architecture[0] == '\0') {
+        return false;
+    }
+
+    g_autofree gchar *directory =
+        g_build_filename(root, architecture, NULL);
+    return try_directory(provider, directory);
+}
+
+static bool try_root_subdirectories(
+    SsCalendarPreviewProvider *provider,
+    const char *root)
+{
+    g_autoptr(GDir) directory = g_dir_open(root, 0U, NULL);
+    const gchar *entry;
+
+    if (directory == NULL) {
+        return false;
+    }
+
+    while ((entry = g_dir_read_name(directory)) != NULL) {
+        g_autofree gchar *path = NULL;
+
+        if (entry[0] == '.') {
+            continue;
+        }
+
+        path = g_build_filename(root, entry, NULL);
+        if (!g_file_test(path, G_FILE_TEST_IS_DIR)) {
+            continue;
+        }
+
+        if (try_directory(provider, path)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool discover_runtime(SsCalendarPreviewProvider *provider)
+{
+    static const char *const roots[] = {
+        "/usr/lib",
+        "/lib",
+        "/usr/local/lib",
+        "/usr/lib64",
+        "/lib64"
+    };
+
+    for (size_t index = 0U;
+         index < sizeof(roots) / sizeof(roots[0]);
+         ++index) {
+        if (try_arch_directory(provider, roots[index]) ||
+            try_directory(provider, roots[index])) {
+            return true;
+        }
+    }
+
+    /*
+     * Debian/Mint normally places the library in a multiarch directory.  The
+     * compile-time architecture is the fast path; this bounded one-level scan
+     * also handles a package built on a toolchain that did not expose
+     * CMAKE_LIBRARY_ARCHITECTURE.
+     */
+    for (size_t index = 0U;
+         index < sizeof(roots) / sizeof(roots[0]);
+         ++index) {
+        if (try_root_subdirectories(provider, roots[index])) {
+            return true;
+        }
+    }
+
+    /*
+     * Retain the platform loader as the final portability fallback.  Trusted
+     * absolute system locations above are preferred on Linux.
+     */
+    return open_runtime(provider, CALENDAR_RUNTIME_SONAME);
+}
+
+static bool ensure_runtime(SsCalendarPreviewProvider *provider)
+{
+    gint64 now;
+
+    if (provider == NULL) {
+        return false;
+    }
+    if (infiltratr_dynlib_is_open(&provider->library) &&
+        (has_clock_runtime(provider) || has_calendar_runtime(provider))) {
+        return true;
+    }
+    if (!provider->discover_default_runtime) {
+        return false;
+    }
+
+    now = g_get_monotonic_time();
+    if (provider->retry_after_monotonic_us > now) {
+        return false;
+    }
+
+    provider->retry_after_monotonic_us =
+        now + DISCOVERY_RETRY_USEC;
+    if (discover_runtime(provider)) {
+        provider->retry_after_monotonic_us = 0;
+        return true;
+    }
+    return false;
 }
 
 SsCalendarPreviewProvider *ss_calendar_preview_provider_new_from(
@@ -85,8 +292,7 @@ SsCalendarPreviewProvider *ss_calendar_preview_provider_new_from(
     provider = g_new0(SsCalendarPreviewProvider, 1);
     provider->library = (InfiltratrDynlib)INFILTRATR_DYNLIB_INIT;
 
-    if (!infiltratr_dynlib_open(&provider->library, library_name) ||
-        !bind_runtime(provider)) {
+    if (!open_runtime(provider, library_name)) {
         ss_calendar_preview_provider_free(provider);
         return NULL;
     }
@@ -95,8 +301,13 @@ SsCalendarPreviewProvider *ss_calendar_preview_provider_new_from(
 
 SsCalendarPreviewProvider *ss_calendar_preview_provider_new(void)
 {
-    return ss_calendar_preview_provider_new_from(
-        CALENDAR_RUNTIME_SONAME);
+    SsCalendarPreviewProvider *provider =
+        g_new0(SsCalendarPreviewProvider, 1);
+
+    provider->library = (InfiltratrDynlib)INFILTRATR_DYNLIB_INIT;
+    provider->discover_default_runtime = true;
+    (void)ensure_runtime(provider);
+    return provider;
 }
 
 void ss_calendar_preview_provider_free(
@@ -106,10 +317,7 @@ void ss_calendar_preview_provider_free(
         return;
     }
 
-    if (provider->calendar != NULL) {
-        g_object_unref(provider->calendar);
-        provider->calendar = NULL;
-    }
+    g_clear_object(&provider->calendar);
     infiltratr_dynlib_close(&provider->library);
     g_free(provider);
 }
@@ -117,12 +325,8 @@ void ss_calendar_preview_provider_free(
 bool ss_calendar_preview_provider_available(
     const SsCalendarPreviewProvider *provider)
 {
-    return provider != NULL &&
-           infiltratr_dynlib_is_open(&provider->library) &&
-           provider->time_mode_from_string != NULL &&
-           provider->format_time_at_location != NULL &&
-           provider->calendar_system_new != NULL &&
-           provider->calendar_system_format_date != NULL;
+    return has_clock_runtime(provider) ||
+           has_calendar_runtime(provider);
 }
 
 char *ss_calendar_preview_provider_format_clock(
@@ -137,7 +341,8 @@ char *ss_calendar_preview_provider_format_clock(
     int mode;
     char *formatted;
 
-    if (!ss_calendar_preview_provider_available(provider) ||
+    if (!ensure_runtime(provider) ||
+        !has_clock_runtime(provider) ||
         clock_mode == NULL || clock_mode[0] == '\0') {
         return NULL;
     }
@@ -155,6 +360,7 @@ char *ss_calendar_preview_provider_format_clock(
         0,
         latitude,
         longitude);
+
     if (formatted == NULL || formatted[0] == '\0') {
         g_free(formatted);
         return NULL;
@@ -166,9 +372,10 @@ static bool select_calendar(
     SsCalendarPreviewProvider *provider,
     const char *calendar_id)
 {
-    void *calendar;
+    GObject *calendar;
 
-    if (!ss_calendar_preview_provider_available(provider) ||
+    if (!ensure_runtime(provider) ||
+        !has_calendar_runtime(provider) ||
         calendar_id == NULL || calendar_id[0] == '\0' ||
         strlen(calendar_id) >= sizeof(provider->calendar_id)) {
         return false;
@@ -184,9 +391,7 @@ static bool select_calendar(
         return false;
     }
 
-    if (provider->calendar != NULL) {
-        g_object_unref(provider->calendar);
-    }
+    g_clear_object(&provider->calendar);
     provider->calendar = calendar;
     g_strlcpy(
         provider->calendar_id,

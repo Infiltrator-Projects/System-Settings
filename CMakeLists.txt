@@ -118,7 +118,12 @@ elseif(UNIX)
         InfiltratrCommon::Common
         InfiltratrCommon::Portable
         PkgConfig::GTK4
-        PkgConfig::GEOCODE)
+        PkgConfig::GEOCODE
+        ${CMAKE_DL_LIBS})
+    if(CMAKE_LIBRARY_ARCHITECTURE)
+        target_compile_definitions(system-settings-date-time-linux PRIVATE
+            SYSTEM_SETTINGS_LIBRARY_ARCHITECTURE="${CMAKE_LIBRARY_ARCHITECTURE}")
+    endif()
 
     add_executable(system-settings
         src/shell/linux/main.c)
@@ -199,6 +204,33 @@ if(BUILD_TESTING)
         target_link_libraries(location-metadata-test PRIVATE
             system-settings-platform)
         add_test(NAME location-metadata COMMAND location-metadata-test)
+
+        add_library(calendar-preview-runtime-fixture SHARED
+            tests/calendar-preview-runtime-fixture.c)
+        ss_configure(calendar-preview-runtime-fixture)
+        target_link_libraries(calendar-preview-runtime-fixture PRIVATE
+            PkgConfig::GIO2)
+        set_target_properties(calendar-preview-runtime-fixture PROPERTIES
+            PREFIX ""
+            OUTPUT_NAME "calendar-preview-runtime-fixture")
+
+        add_executable(calendar-preview-provider-test
+            tests/calendar-preview-provider-test.c
+            src/modules/date-time/calendar-preview-provider.c)
+        ss_configure(calendar-preview-provider-test)
+        target_include_directories(calendar-preview-provider-test PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/modules/date-time")
+        target_link_libraries(calendar-preview-provider-test PRIVATE
+            InfiltratrCommon::Common
+            PkgConfig::GIO2
+            ${CMAKE_DL_LIBS})
+        if(CMAKE_LIBRARY_ARCHITECTURE)
+            target_compile_definitions(calendar-preview-provider-test PRIVATE
+                SYSTEM_SETTINGS_LIBRARY_ARCHITECTURE="${CMAKE_LIBRARY_ARCHITECTURE}")
+        endif()
+        add_test(NAME calendar-preview-provider
+            COMMAND calendar-preview-provider-test
+                $<TARGET_FILE:calendar-preview-runtime-fixture>)
     endif()
 endif()
 

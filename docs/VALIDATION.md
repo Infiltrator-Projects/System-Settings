@@ -97,7 +97,13 @@ The replacement Date & Time module adds specific invariants:
 - non-Gregorian previews use Calendar's chronology formatter rather than
   relabelling the Gregorian date;
 - missing Calendar runtime support degrades to an explicit unavailable preview
-  without preventing policy editing or conventional previews.
+  without preventing policy editing or conventional previews;
+- the Calendar preview bridge is exercised against a shared-library fixture so
+  dynamic symbol discovery, specialised clock formatting and non-Gregorian
+  chronology rendering are regression-tested independently of the installed
+  desktop environment;
+- Linux runtime discovery covers Debian/Mint multiarch library placement and
+  can recover after Calendar becomes available while System Settings is open.
 
 The build contains an architectural CMake guard for the first invariant and
 unit coverage for the conventional/native clock-policy mapping.
