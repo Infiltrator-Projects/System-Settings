@@ -49,6 +49,7 @@ elseif(UNIX)
     pkg_check_modules(GTK4 REQUIRED IMPORTED_TARGET gtk4>=4.6)
 
     add_library(system-settings-platform STATIC
+        src/platform/linux/cinnamon-interface.c
         src/platform/linux/temporal-policy-store.c)
     target_link_libraries(system-settings-platform
         PUBLIC InfiltratrCommon::Common PkgConfig::GIO2)
