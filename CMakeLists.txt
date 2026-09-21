@@ -86,6 +86,15 @@ if(BUILD_TESTING)
     ss_configure(date-time-model-test)
     target_link_libraries(date-time-model-test PRIVATE system-settings-core)
     add_test(NAME date-time-model COMMAND date-time-model-test)
+
+    if(UNIX)
+        add_executable(temporal-policy-store-test
+            tests/temporal-policy-store-test.c)
+        ss_configure(temporal-policy-store-test)
+        target_link_libraries(temporal-policy-store-test PRIVATE
+            system-settings-platform)
+        add_test(NAME temporal-policy-store COMMAND temporal-policy-store-test)
+    endif()
 endif()
 
 
