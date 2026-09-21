@@ -109,22 +109,22 @@ static void install_common_theme(void)
     css = g_string_new(NULL);
     g_string_append_printf(
         css,
-        "window { background: %s; color: %s; font-family: '%s', %s; }\n"
-        ".titlebar-shell { background: %s; border-bottom: 1px solid %s; padding: 10px 16px; }\n"
-        ".app-title { color: %s; font-size: 18px; font-weight: 700; }\n"
+        "window { background: %s; color: %s; font-family: '%s', %s; font-weight: %u; }\n"
+        ".titlebar-shell { background: %s; border-bottom: 1px solid %s; padding: %upx %upx; }\n"
+        ".app-title { color: %s; font-size: 18px; font-weight: %u; }\n"
         ".app-subtitle { color: %s; font-size: 12px; }\n"
         ".settings-sidebar { background: %s; border-right: 1px solid %s; padding: 14px 10px; }\n"
-        ".nav-title { color: %s; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; margin: 4px 8px 8px 8px; }\n"
+        ".nav-title { color: %s; font-size: 11px; font-weight: %u; letter-spacing: 0.08em; margin: 4px 8px 8px 8px; }\n"
         ".nav-row { border-radius: %upx; padding: 10px 12px; }\n"
         ".nav-row:selected { background: %s; }\n"
         ".settings-content { padding: %upx; }\n"
-        ".page-title { color: %s; font-size: 26px; font-weight: 700; }\n"
-        ".page-summary { color: %s; font-size: 13px; margin-bottom: 6px; }\n"
-        ".preview-card, .settings-card { background: %s; border: 1px solid %s; border-radius: %upx; padding: 18px; }\n"
-        ".preview-time { color: %s; font-size: 30px; font-weight: 700; }\n"
+        ".page-title { color: %s; font-size: 26px; font-weight: %u; }\n"
+        ".page-summary { color: %s; font-size: 13px; margin-bottom: %upx; }\n"
+        ".preview-card, .settings-card { background: %s; border: 1px solid %s; border-radius: %upx; padding: %upx; }\n"
+        ".preview-time { color: %s; font-size: 30px; font-weight: %u; }\n"
         ".preview-date { color: %s; font-size: 14px; }\n"
-        ".section-title { color: %s; font-size: 16px; font-weight: 700; }\n"
-        ".setting-label { color: %s; font-weight: 700; }\n"
+        ".section-title { color: %s; font-size: 16px; font-weight: %u; }\n"
+        ".setting-label { color: %s; font-weight: %u; }\n"
         ".setting-description { color: %s; font-size: 12px; }\n"
         ".setting-row { padding: 8px 0; }\n"
         ".divider { background: %s; min-height: 1px; }\n"
@@ -133,11 +133,24 @@ static void install_common_theme(void)
         ".error { color: %s; font-size: 12px; }\n"
         "dropdown, switch, spinbutton { background: %s; }\n",
         background, text, type->ui_family, type->gtk_fallback,
-        titlebar, border, title, muted, panel, border, muted,
-        metrics->control_radius, selected, metrics->screen_padding,
-        title, muted, card, border, metrics->card_radius, title, muted,
-        title, text, muted, border, accent,
-        success, fault, surface);
+        (unsigned int)type->ui_regular_weight,
+        titlebar, border,
+        (unsigned int)metrics->control_spacing,
+        (unsigned int)metrics->content_padding,
+        title, (unsigned int)type->ui_bold_weight,
+        muted, panel, border,
+        muted, (unsigned int)type->ui_bold_weight,
+        (unsigned int)metrics->control_radius,
+        selected, (unsigned int)metrics->screen_padding,
+        title, (unsigned int)type->ui_bold_weight,
+        muted, (unsigned int)metrics->compact_spacing,
+        card, border, (unsigned int)metrics->card_radius,
+        (unsigned int)metrics->section_spacing,
+        title, (unsigned int)type->ui_bold_weight,
+        muted,
+        title, (unsigned int)type->ui_bold_weight,
+        text, (unsigned int)type->ui_bold_weight,
+        muted, border, accent, success, fault, surface);
 
     provider = gtk_css_provider_new();
 #if GTK_CHECK_VERSION(4, 12, 0)

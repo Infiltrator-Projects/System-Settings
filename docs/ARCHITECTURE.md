@@ -269,7 +269,7 @@ System Settings retains settings-domain policy. Network configuration logic does
 
 The repository consumes an exact pinned Common revision so every build has a reproducible shared foundation.
 
-System Settings consumes Common's canonical project-identity/build-profile contract, strict locale-independent numeric parsing, deterministic ASCII matching and semantic design palette directly. Product-specific GTK composition and platform authority detection remain local; System Settings does not duplicate Common's generic parsing or identity rules.
+System Settings consumes Common's canonical project-identity/build-profile contract, strict locale-independent numeric parsing, deterministic ASCII matching, semantic design palette, typography-role weights and shared structural spacing metrics directly. Product-specific GTK composition and platform authority detection remain local; System Settings does not duplicate Common's generic parsing or identity rules.
 
 ## Cross-application presentation policy
 

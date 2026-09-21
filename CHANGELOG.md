@@ -8,6 +8,12 @@ All notable user-visible and architectural changes are recorded here.
 
 No unreleased changes.
 
+## 0.3.6 — 2026-09-21
+
+- Finish the Common-to-System-Settings design pass by consuming Common's canonical regular/bold typography weights instead of hard-coding the current numeric weight.
+- Replace exact duplicated titlebar, page-summary and card spacing literals with Common's control, content, compact and section spacing metrics.
+- Keep component-specific GTK geometry local where Common does not define an equivalent semantic role.
+
 ## 0.3.5 — 2026-09-21
 
 - Consume Common 1.19.20's strict locale-independent ranged double parser for command-line geographic coordinates instead of libc `strtod()`.
