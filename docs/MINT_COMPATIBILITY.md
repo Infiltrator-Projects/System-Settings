@@ -18,7 +18,7 @@ When Mint, Cinnamon, GNOME or another authoritative desktop/system component alr
 
 Examples include ordinary desktop preferences such as:
 
-- conventional 12/24-hour clock preference;
+- Cinnamon's conventional 12/24-hour clock value as a compatibility backend for the explicit Standard 12-hour/24-hour Clock system choices;
 - theme/desktop preferences;
 - keyboard and pointer preferences;
 - other GSettings, D-Bus or system-service settings that are already the actual source of truth.
@@ -88,7 +88,8 @@ System Settings
     ├── Time zone ───────────────→ org.freedesktop.timedate1.SetTimezone
     ├── Network time ────────────→ org.freedesktop.timedate1.SetNTP
     ├── Manual date/time ────────→ org.freedesktop.timedate1.SetTime
-    ├── 12/24-hour ──────────────→ org.cinnamon.desktop.interface
+    ├── explicit Standard 12/24-hour Clock system
+    │        └────────────────────→ org.cinnamon.desktop.interface
     │                                + GNOME clock-format compatibility mirror
     ├── Display date ────────────→ org.cinnamon.desktop.interface
     ├── Display seconds ─────────→ temporal policy + exact Cinnamon fallback
@@ -177,9 +178,9 @@ optional compatible Mint fallback updated
 
 ## Temporal example
 
-Conventional 12-hour and 24-hour presentation can map to the existing desktop preference where that preference is authoritative.
+Conventional 12-hour and 24-hour presentation are first-class Clock system choices in System Settings. The existing Cinnamon/GNOME preference is retained only as the compatibility representation for those exact conventional modes; it is not exposed as a second competing user-facing switch.
 
-A decimal 10-hour profile cannot be represented faithfully by that conventional choice, so its real identity remains an Infiltrator temporal policy.
+A decimal 10-hour profile cannot be represented faithfully by that conventional compatibility value, so its real identity remains an Infiltrator temporal policy.
 
 Conceptually:
 

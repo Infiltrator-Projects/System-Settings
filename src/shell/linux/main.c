@@ -44,7 +44,6 @@ typedef struct SettingsWindow {
     GtkButton *manual_set_time;
     GtkWidget *manual_row;
     GtkWidget *manual_unavailable;
-    GtkSwitch *use_24h;
     GtkSwitch *show_date;
     GtkDropDown *first_day;
     GtkWidget *status_label;
@@ -556,13 +555,6 @@ static void sync_native_format_controls(SettingsWindow *state)
     }
 
     state->updating_system_controls = true;
-    if (state->use_24h != NULL &&
-        ss_cinnamon_interface_get_boolean(
-            state->cinnamon_interface_settings,
-            "clock-use-24h",
-            &value)) {
-        gtk_switch_set_active(state->use_24h, value);
-    }
     if (state->show_date != NULL &&
         ss_cinnamon_interface_get_boolean(
             state->cinnamon_interface_settings,
@@ -1318,29 +1310,6 @@ static void on_manual_set_time_clicked(
         g_object_ref(state->window));
 }
 
-static void on_use_24h_changed(GObject *object,
-                               GParamSpec *pspec G_GNUC_UNUSED,
-                               gpointer user_data)
-{
-    SettingsWindow *state = user_data;
-    bool value;
-
-    if (state == NULL || state->updating_system_controls ||
-        state->cinnamon_interface_settings == NULL) {
-        return;
-    }
-
-    value = gtk_switch_get_active(GTK_SWITCH(object)) != FALSE;
-    if (!ss_cinnamon_interface_set_clock_use_24h(
-            state->cinnamon_interface_settings, value)) {
-        set_status(state, "Could not change the desktop 12/24-hour format.", true);
-        sync_native_format_controls(state);
-        return;
-    }
-    set_status(state, "Desktop clock format updated.", false);
-    (void)refresh_preview(state);
-}
-
 static void on_show_date_changed(GObject *object,
                                  GParamSpec *pspec G_GNUC_UNUSED,
                                  gpointer user_data)
@@ -1933,16 +1902,6 @@ static GtkWidget *build_date_time_panel(SettingsWindow *state)
         GTK_BOX(format_card),
         make_label("Desktop format", "section-title"));
 
-    state->use_24h = GTK_SWITCH(gtk_switch_new());
-    gtk_widget_add_css_class(
-        GTK_WIDGET(state->use_24h), "setting-switch");
-    gtk_box_append(
-        GTK_BOX(format_card),
-        make_setting_row(
-            "Use 24-hour clock",
-            "Native Cinnamon clock preference used by Standard time and non-Common applications. GNOME's conventional clock-format preference is mirrored for compatibility, matching Mint's behaviour.",
-            GTK_WIDGET(state->use_24h)));
-
     state->show_date = GTK_SWITCH(gtk_switch_new());
     gtk_widget_add_css_class(
         GTK_WIDGET(state->show_date), "setting-switch");
@@ -2005,9 +1964,6 @@ static GtkWidget *build_date_time_panel(SettingsWindow *state)
         state->longitude, "notify::value",
         G_CALLBACK(on_location_coordinate_changed), state);
 
-    g_signal_connect(
-        state->use_24h, "notify::active",
-        G_CALLBACK(on_use_24h_changed), state);
     g_signal_connect(
         state->show_date, "notify::active",
         G_CALLBACK(on_show_date_changed), state);

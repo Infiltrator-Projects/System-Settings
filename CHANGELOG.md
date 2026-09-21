@@ -8,6 +8,12 @@ All notable user-visible and architectural changes are recorded here.
 
 No unreleased changes.
 
+## 0.3.12 — 2026-09-21
+
+- Remove the redundant user-facing `Use 24-hour clock` switch from Desktop format. Explicit 12-hour and 24-hour presentation are already first-class Clock system choices, so exposing the Cinnamon compatibility Boolean as a second control created two UI authorities for the same choice.
+- Keep Cinnamon/GNOME's conventional 12/24-hour setting only as a compatibility backend: selecting the explicit Standard 12-hour or Standard 24-hour clock mode mirrors the matching native desktop value, while richer clock modes do not pretend to have a conventional equivalent.
+- Retain `Standard time (OS locale)` as the locale/native conventional mode; it reads the native desktop convention rather than adding another visible toggle.
+
 ## 0.3.11 — 2026-09-21
 
 - Hide manual date/time controls completely while Network time is enabled instead of leaving inactive-looking manual fields visible beside an authoritative NTP source.
