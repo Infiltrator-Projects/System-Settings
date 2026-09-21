@@ -8,6 +8,11 @@ All notable user-visible and architectural changes are recorded here.
 
 No unreleased changes.
 
+## 0.3.3 — 2026-09-21
+
+- Pin the final Common 1.19.19 release revision containing the shared POSIX temporal authority contract and release-build-safe contract test.
+- Retain the explicit temporal-v3 provider marker, shared atomic policy store and Mint/Cinnamon compatibility behaviour introduced in 0.3.2.
+
 ## 0.3.2 — 2026-09-21
 
 - Publish the explicit `temporal-v3` provider capability marker so consumers can detect the installed System Settings authority without probing executable names or PATH.
