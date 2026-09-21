@@ -69,6 +69,14 @@ Enhanced integration is optional. The core System Settings design must remain co
 
 On Mint/Linux, the System Settings package publishes the canonical `/usr/share/infiltrator/policy-providers/temporal-v3` capability marker defined by Common. Consumers use that marker rather than executable-name/PATH probing. The marker means the richer provider is installed; it does not by itself mean a user policy exists. Until a valid policy is present, native Cinnamon settings remain authoritative.
 
+## Region, time zone and geographic location
+
+The long-term Mint/Cinnamon integration treats language, regional formats, time zone and geographic location as related but separate authorities.
+
+System Settings should read the native Mint/Linux values first and eventually replace the user-facing locale/control-centre surface by writing through to those same native authorities. It must not create an Infiltrator shadow copy of ordinary locale or time-zone state.
+
+The installed IANA time zone may provide a representative tzdata coordinate. System Settings can offer that coordinate as an explicit approximation for location-dependent Infiltrator features, but must not infer that the user physically lives in the reference city. A more precise locality choice is a separate user action.
+
 ## Compatible fallback
 
 An extended Infiltrator policy may have no exact representation in Mint.

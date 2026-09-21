@@ -163,3 +163,12 @@ See [MINT_COMPATIBILITY.md](MINT_COMPATIBILITY.md).
 **Rationale.** Private storage can bypass platform policy, notifications, validation and migration logic.
 
 **Consequence.** If Windows exposes only a supported Settings destination for a workflow, System Settings may hand off rather than reverse-engineering Settings internals. Equivalent discipline applies to Mint/Cinnamon.
+
+
+## ADR-020 — A time zone is regional evidence, not a physical-location assertion
+
+**Decision.** System Settings may use the operating-system IANA time zone to seed an approximate geographic reference, but it never silently treats that reference coordinate as the user's actual physical location.
+
+**Rationale.** A time zone such as `Australia/Melbourne` spans a large area. The tzdata coordinate identifies a representative reference for the zone, not the machine's position. Conflating the two would create false precision and would make future Language & Region work architecturally ambiguous.
+
+**Consequence.** Geographic location has an explicit source: absent, time-zone reference, or user-selected/custom. The system time zone remains authoritative for civil-time rules. A future locality chooser may resolve a named place such as a town or suburb to coordinates, but that resolution is a separate location operation and must not rewrite language, regional formats or time zone unless the user explicitly requests it.

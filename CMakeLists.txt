@@ -61,6 +61,7 @@ elseif(UNIX)
 
     add_library(system-settings-platform STATIC
         src/platform/linux/cinnamon-interface.c
+        src/platform/linux/regional-context.c
         src/platform/linux/temporal-policy-store.c)
     target_link_libraries(system-settings-platform
         PUBLIC InfiltratrCommon::Common PkgConfig::GIO2)
@@ -112,6 +113,13 @@ if(BUILD_TESTING)
         target_link_libraries(temporal-policy-store-test PRIVATE
             system-settings-platform)
         add_test(NAME temporal-policy-store COMMAND temporal-policy-store-test)
+
+        add_executable(regional-context-test
+            tests/regional-context-test.c)
+        ss_configure(regional-context-test)
+        target_link_libraries(regional-context-test PRIVATE
+            system-settings-platform)
+        add_test(NAME regional-context COMMAND regional-context-test)
     endif()
 endif()
 

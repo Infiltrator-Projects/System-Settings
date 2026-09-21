@@ -8,6 +8,15 @@ All notable user-visible and architectural changes are recorded here.
 
 No unreleased changes.
 
+## 0.3.9 — 2026-09-21
+
+- Separate operating-system time-zone identity from physical geographic location: a configured time zone is now treated as regional evidence, never silently promoted to the user's exact location.
+- Detect the full IANA time-zone identifier on Linux and read its representative coordinate from the installed tzdata `zone1970.tab`/`zone.tab` database when available.
+- Replace the geographic-location on/off switch with an explicit source selector: no location, system time-zone reference, or custom coordinates.
+- Seed custom coordinates from the system regional reference instead of the misleading 0°,0° origin, while keeping the values editable to locality-level precision.
+- Display the full system zone such as `Australia/Melbourne` rather than only the transient abbreviation such as AEST/AEDT.
+- Add deterministic parser/lookup regression coverage and document the longer-term Language & Region/locality-search architecture.
+
 ## 0.3.8 — 2026-09-21
 
 - Replace the inherited Mint `preferences-system` launcher icon with a first-party System Settings icon using the same graphite, black and cyan visual language as the other Infiltrator desktop applications.

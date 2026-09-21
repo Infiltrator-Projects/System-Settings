@@ -209,6 +209,31 @@ Changing the clock profile does not change the timezone. A canonical instant is 
 
 System timezone changes and user presentation choices may be separate settings where the operating system supports that distinction.
 
+## Geographic location and regional context
+
+Time zone, locale and physical location are related inputs but are not the same setting.
+
+On Linux, System Settings may read the configured IANA time zone and the representative coordinate published by the installed tzdata database. That coordinate is useful as a starting approximation for location-dependent clock systems. It is not evidence that the computer is physically located at that coordinate.
+
+The location source is therefore explicit:
+
+```text
+not selected
+    no latitude/longitude authority
+
+system time-zone reference
+    representative tzdata coordinate
+    approximate regional hint only
+
+custom / future named locality
+    user-selected geographic authority
+    latitude/longitude published to Common Temporal
+```
+
+A future locality selector may resolve a named place such as a town, suburb or property-level location through a proper gazetteer/geocoding provider. System Settings must not ship an arbitrary hard-coded local-town list merely to make the UI appear complete. Until that provider is implemented, custom coordinates remain the precise path.
+
+Language, regional formats, time zone and geographic location will remain independently writable dimensions when the broader Language & Region module is implemented.
+
 ## Filesystem timestamps
 
 Filesystem metadata demonstrates the architectural rule clearly.

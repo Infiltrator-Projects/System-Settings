@@ -8,6 +8,7 @@
 #include "system-settings/temporal-policy-store.h"
 #include "system-settings/cinnamon-interface.h"
 #include "system-settings/project-info.h"
+#include "system-settings/regional-context.h"
 
 #include <gtk/gtk.h>
 #include <infiltratr/core.h>
@@ -19,6 +20,12 @@
 #include <stdio.h>
 #include <string.h>
 
+typedef enum SsLocationSource {
+    SS_LOCATION_SOURCE_NONE = 0,
+    SS_LOCATION_SOURCE_SYSTEM_REFERENCE = 1,
+    SS_LOCATION_SOURCE_CUSTOM = 2
+} SsLocationSource;
+
 typedef struct SettingsWindow {
     GtkWindow *window;
     GtkWidget *clock_preview;
@@ -27,12 +34,14 @@ typedef struct SettingsWindow {
     GtkDropDown *clock_mode;
     GtkDropDown *calendar;
     GtkSwitch *show_seconds;
-    GtkSwitch *location_configured;
+    GtkDropDown *location_source;
+    GtkWidget *location_summary;
     GtkSpinButton *latitude;
     GtkSpinButton *longitude;
     GtkWidget *status_label;
     GSettings *cinnamon_interface_settings;
     SsDateTimeModel model;
+    SsRegionalContext regional_context;
     guint timer_id;
     bool updating_controls;
 } SettingsWindow;
@@ -327,6 +336,136 @@ static GtkStringList *calendar_strings(void)
     return list;
 }
 
+static GtkStringList *location_source_strings(
+    const SettingsWindow *state)
+{
+    GtkStringList *list = gtk_string_list_new(NULL);
+    g_autofree gchar *system_reference = NULL;
+    const char *city = "time-zone reference";
+
+    gtk_string_list_append(list, "Not selected");
+
+    if (state != NULL &&
+        state->regional_context.timezone_city[0] != '\0') {
+        city = state->regional_context.timezone_city;
+    }
+
+    if (state != NULL &&
+        state->regional_context.has_reference_coordinates) {
+        system_reference = g_strdup_printf(
+            "System time-zone reference — %s", city);
+    } else {
+        system_reference = g_strdup(
+            "System time-zone reference unavailable");
+    }
+    gtk_string_list_append(list, system_reference);
+    gtk_string_list_append(list, "Custom coordinates");
+    return list;
+}
+
+static bool coordinate_close(double left, double right)
+{
+    double difference = left - right;
+    if (difference < 0.0) {
+        difference = -difference;
+    }
+    return difference < 0.000001;
+}
+
+static guint location_source_for_policy(
+    const SettingsWindow *state,
+    const InfiltratrTemporalPolicyV3 *policy)
+{
+    if (state == NULL || policy == NULL ||
+        !policy->location_configured) {
+        return SS_LOCATION_SOURCE_NONE;
+    }
+
+    if (state->regional_context.has_reference_coordinates &&
+        coordinate_close(policy->latitude,
+                         state->regional_context.reference_latitude) &&
+        coordinate_close(policy->longitude,
+                         state->regional_context.reference_longitude)) {
+        return SS_LOCATION_SOURCE_SYSTEM_REFERENCE;
+    }
+
+    return SS_LOCATION_SOURCE_CUSTOM;
+}
+
+static gchar *format_coordinate_pair(double latitude, double longitude)
+{
+    const double latitude_magnitude =
+        latitude < 0.0 ? -latitude : latitude;
+    const double longitude_magnitude =
+        longitude < 0.0 ? -longitude : longitude;
+
+    return g_strdup_printf(
+        "%.4f° %c, %.4f° %c",
+        latitude_magnitude, latitude < 0.0 ? 'S' : 'N',
+        longitude_magnitude, longitude < 0.0 ? 'W' : 'E');
+}
+
+static void update_location_summary(SettingsWindow *state)
+{
+    const InfiltratrTemporalPolicyV3 *policy;
+    guint source;
+    g_autofree gchar *coordinates = NULL;
+    g_autofree gchar *summary = NULL;
+
+    if (state == NULL || state->location_summary == NULL ||
+        state->location_source == NULL) {
+        return;
+    }
+
+    policy = ss_date_time_model_policy(&state->model);
+    if (policy == NULL) {
+        return;
+    }
+
+    source = gtk_drop_down_get_selected(state->location_source);
+    if (!policy->location_configured ||
+        source == SS_LOCATION_SOURCE_NONE) {
+        if (state->regional_context.has_reference_coordinates) {
+            const char *city =
+                state->regional_context.timezone_city[0] != '\0'
+                    ? state->regional_context.timezone_city
+                    : state->regional_context.timezone_id;
+            summary = g_strdup_printf(
+                "No geographic location selected. %s suggests %s as a "
+                "starting approximation; the time zone is not treated as "
+                "your physical location.",
+                state->regional_context.timezone_id,
+                city);
+        } else {
+            summary = g_strdup(
+                "No geographic location selected. The operating-system "
+                "time zone remains independent of physical location.");
+        }
+    } else {
+        coordinates = format_coordinate_pair(
+            policy->latitude, policy->longitude);
+        if (source == SS_LOCATION_SOURCE_SYSTEM_REFERENCE) {
+            const char *city =
+                state->regional_context.timezone_city[0] != '\0'
+                    ? state->regional_context.timezone_city
+                    : "time-zone";
+            summary = g_strdup_printf(
+                "Approximate %s reference from %s • %s. "
+                "Choose Custom coordinates for a more precise locality.",
+                city,
+                state->regional_context.timezone_id,
+                coordinates);
+        } else {
+            summary = g_strdup_printf(
+                "Custom geographic coordinates • %s. "
+                "These are independent of the operating-system time zone.",
+                coordinates);
+        }
+    }
+
+    gtk_label_set_text(GTK_LABEL(state->location_summary), summary);
+}
+
 static guint clock_index_for_id(const char *id)
 {
     size_t index;
@@ -379,24 +518,31 @@ selected_calendar(GtkDropDown *dropdown)
 static void update_control_capabilities(SettingsWindow *state)
 {
     const InfiltratrTemporalClockModeInfo *mode;
-    bool location_enabled;
+    const InfiltratrTemporalPolicyV3 *policy;
+    guint location_source;
+    bool custom_location;
 
     if (state == NULL) {
         return;
     }
 
+    location_source = state->location_source != NULL
+        ? gtk_drop_down_get_selected(state->location_source)
+        : SS_LOCATION_SOURCE_NONE;
+    custom_location = location_source == SS_LOCATION_SOURCE_CUSTOM;
+
     mode = selected_clock_mode(state);
+    policy = ss_date_time_model_policy(&state->model);
     gtk_widget_set_sensitive(GTK_WIDGET(state->show_seconds),
                              mode == NULL || mode->supports_seconds);
+    gtk_widget_set_sensitive(GTK_WIDGET(state->latitude), custom_location);
+    gtk_widget_set_sensitive(GTK_WIDGET(state->longitude), custom_location);
 
-    location_enabled =
-        gtk_switch_get_active(state->location_configured) != FALSE;
-    gtk_widget_set_sensitive(GTK_WIDGET(state->latitude), location_enabled);
-    gtk_widget_set_sensitive(GTK_WIDGET(state->longitude), location_enabled);
+    update_location_summary(state);
 
     if (mode != NULL &&
         (mode->requires_latitude || mode->requires_longitude) &&
-        !location_enabled) {
+        (policy == NULL || !policy->location_configured)) {
         set_status(state,
                    "This clock system needs a geographic location for a meaningful result.",
                    false);
@@ -488,8 +634,11 @@ static gboolean refresh_preview(gpointer user_data)
         if (summary != NULL) {
             gtk_label_set_text(GTK_LABEL(state->date_preview), summary);
         }
-        gtk_label_set_text(GTK_LABEL(state->timezone_value),
-                           zone != NULL ? zone : "Local time");
+        gtk_label_set_text(
+            GTK_LABEL(state->timezone_value),
+            state->regional_context.timezone_id[0] != '\0'
+                ? state->regional_context.timezone_id
+                : (zone != NULL ? zone : "Local time"));
     }
 
     return G_SOURCE_CONTINUE;
@@ -511,8 +660,9 @@ static void sync_controls(SettingsWindow *state)
         state->calendar,
         calendar_index_for_id(policy->calendar));
     gtk_switch_set_active(state->show_seconds, policy->show_seconds);
-    gtk_switch_set_active(state->location_configured,
-                          policy->location_configured);
+    gtk_drop_down_set_selected(
+        state->location_source,
+        location_source_for_policy(state, policy));
     gtk_spin_button_set_value(state->latitude, policy->latitude);
     gtk_spin_button_set_value(state->longitude, policy->longitude);
     state->updating_controls = false;
@@ -622,14 +772,16 @@ static void on_seconds_changed(GObject *object,
     policy_saved(state);
 }
 
-static void on_location_changed(GObject *object,
-                                GParamSpec *pspec,
-                                gpointer user_data)
+static void on_location_source_changed(GObject *object,
+                                       GParamSpec *pspec,
+                                       gpointer user_data)
 {
     SettingsWindow *state = user_data;
-    bool configured;
+    const InfiltratrTemporalPolicyV3 *policy;
+    guint source;
     double latitude;
     double longitude;
+    bool configured;
 
     (void)object;
     (void)pspec;
@@ -637,14 +789,74 @@ static void on_location_changed(GObject *object,
         return;
     }
 
-    configured =
-        gtk_switch_get_active(state->location_configured) != FALSE;
-    latitude = gtk_spin_button_get_value(state->latitude);
-    longitude = gtk_spin_button_get_value(state->longitude);
+    policy = ss_date_time_model_policy(&state->model);
+    if (policy == NULL) {
+        return;
+    }
+
+    source = gtk_drop_down_get_selected(state->location_source);
+    latitude = policy->latitude;
+    longitude = policy->longitude;
+    configured = source != SS_LOCATION_SOURCE_NONE;
+
+    if (source == SS_LOCATION_SOURCE_SYSTEM_REFERENCE) {
+        if (!state->regional_context.has_reference_coordinates) {
+            set_status(state,
+                       "The system time zone has no reference coordinate in the installed tzdata.",
+                       true);
+            state->updating_controls = true;
+            gtk_drop_down_set_selected(
+                state->location_source,
+                location_source_for_policy(state, policy));
+            state->updating_controls = false;
+            update_control_capabilities(state);
+            return;
+        }
+        latitude = state->regional_context.reference_latitude;
+        longitude = state->regional_context.reference_longitude;
+    } else if (source == SS_LOCATION_SOURCE_CUSTOM &&
+               !policy->location_configured &&
+               state->regional_context.has_reference_coordinates) {
+        latitude = state->regional_context.reference_latitude;
+        longitude = state->regional_context.reference_longitude;
+    }
+
+    state->updating_controls = true;
+    gtk_spin_button_set_value(state->latitude, latitude);
+    gtk_spin_button_set_value(state->longitude, longitude);
+    state->updating_controls = false;
 
     if (!ss_date_time_model_set_location(
             &state->model, configured, latitude, longitude)) {
         set_status(state, "Could not save geographic location.", true);
+        sync_controls(state);
+        return;
+    }
+    policy_saved(state);
+}
+
+static void on_location_coordinate_changed(GObject *object,
+                                           GParamSpec *pspec,
+                                           gpointer user_data)
+{
+    SettingsWindow *state = user_data;
+    double latitude;
+    double longitude;
+
+    (void)object;
+    (void)pspec;
+    if (state == NULL || state->updating_controls ||
+        gtk_drop_down_get_selected(state->location_source) !=
+            SS_LOCATION_SOURCE_CUSTOM) {
+        return;
+    }
+
+    latitude = gtk_spin_button_get_value(state->latitude);
+    longitude = gtk_spin_button_get_value(state->longitude);
+
+    if (!ss_date_time_model_set_location(
+            &state->model, true, latitude, longitude)) {
+        set_status(state, "Could not save custom geographic coordinates.", true);
         sync_controls(state);
         return;
     }
@@ -730,33 +942,41 @@ static GtkWidget *build_date_time_panel(SettingsWindow *state)
     gtk_box_append(GTK_BOX(location_card),
                    make_label("Geographic location", "section-title"));
 
-    state->location_configured = GTK_SWITCH(gtk_switch_new());
-    gtk_widget_add_css_class(GTK_WIDGET(state->location_configured),
-                             "setting-switch");
+    state->location_summary = make_label("", "accent-note");
+    gtk_label_set_wrap(GTK_LABEL(state->location_summary), TRUE);
+    gtk_box_append(GTK_BOX(location_card), state->location_summary);
+
+    strings = location_source_strings(state);
+    state->location_source = GTK_DROP_DOWN(
+        gtk_drop_down_new(G_LIST_MODEL(strings), NULL));
+    g_object_unref(strings);
+    gtk_widget_add_css_class(GTK_WIDGET(state->location_source),
+                             "setting-dropdown");
+    gtk_widget_set_size_request(GTK_WIDGET(state->location_source), 360, -1);
     gtk_box_append(GTK_BOX(location_card),
                    make_setting_row(
-                       "Use geographic location",
-                       "Required by solar, sidereal and several historical clock systems.",
-                       GTK_WIDGET(state->location_configured)));
+                       "Location",
+                       "Choose no location, use the system time-zone reference as an approximation, or enter custom coordinates. A time zone is only a regional hint, never an assertion of physical location.",
+                       GTK_WIDGET(state->location_source)));
 
     state->latitude = GTK_SPIN_BUTTON(
-        gtk_spin_button_new_with_range(-90.0, 90.0, 0.01));
+        gtk_spin_button_new_with_range(-90.0, 90.0, 0.001));
     gtk_widget_add_css_class(GTK_WIDGET(state->latitude), "setting-spin");
-    gtk_spin_button_set_digits(state->latitude, 2U);
+    gtk_spin_button_set_digits(state->latitude, 4U);
     gtk_box_append(GTK_BOX(location_card),
                    make_setting_row(
                        "Latitude",
-                       "Degrees north are positive; degrees south are negative.",
+                       "Advanced custom coordinate. Degrees north are positive; degrees south are negative.",
                        GTK_WIDGET(state->latitude)));
 
     state->longitude = GTK_SPIN_BUTTON(
-        gtk_spin_button_new_with_range(-180.0, 180.0, 0.01));
+        gtk_spin_button_new_with_range(-180.0, 180.0, 0.001));
     gtk_widget_add_css_class(GTK_WIDGET(state->longitude), "setting-spin");
-    gtk_spin_button_set_digits(state->longitude, 2U);
+    gtk_spin_button_set_digits(state->longitude, 4U);
     gtk_box_append(GTK_BOX(location_card),
                    make_setting_row(
                        "Longitude",
-                       "Degrees east of Greenwich are positive; degrees west are negative.",
+                       "Advanced custom coordinate. Degrees east of Greenwich are positive; degrees west are negative.",
                        GTK_WIDGET(state->longitude)));
     gtk_box_append(GTK_BOX(page), location_card);
 
@@ -770,7 +990,7 @@ static GtkWidget *build_date_time_panel(SettingsWindow *state)
     gtk_box_append(GTK_BOX(system_card),
                    make_setting_row(
                        "Time zone",
-                       "Current operating-system time zone. Protected time-zone editing will use the native system service rather than altering the presentation policy.",
+                       "Authoritative operating-system time zone. It can seed an approximate geographic reference, but it is not treated as your physical location. Protected time-zone editing will use the native system service.",
                        state->timezone_value));
 
     state->status_label = make_label("", "status-ok");
@@ -784,12 +1004,12 @@ static GtkWidget *build_date_time_panel(SettingsWindow *state)
                      G_CALLBACK(on_calendar_changed), state);
     g_signal_connect(state->show_seconds, "notify::active",
                      G_CALLBACK(on_seconds_changed), state);
-    g_signal_connect(state->location_configured, "notify::active",
-                     G_CALLBACK(on_location_changed), state);
+    g_signal_connect(state->location_source, "notify::selected",
+                     G_CALLBACK(on_location_source_changed), state);
     g_signal_connect(state->latitude, "notify::value",
-                     G_CALLBACK(on_location_changed), state);
+                     G_CALLBACK(on_location_coordinate_changed), state);
     g_signal_connect(state->longitude, "notify::value",
-                     G_CALLBACK(on_location_changed), state);
+                     G_CALLBACK(on_location_coordinate_changed), state);
 
     return page;
 }
@@ -883,6 +1103,8 @@ static void on_activate(GtkApplication *application, gpointer user_data)
         g_free(state);
         return;
     }
+
+    (void)ss_regional_context_detect(&state->regional_context);
 
     state->cinnamon_interface_settings =
         ss_cinnamon_interface_settings_new();

@@ -55,7 +55,10 @@ Implement settings that can establish the UX without broad system privilege:
 - Keyboard;
 - Mouse/Touchpad;
 - Startup/session-facing settings where appropriate;
-- Temporal Presentation policy foundation in Common plus the Date & Time UI for at least conventional 12/24-hour and decimal 10-hour profiles.
+- Language & Region frontend foundations that read/write the native platform authorities rather than creating a shadow locale database;
+- Temporal Presentation policy foundation in Common plus the Date & Time UI for at least conventional 12/24-hour and decimal 10-hour profiles;
+- regional-context discovery that can use the system IANA time zone as an explicit approximate location hint without conflating time zone and physical position;
+- a proper named-locality search/selection provider before locality names are treated as authoritative geographic state.
 
 Requirements:
 
