@@ -12,6 +12,13 @@ include(CTest)
 include(GNUInstallDirs)
 
 option(SYSTEM_SETTINGS_WARNINGS_AS_ERRORS "Treat warnings as errors" ON)
+set(SYSTEM_SETTINGS_BUILD_PROFILE "cmake" CACHE STRING
+    "Common build-profile identity for this System Settings build")
+set_property(CACHE SYSTEM_SETTINGS_BUILD_PROFILE PROPERTY STRINGS
+    cmake generic native development)
+if(NOT SYSTEM_SETTINGS_BUILD_PROFILE MATCHES "^(cmake|generic|native|development)$")
+    message(FATAL_ERROR "Unsupported SYSTEM_SETTINGS_BUILD_PROFILE")
+endif()
 
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/vendor/infiltratr-common/CMakeLists.txt")
     message(FATAL_ERROR "Pinned Infiltratr Common submodule is required.")
@@ -39,7 +46,7 @@ add_library(system-settings-core STATIC
 ss_configure(system-settings-core)
 target_compile_definitions(system-settings-core PUBLIC
     SYSTEM_SETTINGS_VERSION="${PROJECT_VERSION}"
-    SYSTEM_SETTINGS_BUILD_PROFILE="cmake")
+    SYSTEM_SETTINGS_BUILD_PROFILE="${SYSTEM_SETTINGS_BUILD_PROFILE}")
 target_link_libraries(system-settings-core PUBLIC InfiltratrCommon::Portable)
 
 if(WIN32)

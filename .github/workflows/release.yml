@@ -46,7 +46,8 @@ jobs:
 
       - name: Build and test package
         run: |
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON \
+            -DSYSTEM_SETTINGS_BUILD_PROFILE=generic
           cmake --build build --parallel
           ctest --test-dir build --output-on-failure
           cd build

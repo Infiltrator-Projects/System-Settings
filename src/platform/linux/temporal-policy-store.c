@@ -2,8 +2,8 @@
 #include "system-settings/temporal-policy-store.h"
 #include "system-settings/cinnamon-interface.h"
 
+#include <infiltratr/core.h>
 #include <infiltratr/temporal_posix.h>
-#include <string.h>
 
 static void load_cinnamon_defaults(InfiltratrTemporalPolicyV3 *policy)
 {
@@ -15,8 +15,9 @@ static void load_cinnamon_defaults(InfiltratrTemporalPolicyV3 *policy)
 
     mode = g_settings_get_boolean(settings, "clock-use-24h")
         ? "standard-24" : "standard-12";
-    if (strlen(mode) < sizeof(policy->clock_mode))
-        strcpy(policy->clock_mode, mode);
+    infiltratr_copy_string(policy->clock_mode,
+                           sizeof(policy->clock_mode),
+                           mode);
     policy->show_seconds =
         g_settings_get_boolean(settings, "clock-show-seconds") != FALSE;
     g_object_unref(settings);
@@ -31,9 +32,10 @@ static void mirror_cinnamon_compatibility(
     if (policy == NULL || settings == NULL)
         return;
 
-    if (strcmp(policy->clock_mode, "standard-24") == 0) {
+    if (infiltratr_string_equal(policy->clock_mode, "standard-24")) {
         ok = g_settings_set_boolean(settings, "clock-use-24h", TRUE) && ok;
-    } else if (strcmp(policy->clock_mode, "standard-12") == 0) {
+    } else if (infiltratr_string_equal(
+                   policy->clock_mode, "standard-12")) {
         ok = g_settings_set_boolean(settings, "clock-use-24h", FALSE) && ok;
     }
 
