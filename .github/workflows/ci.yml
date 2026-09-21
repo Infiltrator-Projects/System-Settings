@@ -38,18 +38,13 @@ jobs:
         run: |
           deb="$(find build -maxdepth 1 -type f -name '*.deb' -print -quit)"
           test -n "$deb"
-          dpkg-deb -c "$deb" | grep -q 'usr/share/infiltrator/policy-providers/temporal-v3
-        with:
-          name: infiltrator-system-settings-deb
-          path: build/*.deb
-          if-no-files-found: error
-
           root="$(mktemp -d)"
           dpkg-deb -x "$deb" "$root"
-          test -f "$root/usr/share/infiltrator/policy-providers/temporal-v3"
-          grep -qx 'provider=infiltrator-system-settings'             "$root/usr/share/infiltrator/policy-providers/temporal-v3"
-          grep -qx 'policy-version=3'             "$root/usr/share/infiltrator/policy-providers/temporal-v3"
-          grep -qx 'contract=infiltratr-temporal-v3'             "$root/usr/share/infiltrator/policy-providers/temporal-v3"
+          marker="$root/usr/share/infiltrator/policy-providers/temporal-v3"
+          test -f "$marker"
+          grep -qx 'provider=infiltrator-system-settings' "$marker"
+          grep -qx 'policy-version=3' "$marker"
+          grep -qx 'contract=infiltratr-temporal-v3' "$marker"
           rm -rf "$root"
       - name: Upload Debian package
         if: runner.os == 'Linux'
