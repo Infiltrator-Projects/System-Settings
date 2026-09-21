@@ -11,7 +11,7 @@ The project takes the strongest part of the classic Amiga/Control Panel model â€
 **Status:** Phase 1 usable build with a working Linux GTK4 shell and complete Date & Time temporal-authority panel; Linux/Windows policy persistence is implemented and Calendar consumes the shared policy  
 **Primary targets:** Linux Mint/Cinnamon and Windows desktop  
 **Implementation:** native C/C++, using the strongest style for each component  
-**Shared foundation:** pinned Infiltratr Common 1.19.18  
+**Shared foundation:** pinned Infiltratr Common 1.19.20  
 **Licence:** GPL-3.0-or-later
 
 ## Core idea
