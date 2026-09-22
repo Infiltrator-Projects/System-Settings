@@ -178,6 +178,7 @@ Automated builds/tests must prove:
 - regional coordinate parsing remains bounded and deterministic;
 - Linux builds link the maintained geocode-glib API and package its runtime dependency;
 - Windows remains buildable even though Linux-native timedated/geocoding UI is not compiled there;
+- the Windows temporal-policy adapter recovers from missing, empty and malformed policy files and round-trips valid saved state;
 - strict warnings remain errors.
 
 Environment testing on a supported Mint/Cinnamon system must additionally prove:
@@ -206,7 +207,8 @@ For backends that provide notifications:
 
 ## Sanitizers and static quality
 
-CI should include, as appropriate:
+Current CI enforces strict compiler warnings on Linux and Windows and runs
+the Linux test suite under ASan and UBSan. The maintained hardening list is:
 
 - strict compiler warnings;
 - ASan;

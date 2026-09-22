@@ -8,6 +8,19 @@ All notable user-visible and architectural changes are recorded here.
 
 No unreleased changes.
 
+## 0.3.17 — 2026-09-22
+
+- Pin Infiltratr Common 1.19.24, adopting the hardened temporal-policy parser, bounded POSIX temporal document reads and safer atomic persistence path introduced after 1.19.20.
+- Make Windows temporal-policy loading recover from empty, oversized and malformed per-user policy files in the same way as Linux instead of preventing Date & Time initialisation; add a native Windows regression test for missing, corrupt, valid and saved policy states.
+- Preserve the authoritative current timedated zone in the Linux selector even when it is a valid tzdata alias omitted from zone.tab/zone1970.tab, with deterministic alias regression coverage.
+- Route conventional 12/24-hour mirroring through the canonical Cinnamon/GNOME compatibility writer instead of bypassing its GNOME clock-format update.
+- Construct the timedated proxy asynchronously, defer the first Calendar runtime preview until the GTK event loop can present the window, remove the synchronous constructor from the module API, and eliminate broad library-root subdirectory scanning from preview discovery.
+- Generation-gate timezone, NTP and manual-clock writes so an older cancelled D-Bus completion cannot overwrite status or reconciliation from a newer user operation.
+- Extend the Calendar runtime fixture to prove missing-runtime recovery after the preview provider is already alive, while keeping specialised clock and chronology capabilities optional.
+- Reuse Common's deterministic ASCII case-insensitive comparison for manual-time parsing instead of maintaining a private duplicate.
+- Split Date & Time GTK construction into a dedicated UI translation unit so widget construction is no longer mixed into the backend/policy lifecycle file.
+- Add an Ubuntu ASan/UBSan CI gate alongside the existing Linux/Windows strict-warning builds and Debian package validation.
+
 ## 0.3.16 — 2026-09-22
 
 - Fix all specialised Date & Time previews being reported as unavailable after opening System Settings. The Calendar preview provider is now created with the panel instead of waiting for an unrelated timedated property-change signal.
