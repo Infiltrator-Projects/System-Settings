@@ -664,7 +664,7 @@ static bool preview_coordinates(
     return false;
 }
 
-static bool format_preview(const SsLinuxDateTimePanel *state,
+static bool format_preview(SsLinuxDateTimePanel *state,
                            char *buffer,
                            size_t capacity)
 {
