@@ -61,3 +61,31 @@ jobs:
           name: infiltrator-system-settings-deb
           path: build/*.deb
           if-no-files-found: error
+
+
+  sanitizers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install Linux UI dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev libgeocode-glib-dev pkg-config
+      - name: Configure ASan and UBSan
+        run: |
+          cmake -S . -B build-sanitized \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_TESTING=ON \
+            -DSYSTEM_SETTINGS_WARNINGS_AS_ERRORS=ON \
+            -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address,undefined"
+      - name: Build sanitized targets
+        run: cmake --build build-sanitized --parallel
+      - name: Test with sanitizers
+        env:
+          ASAN_OPTIONS: detect_leaks=0:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: ctest --test-dir build-sanitized --output-on-failure

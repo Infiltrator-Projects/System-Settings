@@ -120,21 +120,6 @@ static SsSystemTimeService *service_from_proxy(GDBusProxy *proxy)
     return service;
 }
 
-SsSystemTimeService *ss_system_time_service_new(GError **error)
-{
-    GDBusProxy *proxy = g_dbus_proxy_new_for_bus_sync(
-        G_BUS_TYPE_SYSTEM,
-        G_DBUS_PROXY_FLAGS_NONE,
-        NULL,
-        TIMEDATE_BUS,
-        TIMEDATE_PATH,
-        TIMEDATE_IFACE,
-        NULL,
-        error);
-
-    return service_from_proxy(proxy);
-}
-
 static void new_proxy_finished(
     GObject *source G_GNUC_UNUSED,
     GAsyncResult *result,

@@ -44,7 +44,6 @@ typedef void (*SsSystemTimeReadyCallback)(
  * timedated/polkit per operation; System Settings never asks for or stores an
  * administrator password itself.
  */
-SsSystemTimeService *ss_system_time_service_new(GError **error);
 void ss_system_time_service_new_async(
     GCancellable *cancellable,
     SsSystemTimeReadyCallback callback,

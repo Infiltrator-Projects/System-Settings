@@ -106,6 +106,7 @@ elseif(UNIX)
     add_library(system-settings-date-time-linux STATIC
         src/modules/date-time/calendar-preview-provider.c
         src/modules/date-time/linux-date-time-panel.c
+        src/modules/date-time/linux-date-time-panel-ui.c
         src/platform/linux/location-search.c)
     ss_configure(system-settings-date-time-linux)
     target_include_directories(system-settings-date-time-linux PRIVATE
