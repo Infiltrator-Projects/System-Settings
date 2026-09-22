@@ -188,6 +188,8 @@ if(BUILD_TESTING)
         add_executable(temporal-policy-store-windows-test
             tests/temporal-policy-store-windows-test.c)
         ss_configure(temporal-policy-store-windows-test)
+        target_include_directories(temporal-policy-store-windows-test PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/platform/windows")
         target_link_libraries(temporal-policy-store-windows-test PRIVATE
             system-settings-platform)
         add_test(NAME temporal-policy-store-windows

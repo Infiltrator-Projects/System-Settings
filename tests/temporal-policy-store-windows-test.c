@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#include <shlobj.h>
 
-#include "system-settings/temporal-policy-store.h"
+#include "temporal-policy-store-private.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,56 +18,13 @@
         } \
     } while (0)
 
-static bool test_paths(wchar_t **directory_out, wchar_t **path_out)
-{
-    PWSTR base = NULL;
-    wchar_t *directory;
-    wchar_t *path;
-    size_t base_length;
-    size_t directory_length;
-
-    if (directory_out == NULL || path_out == NULL ||
-        FAILED(SHGetKnownFolderPath(&FOLDERID_LocalAppData,
-                                    KF_FLAG_CREATE, NULL, &base)) ||
-        base == NULL) {
-        return false;
-    }
-
-    base_length = wcslen(base);
-    directory_length = base_length + wcslen(L"\\Infiltrator");
-    directory = calloc(directory_length + 1U, sizeof(*directory));
-    path = calloc(directory_length + wcslen(L"\\presentation.conf") + 1U,
-                  sizeof(*path));
-    if (directory == NULL || path == NULL) {
-        free(directory);
-        free(path);
-        CoTaskMemFree(base);
-        return false;
-    }
-
-    memcpy(directory, base, base_length * sizeof(*directory));
-    memcpy(directory + base_length, L"\\Infiltrator",
-           (wcslen(L"\\Infiltrator") + 1U) * sizeof(*directory));
-    memcpy(path, directory, directory_length * sizeof(*path));
-    memcpy(path + directory_length, L"\\presentation.conf",
-           (wcslen(L"\\presentation.conf") + 1U) * sizeof(*path));
-
-    CoTaskMemFree(base);
-    *directory_out = directory;
-    *path_out = path;
-    return true;
-}
-
-static void write_policy_file(const wchar_t *directory,
-                              const wchar_t *path,
+static void write_policy_file(const wchar_t *path,
                               const char *text,
                               size_t length)
 {
     HANDLE file;
     DWORD written = 0U;
 
-    CHECK(CreateDirectoryW(directory, NULL) ||
-          GetLastError() == ERROR_ALREADY_EXISTS);
     file = CreateFileW(path, GENERIC_WRITE, 0U, NULL, CREATE_ALWAYS,
                        FILE_ATTRIBUTE_NORMAL, NULL);
     CHECK(file != INVALID_HANDLE_VALUE);
@@ -89,51 +45,61 @@ int main(void)
         "location-configured=false\n"
         "latitude=0.000000\n"
         "longitude=0.000000\n";
-    const SsTemporalPolicyStore *store = ss_platform_temporal_policy_store();
+    wchar_t temp_root[MAX_PATH];
+    wchar_t unique_path[MAX_PATH];
+    wchar_t policy_path[MAX_PATH];
     InfiltratrTemporalPolicyV3 policy;
-    wchar_t *directory = NULL;
-    wchar_t *path = NULL;
     bool found = true;
+    DWORD temp_length;
 
-    CHECK(store != NULL && store->load != NULL && store->save != NULL);
-    CHECK(test_paths(&directory, &path));
-    (void)DeleteFileW(path);
+    temp_length = GetTempPathW(MAX_PATH, temp_root);
+    CHECK(temp_length > 0U && temp_length < MAX_PATH);
+    CHECK(GetTempFileNameW(temp_root, L"sst", 0U, unique_path) != 0U);
+    CHECK(DeleteFileW(unique_path));
+    CHECK(CreateDirectoryW(unique_path, NULL));
+    CHECK(swprintf(policy_path, MAX_PATH, L"%ls\\presentation.conf",
+                   unique_path) > 0);
 
-    CHECK(store->load(&policy, &found));
+    CHECK(ss_windows_temporal_policy_load_file(
+        policy_path, &policy, &found));
     CHECK(!found);
     CHECK(strcmp(policy.clock_mode, "standard") == 0);
 
-    write_policy_file(directory, path, "", 0U);
+    write_policy_file(policy_path, "", 0U);
     found = true;
-    CHECK(store->load(&policy, &found));
+    CHECK(ss_windows_temporal_policy_load_file(
+        policy_path, &policy, &found));
     CHECK(!found);
     CHECK(strcmp(policy.calendar, "gregorian") == 0);
 
-    write_policy_file(directory, path,
-                      "version=3\nclock-mode=broken\n",
-                      strlen("version=3\nclock-mode=broken\n"));
+    write_policy_file(
+        policy_path,
+        "version=3\nclock-mode=broken\n",
+        strlen("version=3\nclock-mode=broken\n"));
     found = true;
-    CHECK(store->load(&policy, &found));
+    CHECK(ss_windows_temporal_policy_load_file(
+        policy_path, &policy, &found));
     CHECK(!found);
     CHECK(strcmp(policy.clock_mode, "standard") == 0);
 
-    write_policy_file(directory, path, valid, sizeof(valid) - 1U);
+    write_policy_file(policy_path, valid, sizeof(valid) - 1U);
     found = false;
-    CHECK(store->load(&policy, &found));
+    CHECK(ss_windows_temporal_policy_load_file(
+        policy_path, &policy, &found));
     CHECK(found);
     CHECK(strcmp(policy.clock_mode, "standard-24") == 0);
     CHECK(policy.show_seconds);
 
     CHECK(infiltratr_temporal_policy_v3_default(&policy));
     strcpy(policy.clock_mode, "standard-12");
-    CHECK(store->save(&policy));
+    CHECK(ss_windows_temporal_policy_save_file(policy_path, &policy));
     found = false;
-    CHECK(store->load(&policy, &found));
+    CHECK(ss_windows_temporal_policy_load_file(
+        policy_path, &policy, &found));
     CHECK(found);
     CHECK(strcmp(policy.clock_mode, "standard-12") == 0);
 
-    CHECK(DeleteFileW(path));
-    free(directory);
-    free(path);
+    CHECK(DeleteFileW(policy_path));
+    CHECK(RemoveDirectoryW(unique_path));
     return EXIT_SUCCESS;
 }

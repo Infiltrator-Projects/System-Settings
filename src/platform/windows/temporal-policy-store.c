@@ -4,6 +4,7 @@
 #include <shlobj.h>
 
 #include "system-settings/temporal-policy-store.h"
+#include "temporal-policy-store-private.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -63,20 +64,19 @@ static bool build_paths(wchar_t **directory_out, wchar_t **path_out)
     return true;
 }
 
-static bool platform_load(InfiltratrTemporalPolicyV3 *policy,
-                          bool *found)
+bool ss_windows_temporal_policy_load_file(
+    const wchar_t *path,
+    InfiltratrTemporalPolicyV3 *policy,
+    bool *found)
 {
-    wchar_t *directory = NULL;
-    wchar_t *path = NULL;
     HANDLE file;
     LARGE_INTEGER size;
     char text[SS_POLICY_CAPACITY];
     DWORD read_count = 0U;
     bool ok = false;
 
-    if (policy == NULL || found == NULL ||
-        !infiltratr_temporal_policy_v3_default(policy) ||
-        !build_paths(&directory, &path)) {
+    if (path == NULL || policy == NULL || found == NULL ||
+        !infiltratr_temporal_policy_v3_default(policy)) {
         return false;
     }
     *found = false;
@@ -86,8 +86,6 @@ static bool platform_load(InfiltratrTemporalPolicyV3 *policy,
                        NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (file == INVALID_HANDLE_VALUE) {
         const DWORD error = GetLastError();
-        free(directory);
-        free(path);
         return error == ERROR_FILE_NOT_FOUND ||
                error == ERROR_PATH_NOT_FOUND;
     }
@@ -96,12 +94,6 @@ static bool platform_load(InfiltratrTemporalPolicyV3 *policy,
         goto done;
     }
 
-    /*
-     * Match the Linux/Common recovery contract: an existing but empty,
-     * oversized or malformed policy is not allowed to brick Date & Time.
-     * The already-initialised v3 defaults remain authoritative and the caller
-     * is told that no valid persisted policy was found.
-     */
     if (size.QuadPart <= 0 ||
         size.QuadPart >= (LONGLONG)sizeof(text)) {
         ok = true;
@@ -118,7 +110,6 @@ static bool platform_load(InfiltratrTemporalPolicyV3 *policy,
         if (!infiltratr_temporal_policy_v3_default(policy)) {
             goto done;
         }
-        *found = false;
         ok = true;
         goto done;
     }
@@ -128,15 +119,13 @@ static bool platform_load(InfiltratrTemporalPolicyV3 *policy,
 
 done:
     CloseHandle(file);
-    free(directory);
-    free(path);
     return ok;
 }
 
-static bool platform_save(const InfiltratrTemporalPolicyV3 *policy)
+bool ss_windows_temporal_policy_save_file(
+    const wchar_t *path,
+    const InfiltratrTemporalPolicyV3 *policy)
 {
-    wchar_t *directory = NULL;
-    wchar_t *path = NULL;
     wchar_t *temporary = NULL;
     char text[SS_POLICY_CAPACITY];
     size_t length = 0U;
@@ -145,22 +134,16 @@ static bool platform_save(const InfiltratrTemporalPolicyV3 *policy)
     DWORD written = 0U;
     bool ok = false;
 
-    if (policy == NULL ||
-        !infiltratr_temporal_policy_v3_serialize(policy, text, sizeof(text),
-                                              &length) ||
-        !build_paths(&directory, &path)) {
+    if (path == NULL || policy == NULL ||
+        !infiltratr_temporal_policy_v3_serialize(
+            policy, text, sizeof(text), &length)) {
         return false;
-    }
-
-    if (!CreateDirectoryW(directory, NULL) &&
-        GetLastError() != ERROR_ALREADY_EXISTS) {
-        goto done;
     }
 
     path_length = wcslen(path);
     temporary = (wchar_t *)calloc(path_length + 5U, sizeof(wchar_t));
     if (temporary == NULL) {
-        goto done;
+        return false;
     }
     memcpy(temporary, path, path_length * sizeof(wchar_t));
     memcpy(temporary + path_length, L".tmp", 5U * sizeof(wchar_t));
@@ -191,6 +174,43 @@ done:
         DeleteFileW(temporary);
     }
     free(temporary);
+    return ok;
+}
+
+static bool platform_load(InfiltratrTemporalPolicyV3 *policy,
+                          bool *found)
+{
+    wchar_t *directory = NULL;
+    wchar_t *path = NULL;
+    bool ok;
+
+    if (!build_paths(&directory, &path)) {
+        return false;
+    }
+    ok = ss_windows_temporal_policy_load_file(path, policy, found);
+    free(directory);
+    free(path);
+    return ok;
+}
+
+static bool platform_save(const InfiltratrTemporalPolicyV3 *policy)
+{
+    wchar_t *directory = NULL;
+    wchar_t *path = NULL;
+    bool ok = false;
+
+    if (policy == NULL || !build_paths(&directory, &path)) {
+        return false;
+    }
+
+    if (!CreateDirectoryW(directory, NULL) &&
+        GetLastError() != ERROR_ALREADY_EXISTS) {
+        goto done;
+    }
+
+    ok = ss_windows_temporal_policy_save_file(path, policy);
+
+done:
     free(directory);
     free(path);
     return ok;

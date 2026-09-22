@@ -8,6 +8,11 @@ All notable user-visible and architectural changes are recorded here.
 
 No unreleased changes.
 
+## 0.3.18 — 2026-09-22
+
+- Isolate Windows temporal-policy file I/O behind a private path-based adapter so recovery behaviour can be regression-tested without touching the real user profile.
+- Move the Windows persistence regression to a unique temporary directory; local CTest runs can no longer overwrite or delete a developer's real `%LOCALAPPDATA%\\Infiltrator\\presentation.conf`.
+
 ## 0.3.17 — 2026-09-22
 
 - Pin Infiltratr Common 1.19.24, adopting the hardened temporal-policy parser, bounded POSIX temporal document reads and safer atomic persistence path introduced after 1.19.20.
