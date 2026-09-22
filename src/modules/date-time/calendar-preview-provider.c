@@ -44,6 +44,7 @@ struct SsCalendarPreviewProvider {
     GObject *calendar;
     char calendar_id[CALENDAR_ID_CAPACITY];
     bool discover_default_runtime;
+    char *discovery_root_override;
     gint64 retry_after_monotonic_us;
 };
 
@@ -181,36 +182,6 @@ static bool try_arch_directory(
     return try_directory(provider, directory);
 }
 
-static bool try_root_subdirectories(
-    SsCalendarPreviewProvider *provider,
-    const char *root)
-{
-    g_autoptr(GDir) directory = g_dir_open(root, 0U, NULL);
-    const gchar *entry;
-
-    if (directory == NULL) {
-        return false;
-    }
-
-    while ((entry = g_dir_read_name(directory)) != NULL) {
-        g_autofree gchar *path = NULL;
-
-        if (entry[0] == '.') {
-            continue;
-        }
-
-        path = g_build_filename(root, entry, NULL);
-        if (!g_file_test(path, G_FILE_TEST_IS_DIR)) {
-            continue;
-        }
-
-        if (try_directory(provider, path)) {
-            return true;
-        }
-    }
-    return false;
-}
-
 static bool discover_runtime(SsCalendarPreviewProvider *provider)
 {
     static const char *const roots[] = {
@@ -220,6 +191,13 @@ static bool discover_runtime(SsCalendarPreviewProvider *provider)
         "/usr/lib64",
         "/lib64"
     };
+
+    if (provider->discovery_root_override != NULL) {
+        return try_arch_directory(
+                   provider, provider->discovery_root_override) ||
+               try_directory(
+                   provider, provider->discovery_root_override);
+    }
 
     for (size_t index = 0U;
          index < sizeof(roots) / sizeof(roots[0]);
@@ -231,22 +209,9 @@ static bool discover_runtime(SsCalendarPreviewProvider *provider)
     }
 
     /*
-     * Debian/Mint normally places the library in a multiarch directory.  The
-     * compile-time architecture is the fast path; this bounded one-level scan
-     * also handles a package built on a toolchain that did not expose
-     * CMAKE_LIBRARY_ARCHITECTURE.
-     */
-    for (size_t index = 0U;
-         index < sizeof(roots) / sizeof(roots[0]);
-         ++index) {
-        if (try_root_subdirectories(provider, roots[index])) {
-            return true;
-        }
-    }
-
-    /*
-     * Retain the platform loader as the final portability fallback.  Trusted
-     * absolute system locations above are preferred on Linux.
+     * Standard multiarch directories are already represented by the
+     * compile-time architecture and the dynamic loader's configured search
+     * path. Do not recursively walk library roots from the GTK thread.
      */
     return open_runtime(provider, CALENDAR_RUNTIME_SONAME);
 }
@@ -306,8 +271,29 @@ SsCalendarPreviewProvider *ss_calendar_preview_provider_new(void)
 
     provider->library = (InfiltratrDynlib)INFILTRATR_DYNLIB_INIT;
     provider->discover_default_runtime = true;
-    (void)ensure_runtime(provider);
     return provider;
+}
+
+SsCalendarPreviewProvider *ss_calendar_preview_provider_new_with_root_for_test(
+    const char *root)
+{
+    SsCalendarPreviewProvider *provider;
+
+    if (root == NULL || root[0] == '\0') {
+        return NULL;
+    }
+
+    provider = ss_calendar_preview_provider_new();
+    provider->discovery_root_override = g_strdup(root);
+    return provider;
+}
+
+void ss_calendar_preview_provider_force_retry_for_test(
+    SsCalendarPreviewProvider *provider)
+{
+    if (provider != NULL) {
+        provider->retry_after_monotonic_us = 0;
+    }
 }
 
 void ss_calendar_preview_provider_free(
@@ -319,6 +305,7 @@ void ss_calendar_preview_provider_free(
 
     g_clear_object(&provider->calendar);
     infiltratr_dynlib_close(&provider->library);
+    g_clear_pointer(&provider->discovery_root_override, g_free);
     g_free(provider);
 }
 

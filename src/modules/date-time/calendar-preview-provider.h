@@ -16,6 +16,10 @@ typedef struct SsCalendarPreviewProvider SsCalendarPreviewProvider;
 SsCalendarPreviewProvider *ss_calendar_preview_provider_new(void);
 SsCalendarPreviewProvider *ss_calendar_preview_provider_new_from(
     const char *library_name);
+SsCalendarPreviewProvider *ss_calendar_preview_provider_new_with_root_for_test(
+    const char *root);
+void ss_calendar_preview_provider_force_retry_for_test(
+    SsCalendarPreviewProvider *provider);
 void ss_calendar_preview_provider_free(
     SsCalendarPreviewProvider *provider);
 

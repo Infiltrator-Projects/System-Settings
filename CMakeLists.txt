@@ -183,6 +183,16 @@ if(BUILD_TESTING)
     target_link_libraries(project-info-test PRIVATE system-settings-core)
     add_test(NAME project-info COMMAND project-info-test)
 
+    if(WIN32)
+        add_executable(temporal-policy-store-windows-test
+            tests/temporal-policy-store-windows-test.c)
+        ss_configure(temporal-policy-store-windows-test)
+        target_link_libraries(temporal-policy-store-windows-test PRIVATE
+            system-settings-platform)
+        add_test(NAME temporal-policy-store-windows
+            COMMAND temporal-policy-store-windows-test)
+    endif()
+
     if(UNIX)
         add_executable(temporal-policy-store-test
             tests/temporal-policy-store-test.c)

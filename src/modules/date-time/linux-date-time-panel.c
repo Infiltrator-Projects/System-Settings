@@ -66,7 +66,9 @@ struct SsLinuxDateTimePanel {
     GCancellable *location_search_cancellable;
     GCancellable *system_time_cancellable;
     guint timer_id;
+    guint preview_idle_id;
     guint location_search_generation;
+    guint system_time_generation;
     bool location_metadata_present;
     bool location_follows_timezone_reference;
     bool updating_controls;
@@ -77,6 +79,11 @@ typedef struct LocationSearchUiRequest {
     GtkWindow *window;
     guint generation;
 } LocationSearchUiRequest;
+
+typedef struct SystemTimeUiRequest {
+    GtkWindow *window;
+    guint generation;
+} SystemTimeUiRequest;
 
 static void set_status(SsLinuxDateTimePanel *state,
                        const char *message,
@@ -206,18 +213,12 @@ static GtkStringList *timezone_strings(SsLinuxDateTimePanel *state)
     }
 
     g_clear_pointer(&state->timezone_ids, g_ptr_array_unref);
-    state->timezone_ids = ss_regional_context_list_timezones();
+    state->timezone_ids = ss_regional_context_list_timezones(
+        state->regional_context.timezone_id);
 
     if (state->timezone_ids == NULL) {
         state->timezone_ids =
             g_ptr_array_new_with_free_func(g_free);
-    }
-
-    if (state->timezone_ids->len == 0U &&
-        state->regional_context.timezone_id[0] != '\0') {
-        g_ptr_array_add(
-            state->timezone_ids,
-            g_strdup(state->regional_context.timezone_id));
     }
 
     for (index = 0U; index < state->timezone_ids->len; ++index) {
@@ -814,6 +815,17 @@ static gboolean refresh_preview(gpointer user_data)
     return G_SOURCE_CONTINUE;
 }
 
+static gboolean refresh_preview_once(gpointer user_data)
+{
+    SsLinuxDateTimePanel *state = user_data;
+
+    if (state != NULL) {
+        state->preview_idle_id = 0U;
+        (void)refresh_preview(state);
+    }
+    return G_SOURCE_REMOVE;
+}
+
 static void sync_controls(SsLinuxDateTimePanel *state)
 {
     const InfiltratrTemporalPolicyV3 *policy =
@@ -857,7 +869,6 @@ static void sync_controls(SsLinuxDateTimePanel *state)
     }
     state->updating_controls = false;
     update_control_capabilities(state);
-    (void)refresh_preview(state);
 }
 
 static void on_cinnamon_interface_changed(
@@ -1052,17 +1063,59 @@ static void system_time_changed(
     (void)refresh_preview(state);
 }
 
+static void system_time_ui_request_free(SystemTimeUiRequest *request)
+{
+    if (request == NULL) {
+        return;
+    }
+    g_clear_object(&request->window);
+    g_free(request);
+}
+
+static SystemTimeUiRequest *begin_system_time_operation(
+    SsLinuxDateTimePanel *state)
+{
+    SystemTimeUiRequest *request;
+
+    if (state == NULL) {
+        return NULL;
+    }
+
+    if (state->system_time_cancellable != NULL) {
+        g_cancellable_cancel(state->system_time_cancellable);
+        g_clear_object(&state->system_time_cancellable);
+    }
+    state->system_time_cancellable = g_cancellable_new();
+    state->system_time_generation++;
+
+    request = g_new0(SystemTimeUiRequest, 1);
+    request->window = g_object_ref(state->window);
+    request->generation = state->system_time_generation;
+    return request;
+}
+
 static void system_time_operation_complete(
     SsSystemTimeService *service G_GNUC_UNUSED,
     bool success,
     const char *error_message,
     gpointer user_data)
 {
-    GtkWindow *window = GTK_WINDOW(user_data);
-    SsLinuxDateTimePanel *state = g_object_get_data(
-        G_OBJECT(window), "system-settings-date-time-panel");
+    SystemTimeUiRequest *request = user_data;
+    SsLinuxDateTimePanel *state = NULL;
 
-    if (state != NULL) {
+    if (request != NULL && request->window != NULL) {
+        state = g_object_get_data(
+            G_OBJECT(request->window),
+            "system-settings-date-time-panel");
+    }
+
+    /*
+     * A later timezone/NTP/manual-time request invalidates every older
+     * completion. Cancellation alone is insufficient because D-Bus replies
+     * can race with the cancellation notification.
+     */
+    if (state != NULL &&
+        request->generation == state->system_time_generation) {
         if (success) {
             (void)ss_regional_context_detect(&state->regional_context);
             sync_system_time_controls(state);
@@ -1081,14 +1134,8 @@ static void system_time_operation_complete(
                 true);
         }
     }
-    g_object_unref(window);
-}
 
-static void ensure_system_cancellable(SsLinuxDateTimePanel *state)
-{
-    if (state != NULL && state->system_time_cancellable == NULL) {
-        state->system_time_cancellable = g_cancellable_new();
-    }
+    system_time_ui_request_free(request);
 }
 
 static void request_system_timezone(
@@ -1100,14 +1147,19 @@ static void request_system_timezone(
         return;
     }
 
-    ensure_system_cancellable(state);
+    SystemTimeUiRequest *request =
+        begin_system_time_operation(state);
+
+    if (request == NULL) {
+        return;
+    }
     set_status(state, "Updating the operating-system time zone…", false);
     ss_system_time_service_set_timezone_async(
         state->system_time_service,
         timezone_id,
         state->system_time_cancellable,
         system_time_operation_complete,
-        g_object_ref(state->window));
+        request);
 }
 
 static void on_timezone_changed(GObject *object G_GNUC_UNUSED,
@@ -1143,8 +1195,13 @@ static void on_network_time_changed(GObject *object,
         return;
     }
 
+    SystemTimeUiRequest *request;
+
     enabled = gtk_switch_get_active(GTK_SWITCH(object)) != FALSE;
-    ensure_system_cancellable(state);
+    request = begin_system_time_operation(state);
+    if (request == NULL) {
+        return;
+    }
     set_status(
         state,
         enabled ? "Enabling network time…" : "Disabling network time…",
@@ -1154,7 +1211,7 @@ static void on_network_time_changed(GObject *object,
         enabled,
         state->system_time_cancellable,
         system_time_operation_complete,
-        g_object_ref(state->window));
+        request);
 }
 
 static bool parse_manual_datetime(
@@ -1243,14 +1300,24 @@ static void on_manual_set_time_clicked(
         return;
     }
 
-    ensure_system_cancellable(state);
-    set_status(state, "Setting the operating-system date and time…", false);
-    ss_system_time_service_set_time_async(
-        state->system_time_service,
-        unix_time_usec,
-        state->system_time_cancellable,
-        system_time_operation_complete,
-        g_object_ref(state->window));
+    {
+        SystemTimeUiRequest *request =
+            begin_system_time_operation(state);
+
+        if (request == NULL) {
+            return;
+        }
+        set_status(
+            state,
+            "Setting the operating-system date and time…",
+            false);
+        ss_system_time_service_set_time_async(
+            state->system_time_service,
+            unix_time_usec,
+            state->system_time_cancellable,
+            system_time_operation_complete,
+            request);
+    }
 }
 
 static void on_show_date_changed(GObject *object,
@@ -1919,6 +1986,47 @@ static GtkWidget *build_panel(SsLinuxDateTimePanel *state)
 
 
 
+static void system_time_service_ready(
+    SsSystemTimeService *service,
+    const char *error_message,
+    gpointer user_data)
+{
+    GtkWindow *window = GTK_WINDOW(user_data);
+    SsLinuxDateTimePanel *state = g_object_get_data(
+        G_OBJECT(window), "system-settings-date-time-panel");
+
+    if (state == NULL) {
+        ss_system_time_service_free(service);
+        g_object_unref(window);
+        return;
+    }
+
+    if (service == NULL) {
+        set_status(
+            state,
+            error_message != NULL
+                ? error_message
+                : "The operating-system date/time service is unavailable.",
+            true);
+        g_object_unref(window);
+        return;
+    }
+
+    state->system_time_service = service;
+    ss_system_time_service_set_changed_callback(
+        state->system_time_service,
+        system_time_changed,
+        state);
+    sync_system_time_controls(state);
+    set_status(
+        state,
+        state->model.persisted_policy_present
+            ? "Using the saved system-wide temporal policy. Native Mint/Linux date and time controls are live."
+            : "Using Mint/Cinnamon temporal preferences as the initial policy. Native Mint/Linux date and time controls are live.",
+        false);
+    g_object_unref(window);
+}
+
 static bool migrate_legacy_native_clock(
     SsLinuxDateTimePanel *state)
 {
@@ -1944,7 +2052,6 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
     GError **error)
 {
     SsLinuxDateTimePanel *state;
-    g_autoptr(GError) system_time_error = NULL;
     bool legacy_migration_ok;
 
     if (host_window == NULL) {
@@ -1982,8 +2089,6 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
         (!ss_date_time_model_policy(&state->model)->location_configured ||
          location_policy_matches_reference(state));
 
-    state->system_time_service =
-        ss_system_time_service_new(&system_time_error);
     state->system_time_cancellable = g_cancellable_new();
 
     state->cinnamon_interface_settings =
@@ -1999,35 +2104,30 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
     legacy_migration_ok = migrate_legacy_native_clock(state);
     state->root = build_panel(state);
 
-    if (state->system_time_service != NULL) {
-        ss_system_time_service_set_changed_callback(
-            state->system_time_service,
-            system_time_changed,
-            state);
-    }
-
     sync_controls(state);
     if (!legacy_migration_ok) {
         set_status(
             state,
             "The legacy native-default clock policy could not be migrated to an explicit 12-hour or 24-hour clock selection.",
             true);
-    } else if (state->system_time_service == NULL) {
-        set_status(
-            state,
-            system_time_error != NULL
-                ? system_time_error->message
-                : "The operating-system date/time service is unavailable.",
-            true);
     } else {
         set_status(
             state,
-            state->model.persisted_policy_present
-                ? "Using the saved system-wide temporal policy. Native Mint/Linux date and time controls are live."
-                : "Using Mint/Cinnamon temporal preferences as the initial policy. Native Mint/Linux date and time controls are live.",
+            "Connecting to the operating-system date/time service…",
             false);
     }
 
+    /*
+     * Proxy construction and Calendar runtime discovery are deliberately
+     * deferred until after construction, allowing the host to present the
+     * window before either external-service work path runs.
+     */
+    ss_system_time_service_new_async(
+        state->system_time_cancellable,
+        system_time_service_ready,
+        g_object_ref(state->window));
+    state->preview_idle_id =
+        g_idle_add(refresh_preview_once, state);
     state->timer_id =
         g_timeout_add_seconds(1U, refresh_preview, state);
     return state;
@@ -2050,6 +2150,10 @@ void ss_linux_date_time_panel_free(gpointer data)
     if (state->timer_id != 0U) {
         g_source_remove(state->timer_id);
         state->timer_id = 0U;
+    }
+    if (state->preview_idle_id != 0U) {
+        g_source_remove(state->preview_idle_id);
+        state->preview_idle_id = 0U;
     }
     if (state->location_search_cancellable != NULL) {
         g_cancellable_cancel(state->location_search_cancellable);

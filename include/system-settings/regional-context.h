@@ -51,7 +51,8 @@ bool ss_regional_context_city_name(const char *timezone_id,
  *
  * Returns: (transfer full) (element-type utf8): strings owned by the array.
  */
-GPtrArray *ss_regional_context_list_timezones(void);
+GPtrArray *ss_regional_context_list_timezones(
+    const char *current_timezone_id);
 
 /**
  * Find the nearest representative IANA zone within a country.

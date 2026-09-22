@@ -32,6 +32,11 @@ typedef void (*SsSystemTimeCompletionCallback)(
     const char *error_message,
     gpointer user_data);
 
+typedef void (*SsSystemTimeReadyCallback)(
+    SsSystemTimeService *service,
+    const char *error_message,
+    gpointer user_data);
+
 /**
  * Open the systemd timedated service used by current Mint releases.
  *
@@ -40,6 +45,10 @@ typedef void (*SsSystemTimeCompletionCallback)(
  * administrator password itself.
  */
 SsSystemTimeService *ss_system_time_service_new(GError **error);
+void ss_system_time_service_new_async(
+    GCancellable *cancellable,
+    SsSystemTimeReadyCallback callback,
+    gpointer user_data);
 void ss_system_time_service_free(SsSystemTimeService *service);
 
 bool ss_system_time_service_read(

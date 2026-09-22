@@ -33,10 +33,12 @@ static void mirror_cinnamon_compatibility(
         return;
 
     if (infiltratr_string_equal(policy->clock_mode, "standard-24")) {
-        ok = g_settings_set_boolean(settings, "clock-use-24h", TRUE) && ok;
+        ok = ss_cinnamon_interface_set_clock_use_24h(
+                 settings, true) && ok;
     } else if (infiltratr_string_equal(
                    policy->clock_mode, "standard-12")) {
-        ok = g_settings_set_boolean(settings, "clock-use-24h", FALSE) && ok;
+        ok = ss_cinnamon_interface_set_clock_use_24h(
+                 settings, false) && ok;
     }
 
     ok = g_settings_set_boolean(

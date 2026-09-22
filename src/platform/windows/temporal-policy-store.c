@@ -64,7 +64,7 @@ static bool build_paths(wchar_t **directory_out, wchar_t **path_out)
 }
 
 static bool platform_load(InfiltratrTemporalPolicyV3 *policy,
-                                   bool *found)
+                          bool *found)
 {
     wchar_t *directory = NULL;
     wchar_t *path = NULL;
@@ -92,15 +92,41 @@ static bool platform_load(InfiltratrTemporalPolicyV3 *policy,
                error == ERROR_PATH_NOT_FOUND;
     }
 
-    if (GetFileSizeEx(file, &size) && size.QuadPart > 0 &&
-        size.QuadPart < (LONGLONG)sizeof(text) &&
-        ReadFile(file, text, (DWORD)size.QuadPart, &read_count, NULL) &&
-        read_count == (DWORD)size.QuadPart) {
-        text[read_count] = '\0';
-        ok = infiltratr_temporal_policy_v3_parse(text, policy);
-        *found = ok;
+    if (!GetFileSizeEx(file, &size)) {
+        goto done;
     }
 
+    /*
+     * Match the Linux/Common recovery contract: an existing but empty,
+     * oversized or malformed policy is not allowed to brick Date & Time.
+     * The already-initialised v3 defaults remain authoritative and the caller
+     * is told that no valid persisted policy was found.
+     */
+    if (size.QuadPart <= 0 ||
+        size.QuadPart >= (LONGLONG)sizeof(text)) {
+        ok = true;
+        goto done;
+    }
+
+    if (!ReadFile(file, text, (DWORD)size.QuadPart, &read_count, NULL) ||
+        read_count != (DWORD)size.QuadPart) {
+        goto done;
+    }
+
+    text[read_count] = '\0';
+    if (!infiltratr_temporal_policy_v3_parse(text, policy)) {
+        if (!infiltratr_temporal_policy_v3_default(policy)) {
+            goto done;
+        }
+        *found = false;
+        ok = true;
+        goto done;
+    }
+
+    *found = true;
+    ok = true;
+
+done:
     CloseHandle(file);
     free(directory);
     free(path);

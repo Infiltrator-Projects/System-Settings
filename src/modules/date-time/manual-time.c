@@ -1,34 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "system-settings/manual-time.h"
 
+#include <infiltratr/core.h>
 #include <infiltratr/temporal.h>
-
-#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 
 #define US_PER_SECOND INT64_C(1000000)
 #define US_PER_DAY (INT64_C(86400) * US_PER_SECOND)
-
-static bool ascii_equal_ci(const char *left, const char *right)
-{
-    size_t index;
-
-    if (left == NULL || right == NULL) {
-        return false;
-    }
-    if (strlen(left) != strlen(right)) {
-        return false;
-    }
-    for (index = 0U; left[index] != '\0'; ++index) {
-        const unsigned char l = (unsigned char)left[index];
-        const unsigned char r = (unsigned char)right[index];
-        if (tolower(l) != tolower(r)) {
-            return false;
-        }
-    }
-    return true;
-}
 
 static bool profile_for_mode(const char *clock_mode,
                              bool desktop_use_24h,
@@ -141,15 +120,15 @@ static bool parse_12_hour(const char *text, int64_t *microseconds_of_day)
     if (hour < 1 || hour > 12 ||
         minute < 0 || minute > 59 ||
         second < 0 || second > 59 ||
-        (!ascii_equal_ci(suffix, "AM") &&
-         !ascii_equal_ci(suffix, "PM"))) {
+        (!infiltratr_ascii_equal_ci(suffix, "AM") &&
+         !infiltratr_ascii_equal_ci(suffix, "PM"))) {
         return false;
     }
 
     if (hour == 12) {
         hour = 0;
     }
-    if (ascii_equal_ci(suffix, "PM")) {
+    if (infiltratr_ascii_equal_ci(suffix, "PM")) {
         hour += 12;
     }
 

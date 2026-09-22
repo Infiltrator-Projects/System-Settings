@@ -61,8 +61,9 @@ int main(void)
 
     {
         g_autoptr(GPtrArray) zones =
-            ss_regional_context_list_timezones();
+            ss_regional_context_list_timezones("US/Eastern");
         bool melbourne_found = false;
+        bool current_alias_found = false;
         size_t index;
 
         CHECK(zones != NULL);
@@ -72,10 +73,13 @@ int main(void)
                 g_ptr_array_index(zones, (guint)index);
             if (strcmp(zone, "Australia/Melbourne") == 0) {
                 melbourne_found = true;
-                break;
+            }
+            if (strcmp(zone, "US/Eastern") == 0) {
+                current_alias_found = true;
             }
         }
         CHECK(melbourne_found);
+        CHECK(current_alias_found);
     }
 
     {

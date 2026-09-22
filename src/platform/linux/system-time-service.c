@@ -13,6 +13,11 @@ typedef struct SsSystemTimeCall {
     gpointer user_data;
 } SsSystemTimeCall;
 
+typedef struct SsSystemTimeNewCall {
+    SsSystemTimeReadyCallback callback;
+    gpointer user_data;
+} SsSystemTimeNewCall;
+
 struct SsSystemTimeService {
     GDBusProxy *proxy;
     gulong properties_changed_id;
@@ -97,11 +102,27 @@ static void on_properties_changed(
     emit_changed(user_data);
 }
 
+static SsSystemTimeService *service_from_proxy(GDBusProxy *proxy)
+{
+    SsSystemTimeService *service;
+
+    if (proxy == NULL) {
+        return NULL;
+    }
+
+    service = g_new0(SsSystemTimeService, 1);
+    service->proxy = proxy;
+    service->properties_changed_id = g_signal_connect(
+        service->proxy,
+        "g-properties-changed",
+        G_CALLBACK(on_properties_changed),
+        service);
+    return service;
+}
+
 SsSystemTimeService *ss_system_time_service_new(GError **error)
 {
-    SsSystemTimeService *service = g_new0(SsSystemTimeService, 1);
-
-    service->proxy = g_dbus_proxy_new_for_bus_sync(
+    GDBusProxy *proxy = g_dbus_proxy_new_for_bus_sync(
         G_BUS_TYPE_SYSTEM,
         G_DBUS_PROXY_FLAGS_NONE,
         NULL,
@@ -110,17 +131,54 @@ SsSystemTimeService *ss_system_time_service_new(GError **error)
         TIMEDATE_IFACE,
         NULL,
         error);
-    if (service->proxy == NULL) {
-        g_free(service);
-        return NULL;
-    }
 
-    service->properties_changed_id = g_signal_connect(
-        service->proxy,
-        "g-properties-changed",
-        G_CALLBACK(on_properties_changed),
-        service);
-    return service;
+    return service_from_proxy(proxy);
+}
+
+static void new_proxy_finished(
+    GObject *source G_GNUC_UNUSED,
+    GAsyncResult *result,
+    gpointer user_data)
+{
+    SsSystemTimeNewCall *call = user_data;
+    g_autoptr(GError) error = NULL;
+    GDBusProxy *proxy;
+    SsSystemTimeService *service;
+
+    proxy = g_dbus_proxy_new_for_bus_finish(result, &error);
+    service = service_from_proxy(proxy);
+
+    if (call != NULL && call->callback != NULL) {
+        call->callback(
+            service,
+            error != NULL ? error->message : NULL,
+            call->user_data);
+    } else {
+        ss_system_time_service_free(service);
+    }
+    g_free(call);
+}
+
+void ss_system_time_service_new_async(
+    GCancellable *cancellable,
+    SsSystemTimeReadyCallback callback,
+    gpointer user_data)
+{
+    SsSystemTimeNewCall *call = g_new0(SsSystemTimeNewCall, 1);
+
+    call->callback = callback;
+    call->user_data = user_data;
+
+    g_dbus_proxy_new_for_bus(
+        G_BUS_TYPE_SYSTEM,
+        G_DBUS_PROXY_FLAGS_NONE,
+        NULL,
+        TIMEDATE_BUS,
+        TIMEDATE_PATH,
+        TIMEDATE_IFACE,
+        cancellable,
+        new_proxy_finished,
+        call);
 }
 
 void ss_system_time_service_free(SsSystemTimeService *service)

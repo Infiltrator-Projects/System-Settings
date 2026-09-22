@@ -413,7 +413,8 @@ static gint timezone_compare(gconstpointer left, gconstpointer right)
     return g_strcmp0(*left_text, *right_text);
 }
 
-GPtrArray *ss_regional_context_list_timezones(void)
+GPtrArray *ss_regional_context_list_timezones(
+    const char *current_timezone_id)
 {
     static const char *const paths[] = {
         "/usr/share/zoneinfo/zone.tab",
@@ -475,6 +476,19 @@ GPtrArray *ss_regional_context_list_timezones(void)
         if (zones->len > 1U) {
             break;
         }
+    }
+
+    /*
+     * timedated may report a valid tzdata alias that is intentionally absent
+     * from zone.tab/zone1970.tab. The authoritative current value must still
+     * be representable in the selector rather than silently falling back to
+     * the first catalogue entry.
+     */
+    if (current_timezone_id != NULL &&
+        timezone_id_valid(current_timezone_id) &&
+        !g_hash_table_contains(seen, current_timezone_id)) {
+        g_hash_table_add(seen, g_strdup(current_timezone_id));
+        g_ptr_array_add(zones, g_strdup(current_timezone_id));
     }
 
     g_hash_table_unref(seen);
