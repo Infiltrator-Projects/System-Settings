@@ -8,6 +8,12 @@ All notable user-visible and architectural changes are recorded here.
 
 No unreleased changes.
 
+## 0.3.16 — 2026-09-22
+
+- Fix all specialised Date & Time previews being reported as unavailable after opening System Settings. The Calendar preview provider is now created with the panel instead of waiting for an unrelated timedated property-change signal.
+- Keep one Calendar preview provider for the complete panel lifetime. Clock-list construction no longer destroys it, timedated changes no longer replace and leak it, and panel teardown now releases it explicitly.
+- Route every Calendar-owned clock and every non-Gregorian calendar preview through the same lazy safety guard, preserving the existing five-second runtime rediscovery path if Calendar is installed or upgraded while System Settings remains open.
+
 ## 0.3.15 — 2026-09-21
 
 - Fix Calendar runtime discovery for the Date & Time live preview. The bridge now prefers trusted system library locations, including Debian/Mint multiarch directories, instead of relying only on the process loader finding `libcalendar-plus.so.0` by bare soname.

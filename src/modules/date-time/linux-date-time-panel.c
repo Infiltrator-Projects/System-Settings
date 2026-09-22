@@ -102,9 +102,6 @@ static GtkStringList *clock_mode_strings(
         return list;
     }
 
-    ss_calendar_preview_provider_free(
-        state->calendar_preview_provider);
-    state->calendar_preview_provider = NULL;
     g_clear_pointer(&state->clock_mode_ids, g_ptr_array_unref);
     state->clock_mode_ids = g_ptr_array_new_with_free_func(g_free);
 
@@ -140,6 +137,26 @@ static GtkStringList *calendar_strings(void)
         }
     }
     return list;
+}
+
+/*
+ * The preview bridge belongs to the Date & Time panel, not to timedated
+ * notifications or control-list construction. Keep one provider for the
+ * lifetime of the panel so every specialised clock and calendar follows the
+ * same runtime-discovery/retry path.
+ */
+static SsCalendarPreviewProvider *ensure_calendar_preview_provider(
+    SsLinuxDateTimePanel *state)
+{
+    if (state == NULL) {
+        return NULL;
+    }
+
+    if (state->calendar_preview_provider == NULL) {
+        state->calendar_preview_provider =
+            ss_calendar_preview_provider_new();
+    }
+    return state->calendar_preview_provider;
 }
 
 static bool coordinate_close(double left, double right)
@@ -707,7 +724,7 @@ static bool format_preview(const SsLinuxDateTimePanel *state,
         unix_us = g_get_real_time();
         offset_us = g_date_time_get_utc_offset(now);
         native_text = ss_calendar_preview_provider_format_clock(
-            state->calendar_preview_provider,
+            ensure_calendar_preview_provider(state),
             policy->clock_mode,
             unix_us,
             (int)(offset_us / G_USEC_PER_SEC),
@@ -771,7 +788,7 @@ static gboolean refresh_preview(gpointer user_data)
             } else {
                 selected_date =
                     ss_calendar_preview_provider_format_date(
-                        state->calendar_preview_provider,
+                        ensure_calendar_preview_provider(state),
                         policy->calendar,
                         g_date_time_get_year(now),
                         g_date_time_get_month(now),
@@ -991,9 +1008,6 @@ static void system_time_changed(
     if (state == NULL || system_state == NULL) {
         return;
     }
-
-    state->calendar_preview_provider =
-        ss_calendar_preview_provider_new();
 
     (void)ss_regional_context_detect(&state->regional_context);
 
@@ -1957,6 +1971,9 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
         return NULL;
     }
 
+    state->calendar_preview_provider =
+        ss_calendar_preview_provider_new();
+
     (void)ss_regional_context_detect(&state->regional_context);
     state->location_metadata_present =
         ss_location_metadata_load(&state->location_metadata);
@@ -2045,6 +2062,9 @@ void ss_linux_date_time_panel_free(gpointer data)
 
     g_clear_pointer(&state->clock_mode_ids, g_ptr_array_unref);
     g_clear_pointer(&state->timezone_ids, g_ptr_array_unref);
+    ss_calendar_preview_provider_free(
+        state->calendar_preview_provider);
+    state->calendar_preview_provider = NULL;
     ss_system_time_service_free(state->system_time_service);
     state->system_time_service = NULL;
     g_clear_object(&state->cinnamon_interface_settings);

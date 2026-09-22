@@ -103,7 +103,10 @@ The replacement Date & Time module adds specific invariants:
   chronology rendering are regression-tested independently of the installed
   desktop environment;
 - Linux runtime discovery covers Debian/Mint multiarch library placement and
-  can recover after Calendar becomes available while System Settings is open.
+  can recover after Calendar becomes available while System Settings is open;
+- the Date & Time panel owns exactly one Calendar preview provider for its
+  lifetime, so specialised clock and non-Gregorian previews are available
+  immediately rather than depending on a timedated property-change event.
 
 The build contains an architectural CMake guard for the first invariant and
 unit coverage for the conventional/native clock-policy mapping.
