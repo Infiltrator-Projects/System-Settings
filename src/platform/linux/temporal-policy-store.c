@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+/**
+ * @file temporal-policy-store.c
+ * @brief POSIX temporal-policy persistence plus Cinnamon compatibility seed.
+ */
 #include "system-settings/temporal-policy-store.h"
 #include "system-settings/cinnamon-interface.h"
 
@@ -53,6 +57,11 @@ static void mirror_cinnamon_compatibility(
 
 static bool platform_load(InfiltratrTemporalPolicyV3 *policy, bool *found)
 {
+    /*
+     * Invalid/empty optional policy must not brick Settings. Recover to Common
+     * defaults, then seed the conventional clock/seconds values from Cinnamon.
+     * Permission/I/O failures remain real failures rather than being hidden.
+     */
     const InfiltratrIoResult result =
         infiltratr_temporal_posix_policy_load(policy, found);
 

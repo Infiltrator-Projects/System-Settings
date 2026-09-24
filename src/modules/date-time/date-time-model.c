@@ -1,8 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+/**
+ * @file date-time-model.c
+ * @brief Validation and transactional publication for Date & Time policy.
+ *
+ * This layer contains no GTK or operating-system policy. It is the semantic
+ * commit boundary between UI requests and the platform persistence adapter.
+ */
 #include "system-settings/date-time-model.h"
 
 #include <infiltratr/core.h>
 
+/*
+ * Persist-before-publish is the central model invariant. A failed write must
+ * never make an uncommitted value visible through ss_date_time_model_policy().
+ */
 static bool save_candidate(SsDateTimeModel *model,
                            const InfiltratrTemporalPolicyV3 *candidate)
 {

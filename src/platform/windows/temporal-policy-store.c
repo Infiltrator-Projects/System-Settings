@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+/**
+ * @file temporal-policy-store.c
+ * @brief Windows LocalAppData persistence for temporal presentation policy.
+ */
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <shlobj.h>
@@ -12,6 +16,10 @@
 
 #define SS_POLICY_CAPACITY 1024U
 
+/*
+ * Resolve the supported per-user storage root through Known Folders rather
+ * than assuming an environment variable or a fixed profile layout.
+ */
 static bool build_paths(wchar_t **directory_out, wchar_t **path_out)
 {
     static const wchar_t directory_name[] = L"Infiltrator";
@@ -94,6 +102,11 @@ bool ss_windows_temporal_policy_load_file(
         goto done;
     }
 
+    /*
+     * Policy is optional enrichment. Empty/oversized content is treated like
+     * an absent valid policy, matching the Linux recovery contract rather than
+     * preventing Date & Time from opening.
+     */
     if (size.QuadPart <= 0 ||
         size.QuadPart >= (LONGLONG)sizeof(text)) {
         ok = true;
@@ -148,6 +161,10 @@ bool ss_windows_temporal_policy_save_file(
     memcpy(temporary, path, path_length * sizeof(wchar_t));
     memcpy(temporary + path_length, L".tmp", 5U * sizeof(wchar_t));
 
+    /*
+     * Write and flush a sibling temporary file, then publish it with replace +
+     * write-through. The destination is never intentionally exposed partially.
+     */
     file = CreateFileW(temporary, GENERIC_WRITE, 0U, NULL, CREATE_ALWAYS,
                        FILE_ATTRIBUTE_NORMAL, NULL);
     if (file == INVALID_HANDLE_VALUE) {

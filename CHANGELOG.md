@@ -8,6 +8,14 @@ All notable user-visible and architectural changes are recorded here.
 
 No unreleased changes.
 
+## 0.3.19 — 2026-09-24
+
+- Raise source-level documentation to the same standard as the project's architecture documents: document Date & Time persist-before-publish semantics, borrowed/owned state and platform-store fallback contracts.
+- Document timedated asynchronous ownership, cancellation/completion behaviour, absolute microsecond clock writes and the rule that privilege remains with timedated/polkit rather than the GUI.
+- Document Calendar runtime capability binding, destructive rebinding, lazy discovery throttling and cached chronology lifetime without adding redundant line-by-line commentary.
+- Document locality metadata durability/privacy, geocoding result ownership, tzdata ISO-6709 coordinate grammar and Linux/Windows temporal-policy recovery/publication invariants.
+- This release intentionally changes documentation/comments only; runtime behaviour is unchanged.
+
 ## 0.3.18 — 2026-09-22
 
 - Isolate Windows temporal-policy file I/O behind a private path-based adapter so recovery behaviour can be regression-tested without touching the real user profile.

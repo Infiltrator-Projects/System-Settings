@@ -1,4 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+/**
+ * @file calendar-preview-provider.c
+ * @brief Lazy dynamic discovery and capability binding for Calendar previews.
+ *
+ * This bridge intentionally does not copy Calendar algorithms. It binds a
+ * small stable C ABI at runtime and degrades per capability when Calendar is
+ * absent or exposes only part of that ABI.
+ */
 #include "calendar-preview-provider.h"
 
 #include <infiltratr/dynlib.h>
@@ -35,6 +43,12 @@ typedef char *(*CalendarSystemFormatDateFn)(
     int gregorian_day,
     const char *part);
 
+/*
+ * Invariant: function pointers are meaningful only while library is open.
+ * calendar is a cached instance for calendar_id and must be dropped before the
+ * library is closed. retry_after_monotonic_us throttles failed lazy discovery
+ * so a missing optional runtime cannot cause a filesystem scan every tick.
+ */
 struct SsCalendarPreviewProvider {
     InfiltratrDynlib library;
     TimeModeFromStringFn time_mode_from_string;
@@ -72,6 +86,10 @@ static bool has_calendar_runtime(const SsCalendarPreviewProvider *provider)
            provider->calendar_system_format_date != NULL;
 }
 
+/*
+ * Every symbol is individually optional. A runtime is accepted only when it
+ * supplies a complete clock pair, a complete calendar pair, or both.
+ */
 static bool bind_runtime(SsCalendarPreviewProvider *provider)
 {
     InfiltratrDynlibBinding bindings[] = {
@@ -117,6 +135,11 @@ static bool bind_runtime(SsCalendarPreviewProvider *provider)
     return true;
 }
 
+/*
+ * Rebinding is destructive by design: close any previous handle and clear all
+ * symbol state before trying the new candidate so pointers can never outlive
+ * the library that supplied them.
+ */
 static bool open_runtime(
     SsCalendarPreviewProvider *provider,
     const char *library_name)
@@ -216,6 +239,11 @@ static bool discover_runtime(SsCalendarPreviewProvider *provider)
     return open_runtime(provider, CALENDAR_RUNTIME_SONAME);
 }
 
+/*
+ * Lazy discovery permits System Settings to start without Calendar and to
+ * recover if Calendar is installed while the panel remains open. Failed
+ * discovery is throttled for five seconds; success removes the throttle.
+ */
 static bool ensure_runtime(SsCalendarPreviewProvider *provider)
 {
     gint64 now;
@@ -355,6 +383,11 @@ char *ss_calendar_preview_provider_format_clock(
     return formatted;
 }
 
+/*
+ * Cache one Calendar object because repeated one-second preview refreshes
+ * normally target the same chronology. A changed identifier is constructed
+ * first, then atomically replaces the old cached object.
+ */
 static bool select_calendar(
     SsCalendarPreviewProvider *provider,
     const char *calendar_id)

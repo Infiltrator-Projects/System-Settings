@@ -1,4 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+/**
+ * @file location-metadata.c
+ * @brief Durable Linux persistence for user-selected locality metadata.
+ *
+ * The file is deliberately separate from native time-zone state. It stores
+ * only the richer locality evidence that Mint/Linux does not otherwise expose
+ * as one authoritative setting.
+ */
 #include "system-settings/location-metadata.h"
 
 #include <glib.h>
@@ -7,6 +15,7 @@
 #include <errno.h>
 #include <string.h>
 
+/* Resolve through GLib's XDG configuration directory contract. */
 static gchar *metadata_path(void)
 {
     return g_build_filename(
@@ -116,6 +125,11 @@ bool ss_location_metadata_save(const SsLocationMetadata *metadata)
         return false;
     }
 
+    /*
+     * CONSISTENT requests replacement through a temporary file and DURABLE
+     * requests publication to stable storage. Metadata is private user state,
+     * hence mode 0600.
+     */
     return g_file_set_contents_full(
         path,
         data,

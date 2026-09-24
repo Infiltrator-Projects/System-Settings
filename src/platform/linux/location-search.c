@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+/**
+ * @file location-search.c
+ * @brief geocode-glib adapter with explicit result and request ownership.
+ */
 #include "system-settings/location-search.h"
 
 #include <geocode-glib/geocode-glib.h>
@@ -59,9 +63,17 @@ static void search_finished(GObject *source,
 
     places = geocode_forward_search_finish(
         GEOCODE_FORWARD(source), async_result, &error);
+    /*
+     * Always construct the result container, including on cancellation or
+     * backend failure, so callers have one ownership contract on every path.
+     */
     results = g_ptr_array_new_with_free_func(result_free);
 
     if (places != NULL) {
+        /*
+         * Eight results is both the requested backend cap and the UI cap. Do
+         * not allow a backend returning more to grow an unbounded result list.
+         */
         for (cursor = places;
              cursor != NULL && results->len < 8U;
              cursor = cursor->next) {

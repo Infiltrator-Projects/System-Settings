@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+/**
+ * @file regional-context.c
+ * @brief Linux IANA time-zone discovery and tzdata reference-coordinate logic.
+ */
 #include "system-settings/regional-context.h"
 
 #include <glib.h>
@@ -104,6 +108,13 @@ static bool read_timezone_glib(char *destination, size_t capacity)
     return ok;
 }
 
+/*
+ * tzdata zone.tab coordinates use ISO 6709 compact forms:
+ * latitude  ±DDMM[SS], longitude ±DDDMM[SS].
+ * Degree width is therefore supplied by the caller (2 for latitude, 3 for
+ * longitude), while minutes/optional seconds must stay below 60 and the poles/
+ * antimeridian cannot carry a non-zero fractional component.
+ */
 static bool parse_component(const char *text,
                             size_t length,
                             size_t degree_digits,
@@ -509,6 +520,11 @@ bool ss_regional_context_detect(SsRegionalContext *context)
     }
     memset(context, 0, sizeof(*context));
 
+    /*
+     * Prefer the distribution's explicit /etc/timezone identity, then the
+     * canonical /etc/localtime symlink, then GLib's local-zone fallback. This
+     * preserves a stable IANA identifier where the platform exposes one.
+     */
     if (!read_timezone_file(context->timezone_id,
                             sizeof(context->timezone_id)) &&
         !read_timezone_localtime_link(context->timezone_id,

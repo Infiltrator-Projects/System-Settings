@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+/**
+ * @file system-time-service.c
+ * @brief Linux timedated transport and asynchronous lifetime management.
+ */
 #include "system-settings/system-time-service.h"
 
 #include <string.h>
@@ -7,6 +11,11 @@
 #define TIMEDATE_PATH "/org/freedesktop/timedate1"
 #define TIMEDATE_IFACE "org.freedesktop.timedate1"
 
+/*
+ * The panel owns SsSystemTimeService. In-flight calls borrow it; panel teardown
+ * cancels its shared cancellable before freeing the service. UI request
+ * generation checks prevent a late cancelled reply from publishing stale state.
+ */
 typedef struct SsSystemTimeCall {
     SsSystemTimeService *service;
     SsSystemTimeCompletionCallback callback;
@@ -102,6 +111,7 @@ static void on_properties_changed(
     emit_changed(user_data);
 }
 
+/* Take ownership of a newly created proxy and attach the one change signal. */
 static SsSystemTimeService *service_from_proxy(GDBusProxy *proxy)
 {
     SsSystemTimeService *service;
@@ -131,6 +141,10 @@ static void new_proxy_finished(
     SsSystemTimeService *service;
 
     proxy = g_dbus_proxy_new_for_bus_finish(result, &error);
+    /*
+     * g_dbus_proxy_new_for_bus_finish() transfers a full reference. The
+     * service takes that reference on success; a NULL proxy needs no cleanup.
+     */
     service = service_from_proxy(proxy);
 
     if (call != NULL && call->callback != NULL) {
@@ -192,6 +206,11 @@ void ss_system_time_service_set_changed_callback(
     service->changed_user_data = user_data;
 }
 
+/*
+ * Finish exactly one D-Bus mutation. GIO reports cancellation through error,
+ * so there is one completion path for success, denial, transport failure and
+ * cancellation.
+ */
 static void call_finished(GObject *source,
                           GAsyncResult *result,
                           gpointer user_data)
@@ -219,6 +238,11 @@ static void call_finished(GObject *source,
     g_free(call);
 }
 
+/*
+ * Common mutation launcher. Calls are always asynchronous and use the
+ * caller-provided cancellable; no synchronous D-Bus round trip is allowed on
+ * the GTK thread.
+ */
 static void begin_call(SsSystemTimeService *service,
                        const char *method,
                        GVariant *parameters,
@@ -302,6 +326,11 @@ void ss_system_time_service_set_time_async(
     SsSystemTimeCompletionCallback callback,
     gpointer user_data)
 {
+    /*
+     * timedated SetTime uses (microseconds, relative, interactive). We pass an
+     * absolute Unix instant and delegate any required privilege prompt to
+     * polkit rather than elevating System Settings itself.
+     */
     begin_call(
         service,
         "SetTime",
