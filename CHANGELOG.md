@@ -8,6 +8,11 @@ All notable user-visible and architectural changes are recorded here.
 
 No unreleased changes.
 
+## 0.4.4 — 2026-09-24
+
+- Align the Date & Time hero card with the 18 px publisher panel radius.
+- Preserve settings behaviour, clock/calendar authority, dependencies and Common APIs unchanged.
+
 ## 0.4.3 — 2026-09-24
 
 - Pin Infiltratr Common 1.19.25 and make its complete shared clock formatter the Date & Time preview authority for every explicit clock mode.
