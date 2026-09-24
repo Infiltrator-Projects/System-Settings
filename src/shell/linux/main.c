@@ -119,7 +119,7 @@ static void install_common_theme(void)
         ".nav-title { color: %s; font-size: 10px; font-weight: %u; letter-spacing: 0.10em; margin: 0 8px 7px 8px; }\n"
         ".nav-row { border: 1px solid transparent; border-radius: 11px; padding: 11px 12px; margin: 2px 0; }\n"
         ".nav-row:hover { background: %s; }\n"
-        ".nav-row:selected { background: %s; border-color: %s; }\n"
+        ".nav-row:selected { background: %s; border-color: %s; border-left-width: 3px; border-left-color: %s; }\n"
         ".nav-primary { color: %s; font-weight: %u; }\n"
         ".nav-secondary { color: %s; font-size: 11px; }\n"
         ".sidebar-footer { border-top: 1px solid %s; padding-top: 12px; margin-top: 12px; }\n"
@@ -128,7 +128,7 @@ static void install_common_theme(void)
         ".sidebar-about:hover { background: %s; border-color: %s; }\n"
         ".settings-content { padding: 30px 34px 40px 34px; }\n"
         ".page-eyebrow { color: %s; font-size: 10px; font-weight: %u; letter-spacing: 0.12em; }\n"
-        ".page-title { color: %s; font-size: 30px; font-weight: %u; }\n"
+        ".page-title { color: %s; font-size: 28px; font-weight: %u; }\n"
         ".page-summary { color: %s; font-size: 13px; margin-bottom: 4px; }\n"
         ".hero-card { background: %s; border: 1px solid %s; border-radius: 16px; padding: 20px 22px; }\n"
         ".hero-kicker { color: %s; font-size: 10px; font-weight: %u; letter-spacing: 0.11em; }\n"
@@ -156,7 +156,7 @@ static void install_common_theme(void)
         muted,
         muted, (unsigned int)type->ui_bold_weight,
         surface_hover,
-        selected, accent,
+        selected, accent, accent,
         text, (unsigned int)type->ui_bold_weight,
         muted,
         border,
@@ -282,7 +282,7 @@ static GtkWidget *build_sidebar(GtkWindow *parent)
     g_autofree gchar *version =
         g_strdup_printf("Version %s", info->version);
 
-    gtk_widget_set_size_request(sidebar, 238, -1);
+    gtk_widget_set_size_request(sidebar, 248, -1);
     gtk_widget_add_css_class(sidebar, "settings-sidebar");
 
     gtk_widget_add_css_class(brand, "brand-block");
