@@ -8,6 +8,12 @@ All notable user-visible and architectural changes are recorded here.
 
 No unreleased changes.
 
+## 0.4.3 — 2026-09-24
+
+- Pin Infiltratr Common 1.19.25 and make its complete shared clock formatter the Date & Time preview authority for every explicit clock mode.
+- Remove Calendar as a requirement for specialised clock previews; Calendar remains the optional chronology provider for non-Gregorian date previews.
+- Preserve the platform-owned legacy Standard mode by resolving it through Cinnamon's current 12/24-hour choice before entering the shared formatter.
+
 ## 0.4.2 — 2026-09-24
 
 - Continue the cautious publisher-wide UI alignment with five small Linux shell changes only.

@@ -545,10 +545,9 @@ static bool format_preview(SsLinuxDateTimePanel *state,
         ss_date_time_model_policy(&state->model);
     const InfiltratrTemporalClockModeInfo *mode;
     g_autoptr(GDateTime) now = g_date_time_new_now_local();
-    g_autofree gchar *native_text = NULL;
+    const char *effective_mode;
     int64_t unix_us;
     gint64 offset_us;
-    InfiltratrClockProfile conventional;
     double latitude = 0.0;
     double longitude = 0.0;
     bool has_location;
@@ -557,71 +556,49 @@ static bool format_preview(SsLinuxDateTimePanel *state,
         return false;
     }
 
-    if (strcmp(policy->clock_mode, "standard") == 0) {
-        const gboolean use_24h =
-            state->cinnamon_interface_settings != NULL
-                ? g_settings_get_boolean(
-                    state->cinnamon_interface_settings, "clock-use-24h")
-                : TRUE;
-        conventional = use_24h
-            ? INFILTRATR_CLOCK_PROFILE_CONVENTIONAL_24
-            : INFILTRATR_CLOCK_PROFILE_CONVENTIONAL_12;
-    } else if (strcmp(policy->clock_mode, "standard-12") == 0) {
-        conventional = INFILTRATR_CLOCK_PROFILE_CONVENTIONAL_12;
-    } else if (strcmp(policy->clock_mode, "standard-24") == 0) {
-        conventional = INFILTRATR_CLOCK_PROFILE_CONVENTIONAL_24;
-    } else if (strcmp(policy->clock_mode, "decimal") == 0) {
-        conventional = INFILTRATR_CLOCK_PROFILE_DECIMAL_10;
-    } else {
-        mode = infiltratr_temporal_clock_mode_find(policy->clock_mode);
-        if (mode == NULL) {
-            return false;
-        }
+    /*
+     * Common is the system-wide clock renderer. The legacy "standard" value
+     * deliberately remains platform-owned, so resolve it to Cinnamon's current
+     * conventional choice before entering the portable formatter. Every
+     * explicit mode then uses the same implementation that other Infiltrator
+     * applications consume.
+     */
+    effective_mode = policy->clock_mode;
+    if (strcmp(effective_mode, "standard") == 0) {
+        effective_mode = ss_native_clock_mode_id(
+            desktop_uses_24h(state));
+    }
 
-        has_location = preview_coordinates(
-            state, &latitude, &longitude);
-        if ((mode->requires_latitude || mode->requires_longitude) &&
-            !has_location) {
-            return g_snprintf(
-                       buffer,
-                       capacity,
-                       "%s — location required",
-                       mode->name) > 0;
-        }
+    mode = infiltratr_temporal_clock_mode_find(effective_mode);
+    if (mode == NULL) {
+        return false;
+    }
 
-        /*
-         * Calendar owns the specialised clock algorithms. Do not fake a
-         * preview by displaying the mode's label: ask Calendar's stable
-         * runtime ABI for the same formatter the panel clock uses.
-         */
-        unix_us = g_get_real_time();
-        offset_us = g_date_time_get_utc_offset(now);
-        native_text = ss_calendar_preview_provider_format_clock(
-            ensure_calendar_preview_provider(state),
-            policy->clock_mode,
-            unix_us,
-            (int)(offset_us / G_USEC_PER_SEC),
-            policy->show_seconds,
-            latitude,
-            longitude);
-        if (native_text != NULL) {
-            return g_strlcpy(
-                       buffer, native_text, capacity) < capacity;
-        }
-
+    has_location = preview_coordinates(
+        state, &latitude, &longitude);
+    if ((mode->requires_latitude || mode->requires_longitude) &&
+        !has_location) {
         return g_snprintf(
                    buffer,
                    capacity,
-                   "%s — preview unavailable",
+                   "%s — location required",
                    mode->name) > 0;
     }
 
     unix_us = g_get_real_time();
     offset_us = g_date_time_get_utc_offset(now);
-    return infiltratr_temporal_format_clock(
-        conventional, unix_us,
+    return infiltratr_temporal_format_clock_mode(
+        effective_mode,
+        unix_us,
         (int32_t)(offset_us / G_USEC_PER_SEC),
-        policy->show_seconds, buffer, capacity, NULL);
+        policy->show_seconds,
+        false,
+        has_location,
+        latitude,
+        longitude,
+        buffer,
+        capacity,
+        NULL);
 }
 
 static gboolean refresh_preview(gpointer user_data)
