@@ -11,6 +11,7 @@ static GtkWidget *make_setting_identity(const char *title,
         ss_linux_ui_make_label(description, "setting-description");
 
     gtk_label_set_wrap(GTK_LABEL(copy), TRUE);
+    gtk_widget_set_hexpand(box, TRUE);
     gtk_widget_set_hexpand(copy, TRUE);
     gtk_box_append(GTK_BOX(box), heading);
     gtk_box_append(GTK_BOX(box), copy);
@@ -46,6 +47,7 @@ GtkWidget *ss_linux_ui_make_setting_row(const char *title,
         GTK_BOX(row),
         make_setting_identity(title, description));
     gtk_widget_set_valign(control, GTK_ALIGN_CENTER);
+    gtk_widget_set_halign(control, GTK_ALIGN_END);
     gtk_box_append(GTK_BOX(row), control);
     return row;
 }

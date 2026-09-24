@@ -100,48 +100,130 @@ static GtkStringList *first_day_strings(void)
     return gtk_string_list_new(values);
 }
 
+static GtkWidget *make_section_heading(const char *icon_name,
+                                       const char *title,
+                                       const char *summary)
+{
+    GtkWidget *heading = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+    GtkWidget *icon_wrap = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    GtkWidget *icon = gtk_image_new_from_icon_name(icon_name);
+    GtkWidget *copy = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
+    GtkWidget *subtitle = ss_linux_ui_make_label(summary, "section-summary");
+
+    gtk_widget_add_css_class(heading, "section-heading");
+    gtk_widget_add_css_class(icon_wrap, "section-icon-wrap");
+    gtk_image_set_pixel_size(GTK_IMAGE(icon), 18);
+    gtk_box_append(GTK_BOX(icon_wrap), icon);
+    gtk_box_append(GTK_BOX(heading), icon_wrap);
+    gtk_box_append(
+        GTK_BOX(copy),
+        ss_linux_ui_make_label(title, "section-title"));
+    gtk_label_set_wrap(GTK_LABEL(subtitle), TRUE);
+    gtk_box_append(GTK_BOX(copy), subtitle);
+    gtk_box_append(GTK_BOX(heading), copy);
+    return heading;
+}
+
+static GtkWidget *make_coordinate_field(const char *caption,
+                                        GtkSpinButton *spin)
+{
+    GtkWidget *field = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
+
+    gtk_box_append(
+        GTK_BOX(field),
+        ss_linux_ui_make_label(caption, "field-caption"));
+    gtk_box_append(GTK_BOX(field), GTK_WIDGET(spin));
+    return field;
+}
+
+static GtkWidget *make_manual_setting_block(
+    SsLinuxDateTimePanel *state,
+    GtkWidget *controls)
+{
+    GtkWidget *block = gtk_box_new(GTK_ORIENTATION_VERTICAL, 7);
+    GtkWidget *description = ss_linux_ui_make_label(
+        "Available when Network time is off and the selected clock/calendar "
+        "can be converted safely back to one system instant.",
+        "setting-description");
+
+    gtk_widget_add_css_class(block, "setting-row");
+    gtk_box_append(
+        GTK_BOX(block),
+        ss_linux_ui_make_label("Manual date and time", "setting-label"));
+    gtk_label_set_wrap(GTK_LABEL(description), TRUE);
+    gtk_box_append(GTK_BOX(block), description);
+    gtk_box_append(GTK_BOX(block), controls);
+    state->manual_row = block;
+    return block;
+}
+
 GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
 {
-    GtkWidget *page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 14);
+    GtkWidget *page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 18);
     GtkWidget *summary = ss_linux_ui_make_label(
-        "System Settings is the authoritative Date & Time frontend. It writes ordinary Mint/Linux settings through their native interfaces and adds richer Common-aware clock, calendar and geographic policy without maintaining a second copy of native system state.",
+        "Choose how the system represents time, calendar and location. "
+        "Native Mint/Linux services remain authoritative where they already "
+        "exist; richer presentation is shared through Common.",
         "page-summary");
-    GtkWidget *preview_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
+    GtkWidget *hero_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 3);
     GtkWidget *location_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
-    GtkWidget *clock_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
-    GtkWidget *calendar_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
-    GtkWidget *system_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
-    GtkWidget *format_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
+    GtkWidget *presentation_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+    GtkWidget *system_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+    GtkWidget *lower = gtk_flow_box_new();
     GtkWidget *manual_box;
     GtkWidget *search_box;
+    GtkWidget *coordinate_box;
     GtkStringList *strings;
     GtkExpression *expression;
 
     gtk_widget_add_css_class(page, "settings-content");
-    gtk_box_append(GTK_BOX(page), ss_linux_ui_make_label("Date & Time", "page-title"));
+    gtk_widget_set_hexpand(page, TRUE);
+
+    gtk_box_append(
+        GTK_BOX(page),
+        ss_linux_ui_make_label("SYSTEM / DATE & TIME", "page-eyebrow"));
+    gtk_box_append(
+        GTK_BOX(page),
+        ss_linux_ui_make_label("Date & Time", "page-title"));
     gtk_label_set_wrap(GTK_LABEL(summary), TRUE);
+    gtk_label_set_max_width_chars(GTK_LABEL(summary), 92);
     gtk_box_append(GTK_BOX(page), summary);
 
-    gtk_widget_add_css_class(preview_card, "preview-card");
+    /*
+     * One dominant preview gives the page a visual anchor. Everything below
+     * edits the values represented here, avoiding the former stack of equally
+     * prominent coloured cards.
+     */
+    gtk_widget_add_css_class(hero_card, "hero-card");
+    gtk_box_append(
+        GTK_BOX(hero_card),
+        ss_linux_ui_make_label("LIVE PRESENTATION", "hero-kicker"));
     state->clock_preview = ss_linux_ui_make_label("--:--", "preview-time");
     state->date_preview = ss_linux_ui_make_label("", "preview-date");
     gtk_label_set_wrap(GTK_LABEL(state->clock_preview), TRUE);
     gtk_label_set_wrap(GTK_LABEL(state->date_preview), TRUE);
-    gtk_box_append(GTK_BOX(preview_card), state->clock_preview);
-    gtk_box_append(GTK_BOX(preview_card), state->date_preview);
-    gtk_box_append(GTK_BOX(page), preview_card);
+    gtk_box_append(GTK_BOX(hero_card), state->clock_preview);
+    gtk_box_append(GTK_BOX(hero_card), state->date_preview);
+    gtk_box_append(
+        GTK_BOX(hero_card),
+        ss_linux_ui_make_label(
+            "Preview updates immediately; system-clock writes still use the "
+            "operating system's protected time service.",
+            "hero-note"));
+    gtk_box_append(GTK_BOX(page), hero_card);
 
     /*
-     * Locality, coordinates and time zone are one coherent settings family.
-     * A named locality may propose the matching IANA zone, while the explicit
-     * zone selector remains visible for correction. If no precise locality has
-     * been selected, the system zone's tzdata reference follows zone changes.
+     * Location needs the full content width because search results, IANA zone
+     * selection and coordinate overrides form one correction workflow.
      */
     gtk_widget_add_css_class(location_card, "settings-card");
-    gtk_widget_add_css_class(location_card, "location-card");
     gtk_box_append(
         GTK_BOX(location_card),
-        ss_linux_ui_make_label("Location & time zone", "section-title"));
+        make_section_heading(
+            "mark-location-symbolic",
+            "Location & time zone",
+            "Find a locality, keep the real Linux time zone visible, and "
+            "fine-tune coordinates only when needed."));
 
     state->location_summary = ss_linux_ui_make_label("", "accent-note");
     gtk_label_set_wrap(GTK_LABEL(state->location_summary), TRUE);
@@ -153,33 +235,30 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         GTK_BUTTON(gtk_button_new_with_label("Search"));
     gtk_entry_set_placeholder_text(
         state->location_search,
-        "Type a locality, for example Mooroopna");
-    gtk_widget_set_hexpand(
-        GTK_WIDGET(state->location_search), TRUE);
+        "Town, suburb, city or place");
+    gtk_widget_set_hexpand(GTK_WIDGET(state->location_search), TRUE);
     gtk_widget_add_css_class(
         GTK_WIDGET(state->location_search), "setting-entry");
     gtk_widget_add_css_class(
         GTK_WIDGET(state->location_search_button), "setting-button");
+    gtk_widget_add_css_class(
+        GTK_WIDGET(state->location_search_button), "primary-button");
+    gtk_box_append(GTK_BOX(search_box), GTK_WIDGET(state->location_search));
     gtk_box_append(
-        GTK_BOX(search_box), GTK_WIDGET(state->location_search));
-    gtk_box_append(
-        GTK_BOX(search_box),
-        GTK_WIDGET(state->location_search_button));
+        GTK_BOX(search_box), GTK_WIDGET(state->location_search_button));
     gtk_box_append(
         GTK_BOX(location_card),
         ss_linux_ui_make_setting_row(
             "Locality",
-            "Search by town, suburb, city or place name. Selecting a result stores its coordinates and applies the nearest matching IANA time zone to Linux.",
+            "Selecting a result stores its coordinates and proposes the "
+            "nearest matching IANA zone.",
             search_box));
 
     state->location_results = GTK_LIST_BOX(gtk_list_box_new());
     gtk_widget_add_css_class(
         GTK_WIDGET(state->location_results), "location-results");
-    gtk_widget_set_visible(
-        GTK_WIDGET(state->location_results), FALSE);
-    gtk_box_append(
-        GTK_BOX(location_card),
-        GTK_WIDGET(state->location_results));
+    gtk_widget_set_visible(GTK_WIDGET(state->location_results), FALSE);
+    gtk_box_append(GTK_BOX(location_card), GTK_WIDGET(state->location_results));
 
     strings = timezone_strings(state);
     state->timezone = GTK_DROP_DOWN(
@@ -192,45 +271,63 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     gtk_drop_down_set_enable_search(state->timezone, TRUE);
     gtk_widget_add_css_class(
         GTK_WIDGET(state->timezone), "setting-dropdown");
-    gtk_widget_set_size_request(
-        GTK_WIDGET(state->timezone), 360, -1);
+    gtk_widget_set_size_request(GTK_WIDGET(state->timezone), 250, -1);
     gtk_box_append(
         GTK_BOX(location_card),
         ss_linux_ui_make_setting_row(
             "Time zone",
-            "The real operating-system IANA zone. Locality selection normally chooses it automatically; it remains editable for correction or deliberate overrides.",
+            "The actual operating-system IANA zone; always editable after a "
+            "locality suggestion.",
             GTK_WIDGET(state->timezone)));
 
     state->latitude = GTK_SPIN_BUTTON(
         gtk_spin_button_new_with_range(-90.0, 90.0, 0.0001));
-    gtk_widget_add_css_class(
-        GTK_WIDGET(state->latitude), "setting-spin");
-    gtk_spin_button_set_digits(state->latitude, 4U);
-    gtk_box_append(
-        GTK_BOX(location_card),
-        ss_linux_ui_make_setting_row(
-            "Latitude",
-            "Advanced coordinate override. Degrees north are positive; degrees south are negative.",
-            GTK_WIDGET(state->latitude)));
-
     state->longitude = GTK_SPIN_BUTTON(
         gtk_spin_button_new_with_range(-180.0, 180.0, 0.0001));
-    gtk_widget_add_css_class(
-        GTK_WIDGET(state->longitude), "setting-spin");
+    gtk_widget_add_css_class(GTK_WIDGET(state->latitude), "setting-spin");
+    gtk_widget_add_css_class(GTK_WIDGET(state->longitude), "setting-spin");
+    gtk_spin_button_set_digits(state->latitude, 4U);
     gtk_spin_button_set_digits(state->longitude, 4U);
+    gtk_widget_set_size_request(GTK_WIDGET(state->latitude), 130, -1);
+    gtk_widget_set_size_request(GTK_WIDGET(state->longitude), 130, -1);
+
+    coordinate_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+    gtk_box_append(
+        GTK_BOX(coordinate_box),
+        make_coordinate_field("LATITUDE", state->latitude));
+    gtk_box_append(
+        GTK_BOX(coordinate_box),
+        make_coordinate_field("LONGITUDE", state->longitude));
     gtk_box_append(
         GTK_BOX(location_card),
         ss_linux_ui_make_setting_row(
-            "Longitude",
-            "Advanced coordinate override. Degrees east of Greenwich are positive; degrees west are negative.",
-            GTK_WIDGET(state->longitude)));
+            "Coordinates",
+            "Advanced location override in decimal degrees.",
+            coordinate_box));
     gtk_box_append(GTK_BOX(page), location_card);
 
-    gtk_widget_add_css_class(clock_card, "settings-card");
-    gtk_widget_add_css_class(clock_card, "clock-card");
+    /*
+     * Presentation and system-clock control are peers. GtkFlowBox keeps them
+     * side-by-side on an ordinary laptop and naturally wraps them to one
+     * column when the window becomes narrow.
+     */
+    gtk_flow_box_set_selection_mode(
+        GTK_FLOW_BOX(lower), GTK_SELECTION_NONE);
+    gtk_flow_box_set_min_children_per_line(GTK_FLOW_BOX(lower), 1U);
+    gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(lower), 2U);
+    gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(lower), 18U);
+    gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(lower), 18U);
+    gtk_flow_box_set_homogeneous(GTK_FLOW_BOX(lower), TRUE);
+    gtk_widget_set_hexpand(lower, TRUE);
+
+    gtk_widget_add_css_class(presentation_card, "settings-card");
+    gtk_widget_set_size_request(presentation_card, 390, -1);
     gtk_box_append(
-        GTK_BOX(clock_card),
-        ss_linux_ui_make_label("Clock system", "section-title"));
+        GTK_BOX(presentation_card),
+        make_section_heading(
+            "preferences-desktop-display-symbolic",
+            "Presentation",
+            "Clock, calendar and desktop formatting in one place."));
 
     strings = clock_mode_strings(state);
     state->clock_mode = GTK_DROP_DOWN(
@@ -238,31 +335,13 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     g_object_unref(strings);
     gtk_widget_add_css_class(
         GTK_WIDGET(state->clock_mode), "setting-dropdown");
-    gtk_widget_set_size_request(
-        GTK_WIDGET(state->clock_mode), 360, -1);
+    gtk_widget_set_size_request(GTK_WIDGET(state->clock_mode), 190, -1);
     gtk_box_append(
-        GTK_BOX(clock_card),
+        GTK_BOX(presentation_card),
         ss_linux_ui_make_setting_row(
-            "System clock",
-            "Choose the human clock representation used by Common-aware applications. Standard time follows the native desktop's 12/24-hour preference below.",
+            "Clock system",
+            "Human-readable clock representation.",
             GTK_WIDGET(state->clock_mode)));
-
-    state->show_seconds = GTK_SWITCH(gtk_switch_new());
-    gtk_widget_add_css_class(
-        GTK_WIDGET(state->show_seconds), "setting-switch");
-    gtk_box_append(
-        GTK_BOX(clock_card),
-        ss_linux_ui_make_setting_row(
-            "Show seconds",
-            "Show seconds or the closest finer unit supported by the selected clock system. The equivalent Cinnamon panel preference is kept aligned.",
-            GTK_WIDGET(state->show_seconds)));
-    gtk_box_append(GTK_BOX(page), clock_card);
-
-    gtk_widget_add_css_class(calendar_card, "settings-card");
-    gtk_widget_add_css_class(calendar_card, "calendar-card");
-    gtk_box_append(
-        GTK_BOX(calendar_card),
-        ss_linux_ui_make_label("Calendar system", "section-title"));
 
     strings = calendar_strings();
     state->calendar = GTK_DROP_DOWN(
@@ -270,102 +349,31 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     g_object_unref(strings);
     gtk_widget_add_css_class(
         GTK_WIDGET(state->calendar), "setting-dropdown");
-    gtk_widget_set_size_request(
-        GTK_WIDGET(state->calendar), 360, -1);
+    gtk_widget_set_size_request(GTK_WIDGET(state->calendar), 190, -1);
     gtk_box_append(
-        GTK_BOX(calendar_card),
+        GTK_BOX(presentation_card),
         ss_linux_ui_make_setting_row(
             "Calendar",
-            "Choose the calendar system used by Common-aware applications. Gregorian remains the ordinary Mint/Linux calendar.",
+            "Calendar used by Common-aware applications.",
             GTK_WIDGET(state->calendar)));
-    gtk_box_append(GTK_BOX(page), calendar_card);
 
-    /*
-     * Network/manual clock source belongs after the user's presentation
-     * choices. When NTP is enabled the manual controls do not merely become
-     * insensitive: they disappear because they are not an active source.
-     */
-    gtk_widget_add_css_class(system_card, "settings-card");
-    gtk_widget_add_css_class(system_card, "system-card");
-    gtk_box_append(
-        GTK_BOX(system_card),
-        ss_linux_ui_make_label("System time", "section-title"));
-
-    state->network_time = GTK_SWITCH(gtk_switch_new());
+    state->show_seconds = GTK_SWITCH(gtk_switch_new());
     gtk_widget_add_css_class(
-        GTK_WIDGET(state->network_time), "setting-switch");
+        GTK_WIDGET(state->show_seconds), "setting-switch");
     gtk_box_append(
-        GTK_BOX(system_card),
+        GTK_BOX(presentation_card),
         ss_linux_ui_make_setting_row(
-            "Network time",
-            "Synchronise the system clock through the operating system's configured network-time service.",
-            GTK_WIDGET(state->network_time)));
-
-    manual_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-    state->manual_date = GTK_ENTRY(gtk_entry_new());
-    state->manual_time = GTK_ENTRY(gtk_entry_new());
-    state->manual_set_time =
-        GTK_BUTTON(gtk_button_new_with_label("Set"));
-    gtk_entry_set_placeholder_text(
-        state->manual_date, "YYYY-MM-DD");
-    gtk_entry_set_placeholder_text(
-        state->manual_time, "Selected clock time");
-    gtk_entry_set_max_length(state->manual_date, 10);
-    gtk_entry_set_max_length(state->manual_time, 24);
-    gtk_widget_set_size_request(
-        GTK_WIDGET(state->manual_date), 130, -1);
-    gtk_widget_set_size_request(
-        GTK_WIDGET(state->manual_time), 150, -1);
-    gtk_widget_add_css_class(
-        GTK_WIDGET(state->manual_date), "setting-entry");
-    gtk_widget_add_css_class(
-        GTK_WIDGET(state->manual_time), "setting-entry");
-    gtk_widget_add_css_class(
-        GTK_WIDGET(state->manual_set_time), "setting-button");
-    gtk_box_append(
-        GTK_BOX(manual_box), GTK_WIDGET(state->manual_date));
-    gtk_box_append(
-        GTK_BOX(manual_box), GTK_WIDGET(state->manual_time));
-    gtk_box_append(
-        GTK_BOX(manual_box), GTK_WIDGET(state->manual_set_time));
-
-    state->manual_row = ss_linux_ui_make_setting_row(
-        "Manual date and time",
-        "Shown only when Network time is off. The time entry follows the selected clock system above; the current reversible editor supports Gregorian dates with Standard, 12-hour, 24-hour and French Republican decimal time.",
-        manual_box);
-    gtk_box_append(GTK_BOX(system_card), state->manual_row);
-
-    state->manual_unavailable = ss_linux_ui_make_label(
-        "Manual setting is hidden for this clock/calendar combination because System Settings will not reinterpret a presentation it cannot safely convert back to one canonical system instant.",
-        "accent-note");
-    gtk_label_set_wrap(
-        GTK_LABEL(state->manual_unavailable), TRUE);
-    gtk_widget_set_visible(state->manual_unavailable, FALSE);
-    gtk_box_append(
-        GTK_BOX(system_card), state->manual_unavailable);
-
-    state->status_label = ss_linux_ui_make_label("", "status-ok");
-    gtk_label_set_wrap(GTK_LABEL(state->status_label), TRUE);
-    gtk_box_append(GTK_BOX(system_card), state->status_label);
-    gtk_box_append(GTK_BOX(page), system_card);
-
-    /*
-     * These are ordinary Cinnamon authorities, not copies in the Infiltrator
-     * policy. Writing them here has exactly the same system effect as Mint's
-     * Date & Time format controls.
-     */
-    gtk_widget_add_css_class(format_card, "settings-card");
-    gtk_box_append(
-        GTK_BOX(format_card),
-        ss_linux_ui_make_label("Desktop format", "section-title"));
+            "Show seconds",
+            "Or the closest finer unit supported by the clock.",
+            GTK_WIDGET(state->show_seconds)));
 
     state->show_date = GTK_SWITCH(gtk_switch_new());
     gtk_widget_add_css_class(
         GTK_WIDGET(state->show_date), "setting-switch");
     gtk_box_append(
-        GTK_BOX(format_card),
+        GTK_BOX(presentation_card),
         ss_linux_ui_make_setting_row(
-            "Display the date",
+            "Panel date",
             "Show the date in Cinnamon's panel clock.",
             GTK_WIDGET(state->show_date)));
 
@@ -375,15 +383,72 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     g_object_unref(strings);
     gtk_widget_add_css_class(
         GTK_WIDGET(state->first_day), "setting-dropdown");
-    gtk_widget_set_size_request(
-        GTK_WIDGET(state->first_day), 220, -1);
+    gtk_widget_set_size_request(GTK_WIDGET(state->first_day), 180, -1);
     gtk_box_append(
-        GTK_BOX(format_card),
+        GTK_BOX(presentation_card),
         ss_linux_ui_make_setting_row(
             "First day of week",
-            "Use the locale default, Sunday or Monday for Cinnamon's calendar.",
+            "Locale default, Sunday or Monday.",
             GTK_WIDGET(state->first_day)));
-    gtk_box_append(GTK_BOX(page), format_card);
+
+    gtk_widget_add_css_class(system_card, "settings-card");
+    gtk_widget_set_size_request(system_card, 390, -1);
+    gtk_box_append(
+        GTK_BOX(system_card),
+        make_section_heading(
+            "preferences-system-time-symbolic",
+            "System clock",
+            "Network synchronisation and protected manual clock changes."));
+
+    state->network_time = GTK_SWITCH(gtk_switch_new());
+    gtk_widget_add_css_class(
+        GTK_WIDGET(state->network_time), "setting-switch");
+    gtk_box_append(
+        GTK_BOX(system_card),
+        ss_linux_ui_make_setting_row(
+            "Network time",
+            "Synchronise through the operating system's configured service.",
+            GTK_WIDGET(state->network_time)));
+
+    manual_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 7);
+    state->manual_date = GTK_ENTRY(gtk_entry_new());
+    state->manual_time = GTK_ENTRY(gtk_entry_new());
+    state->manual_set_time =
+        GTK_BUTTON(gtk_button_new_with_label("Set"));
+    gtk_entry_set_placeholder_text(state->manual_date, "YYYY-MM-DD");
+    gtk_entry_set_placeholder_text(state->manual_time, "Clock time");
+    gtk_entry_set_max_length(state->manual_date, 10);
+    gtk_entry_set_max_length(state->manual_time, 24);
+    gtk_widget_set_size_request(GTK_WIDGET(state->manual_date), 108, -1);
+    gtk_widget_set_size_request(GTK_WIDGET(state->manual_time), 128, -1);
+    gtk_widget_add_css_class(GTK_WIDGET(state->manual_date), "setting-entry");
+    gtk_widget_add_css_class(GTK_WIDGET(state->manual_time), "setting-entry");
+    gtk_widget_add_css_class(
+        GTK_WIDGET(state->manual_set_time), "setting-button");
+    gtk_widget_add_css_class(
+        GTK_WIDGET(state->manual_set_time), "primary-button");
+    gtk_box_append(GTK_BOX(manual_box), GTK_WIDGET(state->manual_date));
+    gtk_box_append(GTK_BOX(manual_box), GTK_WIDGET(state->manual_time));
+    gtk_box_append(GTK_BOX(manual_box), GTK_WIDGET(state->manual_set_time));
+    gtk_box_append(
+        GTK_BOX(system_card),
+        make_manual_setting_block(state, manual_box));
+
+    state->manual_unavailable = ss_linux_ui_make_label(
+        "Manual setting is unavailable for this presentation because it "
+        "cannot yet be converted safely back to one canonical instant.",
+        "accent-note");
+    gtk_label_set_wrap(GTK_LABEL(state->manual_unavailable), TRUE);
+    gtk_widget_set_visible(state->manual_unavailable, FALSE);
+    gtk_box_append(GTK_BOX(system_card), state->manual_unavailable);
+
+    state->status_label = ss_linux_ui_make_label("", "status-ok");
+    gtk_label_set_wrap(GTK_LABEL(state->status_label), TRUE);
+    gtk_box_append(GTK_BOX(system_card), state->status_label);
+
+    gtk_flow_box_insert(GTK_FLOW_BOX(lower), presentation_card, -1);
+    gtk_flow_box_insert(GTK_FLOW_BOX(lower), system_card, -1);
+    gtk_box_append(GTK_BOX(page), lower);
 
     g_signal_connect(
         state->clock_mode, "notify::selected",
@@ -394,7 +459,6 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     g_signal_connect(
         state->show_seconds, "notify::active",
         G_CALLBACK(on_seconds_changed), state);
-
     g_signal_connect(
         state->timezone, "notify::selected",
         G_CALLBACK(on_timezone_changed), state);
@@ -404,7 +468,6 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     g_signal_connect(
         state->manual_set_time, "clicked",
         G_CALLBACK(on_manual_set_time_clicked), state);
-
     g_signal_connect(
         state->location_search_button, "clicked",
         G_CALLBACK(on_location_search_clicked), state);
@@ -420,7 +483,6 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     g_signal_connect(
         state->longitude, "notify::value",
         G_CALLBACK(on_location_coordinate_changed), state);
-
     g_signal_connect(
         state->show_date, "notify::active",
         G_CALLBACK(on_show_date_changed), state);
@@ -430,5 +492,3 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
 
     return page;
 }
-
-

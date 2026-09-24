@@ -32,6 +32,30 @@ The exact platform rendering and responsive layout may change with window width,
 - direct search;
 - no maze of modal launchers.
 
+## Current Phase 1 Linux hierarchy
+
+The Linux shell uses the conceptual model above without pretending that
+unimplemented categories are already available. Application identity lives in a
+quiet persistent sidebar rather than a second competing title strip. The active
+panel owns the content heading and hierarchy.
+
+Date & Time uses one dominant live-preview surface followed by a full-width
+Location & time zone workflow and two peer setting groups:
+
+- **Presentation** — clock system, calendar, seconds, panel date and week start;
+- **System clock** — network synchronisation and protected manual clock changes.
+
+The two peer groups use a wrapping layout: they sit side-by-side when ordinary
+laptop width permits and collapse to one column when the content area narrows.
+This avoids both oversized whitespace and horizontal clipping.
+
+The visual hierarchy deliberately reserves the cyan/neutral accent for
+selection, focus and primary actions. Cards use the Common graphite surfaces
+and restrained borders rather than a different coloured stripe for every
+section. Explanatory copy is shortened at the control surface; detailed
+authority and compatibility rationale remains in the maintained engineering
+documents.
+
 ## Categories
 
 Initial categories are:

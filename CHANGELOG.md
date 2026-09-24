@@ -8,6 +8,16 @@ All notable user-visible and architectural changes are recorded here.
 
 No unreleased changes.
 
+## 0.4.0 — 2026-09-24
+
+- Rework the Linux System Settings interface from the original functional prototype into a quieter graphite settings shell with application identity and About access integrated into the persistent sidebar instead of a competing full-width header.
+- Replace the five equally prominent Date & Time cards with a deliberate hierarchy: one live presentation hero, one full-width Location & time zone workflow, and responsive Presentation/System clock groups.
+- Merge clock, calendar, seconds, panel-date and week-start controls into one Presentation surface; keep NTP/manual protected clock mutation together in System clock.
+- Combine latitude/longitude into one advanced Coordinates row, shorten control-surface copy, reduce oversized dropdowns and make locality search/manual Set the only primary-accent actions.
+- Replace per-section coloured edge stripes with restrained Common graphite surfaces, selection/focus accents and clearer section icon/title/summary hierarchy.
+- Use a wrapping GTK FlowBox for the two lower setting groups so the layout naturally falls back to one column on narrower windows instead of forcing horizontal overflow.
+- Preserve every existing Date & Time backend, signal, policy and persistence path; this release is an interface restructuring rather than a settings-semantics change.
+
 ## 0.3.19 — 2026-09-24
 
 - Raise source-level documentation to the same standard as the project's architecture documents: document Date & Time persist-before-publish semantics, borrowed/owned state and platform-store fallback contracts.
