@@ -113,7 +113,7 @@ static void install_common_theme(void)
         ".settings-sidebar { background: %s; border-right: 1px solid %s; padding: 20px 14px 16px 14px; }\n"
         ".settings-sidebar list, .settings-sidebar row, flowbox, flowboxchild { background: transparent; }\n"
         ".brand-block { margin: 0 6px 22px 6px; }\n"
-        ".brand-icon { background: %s; border: 1px solid %s; border-radius: 12px; padding: 9px; }\n"
+        ".brand-icon { background: %s; border: 1px solid %s; border-radius: 10px; padding: 9px; }\n"
         ".brand-title { color: %s; font-size: 17px; font-weight: %u; }\n"
         ".brand-subtitle { color: %s; font-size: 11px; }\n"
         ".nav-title { color: %s; font-size: 10px; font-weight: %u; letter-spacing: 0.10em; margin: 0 8px 7px 8px; }\n"
