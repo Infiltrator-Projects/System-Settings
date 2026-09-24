@@ -8,6 +8,13 @@ All notable user-visible and architectural changes are recorded here.
 
 No unreleased changes.
 
+## 0.4.2 — 2026-09-24
+
+- Continue the cautious publisher-wide UI alignment with five small Linux shell changes only.
+- Match Software's 6 px navigation-row radius and 3 px / 8 px navigation margins.
+- Match the 6 px compact About-button radius, 24 px content bottom padding, and 10 px ordinary settings-card radius.
+- Preserve all settings behaviour, page structure, backends, dependencies and Common APIs unchanged.
+
 ## 0.4.1 — 2026-09-24
 
 - Align the Linux System Settings shell a little more closely with the shared Infiltrator desktop language without changing its architecture or adding dependencies.
