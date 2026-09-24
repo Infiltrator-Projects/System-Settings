@@ -8,6 +8,12 @@ All notable user-visible and architectural changes are recorded here.
 
 No unreleased changes.
 
+## 0.4.1 — 2026-09-24
+
+- Align the Linux System Settings shell a little more closely with the shared Infiltrator desktop language without changing its architecture or adding dependencies.
+- Match Software's 248 px navigation width, add the suite-style 3 px cyan selected-navigation marker, and reduce the main page title from 30 px to 28 px.
+- Keep the change intentionally narrow: no new Common API, toolkit, framework, helper library or external runtime dependency.
+
 ## 0.4.0 — 2026-09-24
 
 - Rework the Linux System Settings interface from the original functional prototype into a quieter graphite settings shell with application identity and About access integrated into the persistent sidebar instead of a competing full-width header.
