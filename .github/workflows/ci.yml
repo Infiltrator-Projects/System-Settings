@@ -12,16 +12,26 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.os == 'ubuntu-latest' && (startsWith(github.event.head_commit.message, 'Release ') && 'ubuntu-latest' || 'linux-native') || matrix.os }}
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Install Linux UI dependencies
-        if: runner.os == 'Linux'
+        if: runner.os == 'Linux' && runner.environment == 'github-hosted'
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-4-dev libgeocode-glib-dev pkg-config
+      - name: Verify self-hosted Linux UI dependencies
+        if: runner.os == 'Linux' && runner.environment == 'self-hosted'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for command_name in cmake ctest pkg-config dpkg-deb; do
+            command -v "$command_name" >/dev/null 2>&1 || exit 1
+          done
+          pkg-config --exists gtk4
+          pkg-config --exists geocode-glib-2.0 || pkg-config --exists geocode-glib-1.0
       - name: Configure
         run: cmake -S . -B build -DBUILD_TESTING=ON -DSYSTEM_SETTINGS_WARNINGS_AS_ERRORS=ON
       - name: Build
@@ -64,15 +74,26 @@ jobs:
 
 
   sanitizers:
-    runs-on: ubuntu-latest
+    runs-on: ${{ startsWith(github.event.head_commit.message, 'Release ') && 'ubuntu-latest' || 'linux-native' }}
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
       - name: Install Linux UI dependencies
+        if: runner.environment == 'github-hosted'
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-4-dev libgeocode-glib-dev pkg-config
+      - name: Verify self-hosted sanitizer dependencies
+        if: runner.environment == 'self-hosted'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for command_name in cmake ctest cc pkg-config; do
+            command -v "$command_name" >/dev/null 2>&1 || exit 1
+          done
+          pkg-config --exists gtk4
+          pkg-config --exists geocode-glib-2.0 || pkg-config --exists geocode-glib-1.0
       - name: Configure ASan and UBSan
         run: |
           cmake -S . -B build-sanitized \
