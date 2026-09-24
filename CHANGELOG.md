@@ -8,6 +8,11 @@ All notable user-visible and architectural changes are recorded here.
 
 No unreleased changes.
 
+## 0.4.6 — 2026-09-25
+
+- Align the Linux page summary with the suite-wide 12 px hero-subtitle scale.
+- Preserve settings behaviour, clock/calendar authority, dependencies and Common APIs unchanged.
+
 ## 0.4.5 — 2026-09-25
 
 - Align the persistent sidebar brand tile with the suite-wide 10 px control radius.

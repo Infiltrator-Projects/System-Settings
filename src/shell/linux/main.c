@@ -129,7 +129,7 @@ static void install_common_theme(void)
         ".settings-content { padding: 30px 34px 24px 34px; }\n"
         ".page-eyebrow { color: %s; font-size: 10px; font-weight: %u; letter-spacing: 0.12em; }\n"
         ".page-title { color: %s; font-size: 28px; font-weight: %u; }\n"
-        ".page-summary { color: %s; font-size: 13px; margin-bottom: 4px; }\n"
+        ".page-summary { color: %s; font-size: 12px; margin-bottom: 4px; }\n"
         ".hero-card { background: %s; border: 1px solid %s; border-radius: 18px; padding: 20px 22px; }\n"
         ".hero-kicker { color: %s; font-size: 10px; font-weight: %u; letter-spacing: 0.11em; }\n"
         ".preview-time { color: %s; font-size: 42px; font-weight: %u; }\n"
