@@ -2,6 +2,20 @@
 
 # Changelog
 
+## 0.4.14 — 2026-09-25 — home dashboard and shell convergence
+
+- Add a real Home landing page so System Settings opens as a graphical control
+  centre instead of dropping directly into a form-oriented module.
+- Move application identity into a proper top header and add a working settings
+  search that filters the currently available navigation pages.
+- Add a real System Overview card backed by the running OS, kernel, desktop and
+  hostname rather than mock data.
+- Add Quick Actions for the implemented Date & Time module and About surface.
+- Add a large visual welcome hero with Simple, Secure and Beautiful product
+  cues, bringing the shell materially closer to the committed north-star image
+  without shipping placeholder settings or non-functional category buttons.
+- Keep Date & Time fully intact behind the new Home / Date & Time navigation.
+
 ## 0.4.13 — 2026-09-25 — icon-led control surface polish
 
 - Replace the remaining text-form setting rows with icon-led visual control
