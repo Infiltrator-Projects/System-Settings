@@ -8,6 +8,8 @@
   proving unavailable state is surfaced and authoritative state returns.
 - Add a native Windows cross-process persistence race test; competing writers
   must leave one complete parseable policy and no stale sibling temporary file.
+- Retry transient Windows destination sharing/lock collisions while publishing
+  each writer's private staged file, preserving last-completed-writer semantics.
 - Enforce mode 0700 on the Linux locality-metadata directory even when the
   directory already existed with broader permissions, with regression coverage.
 - Make normal Linux and Windows CI builds use total logical processors minus one,

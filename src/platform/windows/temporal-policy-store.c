@@ -192,11 +192,25 @@ bool ss_windows_temporal_policy_save_file(
     CloseHandle(file);
     file = INVALID_HANDLE_VALUE;
 
-    if (!MoveFileExW(temporary, path,
-                     MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
-        goto done;
+    /*
+     * Competing publishers can transiently collide while Windows replaces the
+     * destination directory entry. Keep our private staged file and retry only
+     * sharing/locking failures; unrelated filesystem errors remain fatal.
+     */
+    for (unsigned int attempt = 0U; attempt < 64U; ++attempt) {
+        if (MoveFileExW(temporary, path,
+                        MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+            ok = true;
+            break;
+        }
+        const DWORD move_error = GetLastError();
+        if (move_error != ERROR_ACCESS_DENIED &&
+            move_error != ERROR_SHARING_VIOLATION &&
+            move_error != ERROR_LOCK_VIOLATION) {
+            goto done;
+        }
+        Sleep(1U);
     }
-    ok = true;
 
 done:
     if (file != INVALID_HANDLE_VALUE) {
