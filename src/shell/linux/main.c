@@ -289,17 +289,7 @@ static void install_common_theme(void)
         ".overview-label { color: %s; font-size: 9px; letter-spacing: 0.06em; }\n"
         ".overview-value { color: %s; font-size: 13px; font-weight: %u; }\n"
         ".location-results row { border-radius: 9px; margin: 2px 4px; }\n"
-        ".settings-card { border-top-width: 2px; }\n"
-        ".setting-tile { background: %s; border: 1px solid %s; border-radius: 13px; padding: 12px 13px; margin: 3px 0; }\n"
-        ".setting-tile:hover { background: %s; border-color: %s; }\n"
-        ".setting-tile-icon { min-width: 38px; min-height: 38px; background: %s; border: 1px solid %s; border-radius: 11px; padding: 6px; }\n"
-        ".setting-tile-icon image { color: %s; }\n"
-        ".location-card { border-top-color: %s; }\n"
-        ".presentation-card { border-top-color: %s; }\n"
-        ".system-card { border-top-color: %s; }\n"
-        ".location-card .section-icon-wrap image { color: %s; }\n"
-        ".presentation-card .section-icon-wrap image { color: %s; }\n"
-        ".system-card .section-icon-wrap image { color: %s; }\n",
+        ".settings-card { border-top-width: 2px; }\n",
         panel, border,
         background, panel,
         panel, background,
@@ -328,7 +318,20 @@ static void install_common_theme(void)
         surface, border,
         accent,
         muted,
-        title, (unsigned int)type->ui_bold_weight,
+        title, (unsigned int)type->ui_bold_weight);
+
+    g_string_append_printf(
+        css,
+        ".setting-tile { background: %s; border: 1px solid %s; border-radius: 13px; padding: 12px 13px; margin: 3px 0; }\n"
+        ".setting-tile:hover { background: %s; border-color: %s; }\n"
+        ".setting-tile-icon { min-width: 38px; min-height: 38px; background: %s; border: 1px solid %s; border-radius: 11px; padding: 6px; }\n"
+        ".setting-tile-icon image { color: %s; }\n"
+        ".location-card { border-top-color: %s; }\n"
+        ".presentation-card { border-top-color: %s; }\n"
+        ".system-card { border-top-color: %s; }\n"
+        ".location-card .section-icon-wrap image { color: %s; }\n"
+        ".presentation-card .section-icon-wrap image { color: %s; }\n"
+        ".system-card .section-icon-wrap image { color: %s; }\n",
         surface, border,
         surface_hover, subtle,
         card, border,
