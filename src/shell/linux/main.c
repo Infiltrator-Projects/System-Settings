@@ -1193,10 +1193,10 @@ static GtkWidget *make_feature(const char *icon_name,
     return box;
 }
 
-static void append_overview_row(GtkGrid *grid,
-                                int row,
-                                const char *label,
-                                const char *value)
+static GtkWidget *append_overview_row(GtkGrid *grid,
+                                     int row,
+                                     const char *label,
+                                     const char *value)
 {
     GtkWidget *key = ss_linux_ui_make_label(label, "overview-key");
     GtkWidget *data = ss_linux_ui_make_label(
@@ -1207,6 +1207,43 @@ static void append_overview_row(GtkGrid *grid,
     gtk_widget_set_halign(data, GTK_ALIGN_START);
     gtk_grid_attach(grid, key, 0, row, 1, 1);
     gtk_grid_attach(grid, data, 1, row, 1, 1);
+    return data;
+}
+
+typedef struct {
+    GtkLabel *clock;
+    GtkLabel *date;
+    GtkLabel *system_time;
+} HomeTemporalTicker;
+
+static gboolean refresh_home_temporal(gpointer user_data)
+{
+    HomeTemporalTicker *ticker = user_data;
+    SsHomeTemporalPresentation temporal = {0};
+
+    if (ticker == NULL ||
+        ticker->clock == NULL ||
+        ticker->date == NULL ||
+        ticker->system_time == NULL) {
+        return G_SOURCE_REMOVE;
+    }
+
+    if (ss_home_temporal_presentation_now(&temporal)) {
+        gtk_label_set_text(ticker->clock, temporal.clock_text);
+        gtk_label_set_text(ticker->date, temporal.date_text);
+        gtk_label_set_text(ticker->system_time, temporal.system_time_text);
+    }
+    ss_home_temporal_presentation_clear(&temporal);
+    return G_SOURCE_CONTINUE;
+}
+
+static void remove_home_temporal_source(gpointer data)
+{
+    const guint source_id = GPOINTER_TO_UINT(data);
+
+    if (source_id != 0U) {
+        g_source_remove(source_id);
+    }
 }
 
 static void open_date_time(GtkButton *button, gpointer user_data)
@@ -1685,6 +1722,7 @@ static GtkWidget *build_home_page(GtkStack *stack)
         "video-display-symbolic");
     GtkWidget *overview_data = gtk_grid_new();
     GtkWidget *overview_body = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 15);
+    GtkWidget *system_time_label;
     GtkWidget *overview_scene = make_visual_panel(
         "overview-asset.png", 190, 126, "overview-scene");
     GtkWidget *quick = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
@@ -1880,7 +1918,7 @@ static GtkWidget *build_home_page(GtkStack *stack)
         GTK_GRID(overview_data), 4, "Hostname", host);
     append_overview_row(
         GTK_GRID(overview_data), 5, "Uptime", uptime_text);
-    append_overview_row(
+    system_time_label = append_overview_row(
         GTK_GRID(overview_data), 6, "System time", temporal.system_time_text);
     gtk_box_append(GTK_BOX(overview_body), overview_scene);
     gtk_widget_set_hexpand(overview_data, TRUE);
@@ -1975,12 +2013,12 @@ static GtkWidget *build_home_page(GtkStack *stack)
 
     GtkWidget *date_body = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 16);
     GtkWidget *date_clock = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
-    gtk_box_append(
-        GTK_BOX(date_clock),
-        ss_linux_ui_make_label(temporal.clock_text, "home-clock-value"));
-    gtk_box_append(
-        GTK_BOX(date_clock),
-        ss_linux_ui_make_label(temporal.date_text, "home-clock-date"));
+    GtkWidget *date_clock_label =
+        ss_linux_ui_make_label(temporal.clock_text, "home-clock-value");
+    GtkWidget *date_calendar_label =
+        ss_linux_ui_make_label(temporal.date_text, "home-clock-date");
+    gtk_box_append(GTK_BOX(date_clock), date_clock_label);
+    gtk_box_append(GTK_BOX(date_clock), date_calendar_label);
     gtk_box_append(GTK_BOX(date_body), date_clock);
 
     date_meta = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
@@ -2119,6 +2157,32 @@ static GtkWidget *build_home_page(GtkStack *stack)
         G_OBJECT(stack),
         "system-settings-home-scroller",
         scroller);
+
+    /*
+     * Home is a live status surface, not a construction-time snapshot.
+     * Refresh faster than one conventional second so decimal/French seconds
+     * (0.864 civil seconds each) advance without visible stalls or skips.
+     * The source is owned by the Home scroller and is removed automatically
+     * when that widget is finalized.
+     */
+    HomeTemporalTicker *ticker = g_new0(HomeTemporalTicker, 1);
+    ticker->clock = GTK_LABEL(date_clock_label);
+    ticker->date = GTK_LABEL(date_calendar_label);
+    ticker->system_time = GTK_LABEL(system_time_label);
+    const guint temporal_source_id = g_timeout_add_full(
+        G_PRIORITY_DEFAULT,
+        250U,
+        refresh_home_temporal,
+        ticker,
+        g_free);
+    g_source_set_name_by_id(
+        temporal_source_id,
+        "[system-settings] live Home temporal presentation");
+    g_object_set_data_full(
+        G_OBJECT(scroller),
+        "system-settings-home-temporal-source",
+        GUINT_TO_POINTER(temporal_source_id),
+        remove_home_temporal_source);
 
     g_free(theme_name);
     ss_home_temporal_presentation_clear(&temporal);

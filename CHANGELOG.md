@@ -2,6 +2,18 @@
 
 # Changelog
 
+## 0.4.24 — 2026-09-25 — live Home clock
+
+- Make the Home Date & Time clock a genuinely live display instead of a
+  construction-time snapshot.
+- Refresh the Home clock, selected-calendar date and System Overview timestamp
+  from the authoritative temporal policy every 250 ms, fast enough to represent
+  French Republican decimal seconds without appearing frozen.
+- Bind the timer lifetime to the Home scroller so closing System Settings
+  removes the GLib source cleanly and cannot leave a callback targeting dead GTK
+  widgets.
+- Extend the Linux shell regression to require the live Home temporal source.
+
 ## 0.4.23 — 2026-09-25 — Home temporal policy and hero spacing polish
 
 - Route the Home dashboard clock, date and System Overview timestamp through

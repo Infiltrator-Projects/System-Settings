@@ -62,6 +62,9 @@ int main(void)
         g_assert_false(gtk_scrolled_window_get_overlay_scrolling(nav_scroller));
         g_assert_false(gtk_scrolled_window_get_overlay_scrolling(date_scroller));
         g_assert_false(gtk_scrolled_window_get_overlay_scrolling(home_scroller));
+        g_assert_nonnull(g_object_get_data(
+            G_OBJECT(home_scroller),
+            "system-settings-home-temporal-source"));
         guint navigation_rows = 0U;
         for (GtkWidget *row = gtk_widget_get_first_child(GTK_WIDGET(navigation));
              row != NULL;
