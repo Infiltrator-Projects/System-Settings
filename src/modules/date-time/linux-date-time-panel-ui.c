@@ -174,10 +174,20 @@ static GtkWidget *make_manual_setting_block(
         "Available when Network time is off.",
         "setting-description");
 
-    gtk_widget_add_css_class(block, "setting-row");
+    GtkWidget *heading = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+    GtkWidget *icon_wrap = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    GtkWidget *icon = gtk_image_new_from_icon_name(
+        "document-edit-symbolic");
+
+    gtk_widget_add_css_class(block, "setting-tile");
+    gtk_widget_add_css_class(icon_wrap, "setting-tile-icon");
+    gtk_image_set_pixel_size(GTK_IMAGE(icon), 19);
+    gtk_box_append(GTK_BOX(icon_wrap), icon);
+    gtk_box_append(GTK_BOX(heading), icon_wrap);
     gtk_box_append(
-        GTK_BOX(block),
+        GTK_BOX(heading),
         ss_linux_ui_make_label("Manual date and time", "setting-label"));
+    gtk_box_append(GTK_BOX(block), heading);
     gtk_label_set_wrap(GTK_LABEL(description), TRUE);
     gtk_box_append(GTK_BOX(block), description);
     gtk_box_append(GTK_BOX(block), controls);
@@ -321,6 +331,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
      * selection and coordinate overrides form one correction workflow.
      */
     gtk_widget_add_css_class(location_card, "settings-card");
+    gtk_widget_add_css_class(location_card, "location-card");
     gtk_box_append(
         GTK_BOX(location_card),
         make_section_heading(
@@ -356,7 +367,8 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         GTK_BOX(search_box), GTK_WIDGET(state->location_search_button));
     gtk_box_append(
         GTK_BOX(location_card),
-        ss_linux_ui_make_setting_row(
+        ss_linux_ui_make_setting_tile(
+            "system-search-symbolic",
             "Locality",
             "Search by town, suburb, city or place.",
             search_box));
@@ -381,7 +393,8 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     gtk_widget_set_size_request(GTK_WIDGET(state->timezone), 250, -1);
     gtk_box_append(
         GTK_BOX(location_card),
-        ss_linux_ui_make_setting_row(
+        ss_linux_ui_make_setting_tile(
+            "preferences-system-time-symbolic",
             "Time zone",
             "Operating-system IANA time zone.",
             GTK_WIDGET(state->timezone)));
@@ -406,7 +419,8 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         make_coordinate_field("LONGITUDE", state->longitude));
     gtk_box_append(
         GTK_BOX(location_card),
-        ss_linux_ui_make_setting_row(
+        ss_linux_ui_make_setting_tile(
+            "mark-location-symbolic",
             "Coordinates",
             "Advanced decimal-degree override.",
             coordinate_box));
@@ -427,6 +441,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     gtk_widget_set_hexpand(lower, TRUE);
 
     gtk_widget_add_css_class(presentation_card, "settings-card");
+    gtk_widget_add_css_class(presentation_card, "presentation-card");
     gtk_widget_set_size_request(presentation_card, 390, -1);
     gtk_box_append(
         GTK_BOX(presentation_card),
@@ -444,7 +459,8 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     gtk_widget_set_size_request(GTK_WIDGET(state->clock_mode), 190, -1);
     gtk_box_append(
         GTK_BOX(presentation_card),
-        ss_linux_ui_make_setting_row(
+        ss_linux_ui_make_setting_tile(
+            "preferences-system-time-symbolic",
             "Clock system",
             "Choose the clock style.",
             GTK_WIDGET(state->clock_mode)));
@@ -458,7 +474,8 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     gtk_widget_set_size_request(GTK_WIDGET(state->calendar), 190, -1);
     gtk_box_append(
         GTK_BOX(presentation_card),
-        ss_linux_ui_make_setting_row(
+        ss_linux_ui_make_setting_tile(
+            "x-office-calendar-symbolic",
             "Calendar",
             "Choose the calendar system.",
             GTK_WIDGET(state->calendar)));
@@ -468,7 +485,8 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         GTK_WIDGET(state->show_seconds), "setting-switch");
     gtk_box_append(
         GTK_BOX(presentation_card),
-        ss_linux_ui_make_setting_row(
+        ss_linux_ui_make_setting_tile(
+            "appointment-soon-symbolic",
             "Show seconds",
             "Show seconds or the closest finer unit.",
             GTK_WIDGET(state->show_seconds)));
@@ -478,7 +496,8 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         GTK_WIDGET(state->show_date), "setting-switch");
     gtk_box_append(
         GTK_BOX(presentation_card),
-        ss_linux_ui_make_setting_row(
+        ss_linux_ui_make_setting_tile(
+            "view-calendar-symbolic",
             "Panel date",
             "Show the date in the Cinnamon panel.",
             GTK_WIDGET(state->show_date)));
@@ -492,12 +511,14 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     gtk_widget_set_size_request(GTK_WIDGET(state->first_day), 180, -1);
     gtk_box_append(
         GTK_BOX(presentation_card),
-        ss_linux_ui_make_setting_row(
+        ss_linux_ui_make_setting_tile(
+            "go-first-symbolic",
             "First day of week",
             "Locale, Sunday or Monday.",
             GTK_WIDGET(state->first_day)));
 
     gtk_widget_add_css_class(system_card, "settings-card");
+    gtk_widget_add_css_class(system_card, "system-card");
     gtk_widget_set_size_request(system_card, 390, -1);
     gtk_box_append(
         GTK_BOX(system_card),
@@ -511,7 +532,8 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         GTK_WIDGET(state->network_time), "setting-switch");
     gtk_box_append(
         GTK_BOX(system_card),
-        ss_linux_ui_make_setting_row(
+        ss_linux_ui_make_setting_tile(
+            "network-transmit-receive-symbolic",
             "Network time",
             "Synchronise automatically with the system service.",
             GTK_WIDGET(state->network_time)));

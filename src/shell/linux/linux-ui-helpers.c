@@ -51,3 +51,35 @@ GtkWidget *ss_linux_ui_make_setting_row(const char *title,
     gtk_box_append(GTK_BOX(row), control);
     return row;
 }
+
+GtkWidget *ss_linux_ui_make_setting_tile(const char *icon_name,
+                                         const char *title,
+                                         const char *description,
+                                         GtkWidget *control)
+{
+    GtkWidget *tile;
+    GtkWidget *icon_wrap;
+    GtkWidget *icon;
+
+    if (control == NULL) {
+        return NULL;
+    }
+
+    tile = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 13);
+    icon_wrap = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    icon = gtk_image_new_from_icon_name(icon_name);
+
+    gtk_widget_add_css_class(tile, "setting-tile");
+    gtk_widget_add_css_class(icon_wrap, "setting-tile-icon");
+    gtk_image_set_pixel_size(GTK_IMAGE(icon), 19);
+    gtk_box_append(GTK_BOX(icon_wrap), icon);
+    gtk_box_append(GTK_BOX(tile), icon_wrap);
+    gtk_box_append(
+        GTK_BOX(tile),
+        make_setting_identity(title, description));
+    gtk_widget_set_hexpand(tile, TRUE);
+    gtk_widget_set_valign(control, GTK_ALIGN_CENTER);
+    gtk_widget_set_halign(control, GTK_ALIGN_END);
+    gtk_box_append(GTK_BOX(tile), control);
+    return tile;
+}

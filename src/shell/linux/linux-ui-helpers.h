@@ -9,5 +9,9 @@ GtkWidget *ss_linux_ui_make_label(const char *text,
 GtkWidget *ss_linux_ui_make_setting_row(const char *title,
                                         const char *description,
                                         GtkWidget *control);
+GtkWidget *ss_linux_ui_make_setting_tile(const char *icon_name,
+                                         const char *title,
+                                         const char *description,
+                                         GtkWidget *control);
 
 #endif

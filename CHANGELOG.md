@@ -2,6 +2,18 @@
 
 # Changelog
 
+## 0.4.13 — 2026-09-25 — icon-led control surface polish
+
+- Replace the remaining text-form setting rows with icon-led visual control
+  tiles while retaining the same live GTK controls and backend behaviour.
+- Give locality, clock presentation and system-clock cards distinct accent
+  identities so the page reads as a graphical control surface rather than a
+  long administrative form.
+- Promote manual date/time editing into the same visual tile language.
+- Increase hover, border and icon feedback across real editable controls.
+- Preserve all existing setting semantics, persistence and operating-system
+  authority boundaries.
+
 ## 0.4.12 — 2026-09-25 — graphical system snapshot polish
 
 - Make the Date & Time hero substantially more graphical by adding a live
