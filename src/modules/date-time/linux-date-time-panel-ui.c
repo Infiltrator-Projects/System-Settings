@@ -112,7 +112,7 @@ static GtkWidget *make_section_heading(const char *icon_name,
 
     gtk_widget_add_css_class(heading, "section-heading");
     gtk_widget_add_css_class(icon_wrap, "section-icon-wrap");
-    gtk_image_set_pixel_size(GTK_IMAGE(icon), 18);
+    gtk_image_set_pixel_size(GTK_IMAGE(icon), 22);
     gtk_box_append(GTK_BOX(icon_wrap), icon);
     gtk_box_append(GTK_BOX(heading), icon_wrap);
     gtk_box_append(
@@ -159,10 +159,23 @@ static GtkWidget *make_manual_setting_block(
 GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
 {
     GtkWidget *page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 18);
+    GtkWidget *page_header = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 14);
+    GtkWidget *page_icon_wrap = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    GtkWidget *page_icon = gtk_image_new_from_icon_name(
+        "preferences-system-time-symbolic");
+    GtkWidget *page_copy = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
     GtkWidget *summary = ss_linux_ui_make_label(
         "Clock, calendar, location and system time — live, visual and immediate.",
         "page-summary");
-    GtkWidget *hero_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 3);
+    GtkWidget *hero_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+    GtkWidget *hero_top = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 16);
+    GtkWidget *hero_copy = gtk_box_new(GTK_ORIENTATION_VERTICAL, 3);
+    GtkWidget *hero_badge = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 7);
+    GtkWidget *hero_badge_icon = gtk_image_new_from_icon_name(
+        "media-playback-start-symbolic");
+    GtkWidget *location_strip = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+    GtkWidget *location_strip_icon = gtk_image_new_from_icon_name(
+        "mark-location-symbolic");
     GtkWidget *location_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
     GtkWidget *presentation_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
     GtkWidget *system_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
@@ -176,15 +189,23 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     gtk_widget_add_css_class(page, "settings-content");
     gtk_widget_set_hexpand(page, TRUE);
 
+    gtk_widget_add_css_class(page_header, "page-header");
+    gtk_widget_add_css_class(page_icon_wrap, "page-icon");
+    gtk_image_set_pixel_size(GTK_IMAGE(page_icon), 28);
+    gtk_box_append(GTK_BOX(page_icon_wrap), page_icon);
+    gtk_box_append(GTK_BOX(page_header), page_icon_wrap);
+    gtk_widget_set_hexpand(page_copy, TRUE);
     gtk_box_append(
-        GTK_BOX(page),
+        GTK_BOX(page_copy),
         ss_linux_ui_make_label("SYSTEM / DATE & TIME", "page-eyebrow"));
     gtk_box_append(
-        GTK_BOX(page),
+        GTK_BOX(page_copy),
         ss_linux_ui_make_label("Date & Time", "page-title"));
     gtk_label_set_wrap(GTK_LABEL(summary), TRUE);
     gtk_label_set_max_width_chars(GTK_LABEL(summary), 92);
-    gtk_box_append(GTK_BOX(page), summary);
+    gtk_box_append(GTK_BOX(page_copy), summary);
+    gtk_box_append(GTK_BOX(page_header), page_copy);
+    gtk_box_append(GTK_BOX(page), page_header);
 
     /*
      * One dominant preview gives the page a visual anchor. Everything below
@@ -192,19 +213,33 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
      * prominent coloured cards.
      */
     gtk_widget_add_css_class(hero_card, "hero-card");
+    gtk_widget_add_css_class(hero_top, "hero-top");
+    gtk_widget_set_hexpand(hero_copy, TRUE);
     gtk_box_append(
-        GTK_BOX(hero_card),
+        GTK_BOX(hero_copy),
         ss_linux_ui_make_label("LIVE PRESENTATION", "hero-kicker"));
     state->clock_preview = ss_linux_ui_make_label("--:--", "preview-time");
     state->date_preview = ss_linux_ui_make_label("", "preview-date");
     gtk_label_set_wrap(GTK_LABEL(state->clock_preview), TRUE);
     gtk_label_set_wrap(GTK_LABEL(state->date_preview), TRUE);
-    gtk_box_append(GTK_BOX(hero_card), state->clock_preview);
-    gtk_box_append(GTK_BOX(hero_card), state->date_preview);
+    gtk_box_append(GTK_BOX(hero_copy), state->clock_preview);
+    gtk_box_append(GTK_BOX(hero_copy), state->date_preview);
+    gtk_box_append(GTK_BOX(hero_top), hero_copy);
+
+    gtk_widget_add_css_class(hero_badge, "hero-badge");
+    gtk_image_set_pixel_size(GTK_IMAGE(hero_badge_icon), 13);
+    gtk_box_append(GTK_BOX(hero_badge), hero_badge_icon);
+    gtk_box_append(
+        GTK_BOX(hero_badge),
+        ss_linux_ui_make_label("LIVE", "hero-badge-label"));
+    gtk_widget_set_valign(hero_badge, GTK_ALIGN_START);
+    gtk_box_append(GTK_BOX(hero_top), hero_badge);
+    gtk_box_append(GTK_BOX(hero_card), hero_top);
+
     gtk_box_append(
         GTK_BOX(hero_card),
         ss_linux_ui_make_label(
-            "Live preview — presentation changes appear here immediately.",
+            "Presentation changes appear here immediately.",
             "hero-note"));
     gtk_box_append(GTK_BOX(page), hero_card);
 
@@ -220,9 +255,14 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
             "Location & time zone",
             "Locality, time zone and coordinates."));
 
+    gtk_widget_add_css_class(location_strip, "info-strip");
+    gtk_image_set_pixel_size(GTK_IMAGE(location_strip_icon), 14);
+    gtk_box_append(GTK_BOX(location_strip), location_strip_icon);
     state->location_summary = ss_linux_ui_make_label("", "accent-note");
     gtk_label_set_wrap(GTK_LABEL(state->location_summary), TRUE);
-    gtk_box_append(GTK_BOX(location_card), state->location_summary);
+    gtk_widget_set_hexpand(state->location_summary, TRUE);
+    gtk_box_append(GTK_BOX(location_strip), state->location_summary);
+    gtk_box_append(GTK_BOX(location_card), location_strip);
 
     search_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
     state->location_search = GTK_ENTRY(gtk_entry_new());

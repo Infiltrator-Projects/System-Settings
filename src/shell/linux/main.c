@@ -266,7 +266,25 @@ static void install_common_theme(void)
         ".setting-row { border-radius: 10px; padding: 11px 12px; }\n"
         ".setting-row:hover { background: %s; }\n"
         ".setting-button, .setting-entry, .setting-dropdown, .setting-spin { min-height: 38px; }\n"
-        ".primary-button { box-shadow: 0 2px 10px rgba(0,0,0,0.18); }\n",
+        ".primary-button { box-shadow: 0 2px 10px rgba(0,0,0,0.18); }\n"
+        ".page-header { padding: 2px 2px 4px 2px; }\n"
+        ".page-icon { min-width: 54px; min-height: 54px; background: %s; border: 1px solid %s; border-radius: 15px; padding: 10px; }\n"
+        ".page-icon image { color: %s; }\n"
+        ".hero-top { min-height: 94px; }\n"
+        ".hero-badge { background: %s; border: 1px solid %s; border-radius: 999px; padding: 6px 10px; }\n"
+        ".hero-badge image, .hero-badge-label { color: %s; }\n"
+        ".hero-badge-label { font-size: 10px; font-weight: %u; letter-spacing: 0.10em; }\n"
+        ".info-strip { background: %s; border: 1px solid %s; border-radius: 10px; padding: 9px 11px; }\n"
+        ".info-strip image { color: %s; }\n"
+        ".status-ok { background: %s; border: 1px solid %s; border-radius: 9px; padding: 8px 10px; }\n"
+        ".error { background: %s; border: 1px solid %s; border-radius: 9px; padding: 8px 10px; }\n"
+        ".settings-card > .section-heading { padding-bottom: 6px; border-bottom: 1px solid %s; }\n",
+        card, border, warm,
+        selected, accent, warm, (unsigned int)type->ui_bold_weight,
+        surface, border, accent,
+        surface, status_border,
+        surface, fault,
+        border);
         panel, border,
         background, panel,
         panel, background,

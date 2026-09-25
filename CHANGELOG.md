@@ -2,6 +2,18 @@
 
 # Changelog
 
+## 0.4.11 — 2026-09-25 — second UI north-star polish
+
+- Replace the text-only page heading with a graphical Date & Time identity block.
+- Recompose the live preview into a stronger hero surface with an explicit live
+  state badge and clearer visual balance.
+- Turn locality state into an icon-led information strip instead of loose text.
+- Increase section-icon scale and reinforce section/card separation.
+- Style operational status and error messages as visible state surfaces rather
+  than incidental footer text.
+- Keep the pass presentation-only: no placeholder modules or fake controls were
+  added, and existing Date & Time behaviour remains unchanged.
+
 ## 0.4.10 — 2026-09-25 — first UI north-star polish
 
 - Apply the first working-program polish pass toward the committed UI north star
