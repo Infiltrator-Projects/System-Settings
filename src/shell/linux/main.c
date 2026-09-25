@@ -781,7 +781,7 @@ static GtkWidget *build_home_page(GtkWindow *parent, GtkStack *stack)
             "home-hero-subtitle"));
 
     gtk_widget_add_css_class(features, "home-feature-row");
-    gtk_widget_set_homogeneous(GTK_BOX(features), TRUE);
+    gtk_box_set_homogeneous(GTK_BOX(features), TRUE);
     gtk_box_append(
         GTK_BOX(features),
         make_feature("emblem-ok-symbolic", "Simple", "Easy to use"));
