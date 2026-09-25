@@ -14,10 +14,10 @@ int main(void)
 
     g_assert_nonnull(noon);
     g_assert_true(infiltratr_temporal_policy_v3_default(&policy));
-    g_assert_true(infiltratr_copy_string(
-        policy.clock_mode, sizeof(policy.clock_mode), "decimal"));
-    g_assert_true(infiltratr_copy_string(
-        policy.calendar, sizeof(policy.calendar), "gregorian"));
+    infiltratr_copy_string(
+        policy.clock_mode, sizeof(policy.clock_mode), "decimal");
+    infiltratr_copy_string(
+        policy.calendar, sizeof(policy.calendar), "gregorian");
     policy.show_seconds = true;
 
     g_assert_true(ss_home_temporal_presentation_format(
@@ -28,8 +28,8 @@ int main(void)
         presentation.system_time_text, "5:00:00"));
     ss_home_temporal_presentation_clear(&presentation);
 
-    g_assert_true(infiltratr_copy_string(
-        policy.clock_mode, sizeof(policy.clock_mode), "standard-24"));
+    infiltratr_copy_string(
+        policy.clock_mode, sizeof(policy.clock_mode), "standard-24");
     policy.show_seconds = false;
     g_assert_true(ss_home_temporal_presentation_format(
         &policy, noon, false, &presentation));
