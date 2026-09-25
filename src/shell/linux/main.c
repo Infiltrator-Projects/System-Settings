@@ -2007,7 +2007,8 @@ static GtkWidget *build_home_page(GtkStack *stack)
     gtk_box_append(GTK_BOX(date_meta), date_location);
     gtk_box_append(GTK_BOX(date_body), date_meta);
 
-    GtkWidget *date_scene = make_visual_panel(\n        "date-city.jpg", 190, 96, "date-scene");
+    GtkWidget *date_scene = make_visual_panel(
+        "date-city.jpg", 190, 96, "date-scene");
     gtk_widget_set_hexpand(date_scene, TRUE);
     gtk_widget_set_halign(date_scene, GTK_ALIGN_END);
     gtk_box_append(GTK_BOX(date_body), date_scene);
