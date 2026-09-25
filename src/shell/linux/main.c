@@ -230,10 +230,9 @@ static void install_common_theme(void)
         surface_hover);
 
     /*
-     * First north-star polish pass. These rules deliberately remain styling
-     * only: no placeholder settings or dead controls are introduced merely to
-     * imitate the concept image. The existing working Date & Time surface gets
-     * the stronger hierarchy, colour, geometry and visual confidence first.
+     * North-star polish layers presentation over Common's semantic palette.
+     * These rules remain styling only: no placeholder settings or dead
+     * controls are introduced merely to imitate the concept image.
      */
     g_string_append_printf(
         css,
@@ -279,12 +278,6 @@ static void install_common_theme(void)
         ".status-ok { background: %s; border: 1px solid %s; border-radius: 9px; padding: 8px 10px; }\n"
         ".error { background: %s; border: 1px solid %s; border-radius: 9px; padding: 8px 10px; }\n"
         ".settings-card > .section-heading { padding-bottom: 6px; border-bottom: 1px solid %s; }\n",
-        card, border, warm,
-        selected, accent, warm, (unsigned int)type->ui_bold_weight,
-        surface, border, accent,
-        surface, status_border,
-        surface, fault,
-        border);
         panel, border,
         background, panel,
         panel, background,
@@ -299,7 +292,13 @@ static void install_common_theme(void)
         warm,
         warm, surface,
         warm,
-        surface_hover);
+        surface_hover,
+        card, border, warm,
+        selected, accent, warm, (unsigned int)type->ui_bold_weight,
+        surface, border, accent,
+        surface, status_border,
+        surface, fault,
+        border);
 
     provider = gtk_css_provider_new();
 #if GTK_CHECK_VERSION(4, 12, 0)
