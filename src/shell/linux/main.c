@@ -9,6 +9,7 @@
 
 #include "linux-date-time-panel.h"
 #include "linux-ui-helpers.h"
+#include "home-temporal-presentation.h"
 
 #include "system-settings/project-info.h"
 #include "system-settings/location-metadata.h"
@@ -388,8 +389,8 @@ static void install_common_theme(void)
 
     g_string_append_printf(
         css,
-        ".home-feature-row { margin-top: 16px; }\n"
-        ".home-feature { background: %s; border: 1px solid %s; border-radius: 12px; padding: 10px 12px; }\n"
+        ".home-feature-row { margin-top: 10px; }\n"
+        ".home-feature { min-height: 44px; background: %s; border: 1px solid %s; border-radius: 12px; padding: 7px 12px; }\n"
         ".home-feature image { color: %s; }\n"
         ".home-feature-title { color: %s; font-weight: %u; }\n"
         ".home-feature-copy { color: %s; font-size: 10px; }\n"
@@ -545,7 +546,7 @@ static void install_common_theme(void)
         ".nav-row:selected .nav-icon-well { background: rgba(3,18,28,0.46); border-color: rgba(255,255,255,0.28); }\n"
         ".home-hero { min-height: 238px; padding: 0; border-color: #0b8fc4; }\n"
         ".hero-scene { min-height: 238px; }\n"
-        ".hero-copy-overlay { min-width: 560px; padding: 22px 26px; margin: 16px; border-radius: 17px; background: rgba(3,11,18,0.66); }\n"
+        ".hero-copy-overlay { min-width: 560px; padding: 16px 24px; margin: 14px; border-radius: 17px; background: rgba(3,11,18,0.66); }\n"
         ".hero-brand-overlay { margin: 18px; padding: 14px 18px; background: rgba(3,11,18,0.68); box-shadow: 0 0 28px rgba(0,183,255,0.15); }\n",
         surface, border);
 
@@ -1171,12 +1172,16 @@ static GtkWidget *make_feature(const char *icon_name,
                                const char *title,
                                const char *copy)
 {
-    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 9);
+    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
     GtkWidget *icon = gtk_image_new_from_icon_name(icon_name);
-    GtkWidget *text = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    GtkWidget *text = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
 
     gtk_widget_add_css_class(box, "home-feature");
-    gtk_image_set_pixel_size(GTK_IMAGE(icon), 24);
+    gtk_widget_set_hexpand(box, TRUE);
+    gtk_widget_set_halign(box, GTK_ALIGN_FILL);
+    gtk_widget_set_valign(icon, GTK_ALIGN_CENTER);
+    gtk_widget_set_valign(text, GTK_ALIGN_CENTER);
+    gtk_image_set_pixel_size(GTK_IMAGE(icon), 22);
     gtk_box_append(GTK_BOX(box), icon);
     gtk_box_append(
         GTK_BOX(text),
@@ -1671,7 +1676,7 @@ static GtkWidget *build_home_page(GtkStack *stack)
     GtkWidget *hero_brand = gtk_box_new(GTK_ORIENTATION_VERTICAL, 3);
     GtkWidget *hero_icon = gtk_image_new_from_icon_name(
         "video-display-symbolic");
-    GtkWidget *features = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 9);
+    GtkWidget *features = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
     GtkWidget *grid = gtk_grid_new();
     GtkWidget *overview = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
     GtkWidget *overview_heading = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 9);
@@ -1719,11 +1724,7 @@ static GtkWidget *build_home_page(GtkStack *stack)
     gboolean online = FALSE;
     gboolean metered = FALSE;
     GNetworkConnectivity connectivity = G_NETWORK_CONNECTIVITY_LOCAL;
-    g_autoptr(GDateTime) now = g_date_time_new_now_local();
-    g_autofree gchar *time_text =
-        now != NULL ? g_date_time_format(now, "%X") : g_strdup("Unknown");
-    g_autofree gchar *date_text =
-        now != NULL ? g_date_time_format(now, "%A, %e %B %Y") : g_strdup("");
+    SsHomeTemporalPresentation temporal = {0};
     g_autofree gchar *region_detail = NULL;
     g_autofree gchar *appearance_detail = NULL;
     g_autofree gchar *network_detail = NULL;
@@ -1744,8 +1745,11 @@ static GtkWidget *build_home_page(GtkStack *stack)
     g_autofree gchar *os_display = g_strdup_printf(
         "Infiltrator OS (%s)",
         os_name != NULL ? os_name : "Linux");
-    g_autofree gchar *system_time_display =
-        now != NULL ? g_date_time_format(now, "%a %e %b %Y  %X") : g_strdup("Unknown");
+    if (!ss_home_temporal_presentation_now(&temporal)) {
+        temporal.clock_text = g_strdup("Unknown");
+        temporal.date_text = g_strdup("");
+        temporal.system_time_text = g_strdup("Unknown");
+    }
 
     if (gtk_settings != NULL) {
         g_object_get(
@@ -1877,7 +1881,7 @@ static GtkWidget *build_home_page(GtkStack *stack)
     append_overview_row(
         GTK_GRID(overview_data), 5, "Uptime", uptime_text);
     append_overview_row(
-        GTK_GRID(overview_data), 6, "System time", system_time_display);
+        GTK_GRID(overview_data), 6, "System time", temporal.system_time_text);
     gtk_box_append(GTK_BOX(overview_body), overview_scene);
     gtk_widget_set_hexpand(overview_data, TRUE);
     gtk_box_append(GTK_BOX(overview_body), overview_data);
@@ -1973,10 +1977,10 @@ static GtkWidget *build_home_page(GtkStack *stack)
     GtkWidget *date_clock = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
     gtk_box_append(
         GTK_BOX(date_clock),
-        ss_linux_ui_make_label(time_text, "home-clock-value"));
+        ss_linux_ui_make_label(temporal.clock_text, "home-clock-value"));
     gtk_box_append(
         GTK_BOX(date_clock),
-        ss_linux_ui_make_label(date_text, "home-clock-date"));
+        ss_linux_ui_make_label(temporal.date_text, "home-clock-date"));
     gtk_box_append(GTK_BOX(date_body), date_clock);
 
     date_meta = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
@@ -2117,6 +2121,7 @@ static GtkWidget *build_home_page(GtkStack *stack)
         scroller);
 
     g_free(theme_name);
+    ss_home_temporal_presentation_clear(&temporal);
     return scroller;
 }
 

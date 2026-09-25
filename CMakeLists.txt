@@ -110,6 +110,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 
     add_library(system-settings-date-time-linux STATIC
         src/modules/date-time/calendar-preview-provider.c
+        src/modules/date-time/home-temporal-presentation.c
         src/modules/date-time/linux-date-time-panel.c
         src/modules/date-time/linux-date-time-panel-ui.c
         src/platform/linux/location-search.c)
@@ -239,6 +240,17 @@ if(BUILD_TESTING)
         else()
             message(WARNING "xvfb-run missing: linux-shell regression is not registered")
         endif()
+        add_executable(home-temporal-presentation-test
+            tests/home-temporal-presentation-test.c)
+        ss_configure(home-temporal-presentation-test)
+        target_include_directories(home-temporal-presentation-test PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/modules/date-time")
+        target_link_libraries(home-temporal-presentation-test PRIVATE
+            system-settings-date-time-linux system-settings-core
+            system-settings-platform InfiltratrCommon::Portable PkgConfig::GTK4)
+        add_test(NAME home-temporal-presentation
+            COMMAND home-temporal-presentation-test)
+
         add_executable(temporal-policy-store-test
             tests/temporal-policy-store-test.c)
         ss_configure(temporal-policy-store-test)

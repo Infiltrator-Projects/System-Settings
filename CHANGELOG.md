@@ -2,6 +2,24 @@
 
 # Changelog
 
+## 0.4.23 — 2026-09-25 — Home temporal policy and hero spacing polish
+
+- Route the Home dashboard clock, date and System Overview timestamp through
+  the Date & Time module's authoritative temporal-policy presentation bridge
+  instead of formatting them independently with GLib civil-time defaults.
+- Make French Republican decimal time and every other explicit Common clock
+  mode render on Home using the same system-wide policy selected in Date & Time,
+  including seconds and location-aware modes.
+- Make the Home date follow the selected calendar; Gregorian remains native
+  locale presentation while alternate calendars use the Calendar runtime
+  bridge with an explicit unavailable state rather than silently showing the
+  wrong chronology.
+- Tighten the Simple / Secure / Beautiful feature strip: reduce vertical
+  pressure in the hero, give all three cards equal fill behaviour, centre their
+  icon/text groups and regularise inter-card and internal spacing.
+- Add a deterministic regression test proving the Home presentation renders
+  French decimal noon as 5:00:00 and conventional 24-hour noon as 12:00.
+
 ## 0.4.22 — 2026-09-25 — uploaded raster assets wired correctly
 
 - Replace the temporary/generated JPEG and SVG placeholder artwork with the nine
