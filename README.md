@@ -14,6 +14,19 @@ The project takes the strongest part of the classic Amiga/Control Panel model â€
 **Shared foundation:** pinned Infiltratr Common 1.19.25  
 **Licence:** GPL-3.0-or-later
 
+## UI North Star
+
+The visual target for the next System Settings shell is documented in
+[UI Vision](docs/UI-VISION.md).
+
+![System Settings UI North Star](docs/design/system-settings-ui-north-star.webp)
+
+This reference is a direction, not a pixel-for-pixel specification. The target is
+a graphical, colourful, GUI-first desktop experience with strong visual hierarchy,
+rich previews, clear icon-led navigation, depth and personality. It deliberately
+moves away from a text-heavy administrative/control-panel appearance while
+preserving native accessibility, responsiveness and platform authority.
+
 ## Core idea
 
 System Settings is **one product, not one monolith**.
