@@ -548,7 +548,7 @@ static void install_common_theme(void)
         ".home-hero { min-height: 238px; padding: 0; border-color: #0b8fc4; }\n"
         ".hero-scene { min-height: 238px; }\n"
         ".hero-copy-overlay { min-width: 560px; padding: 16px 24px; margin: 14px; border-radius: 17px; background: rgba(3,11,18,0.66); }\n"
-        ".hero-brand-overlay { margin: 18px; padding: 14px 18px; background: rgba(3,11,18,0.68); box-shadow: 0 0 28px rgba(0,183,255,0.15); }\n",
+        ".hero-brand-overlay { margin: 18px; padding: 14px 18px; background: rgba(3,11,18,0.68); box-shadow: none; }\n",
         surface, border);
 
     g_string_append_printf(

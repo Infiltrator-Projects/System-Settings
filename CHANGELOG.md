@@ -2,6 +2,12 @@
 
 # Changelog
 
+## 0.4.26 — 2026-09-25 — remove hero logo halo
+
+- Remove the cyan outer glow from the top-right Infiltrator OS hero-brand panel.
+- Keep the dark translucent panel, artwork and border intact so the mark remains
+  crisp against the hero image without looking like a separate light source.
+
 ## 0.4.25 — 2026-09-25 — correct header control order
 
 - Correct the title-bar trailing controls to the conventional visual order:
