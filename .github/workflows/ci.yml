@@ -5,6 +5,7 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   build:
@@ -12,7 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os == 'ubuntu-latest' && (startsWith(github.event.head_commit.message, 'Release ') && 'ubuntu-latest' || 'linux-native') || matrix.os }}
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -21,7 +22,7 @@ jobs:
         if: runner.os == 'Linux' && runner.environment == 'github-hosted'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-4-dev libgeocode-glib-dev pkg-config
+          sudo apt-get install -y libgtk-4-dev libgeocode-glib-dev pkg-config xvfb dbus-x11
       - name: Verify self-hosted Linux UI dependencies
         if: runner.os == 'Linux' && runner.environment == 'self-hosted'
         shell: bash
@@ -31,11 +32,11 @@ jobs:
             command -v "$command_name" >/dev/null 2>&1 || exit 1
           done
           pkg-config --exists gtk4
-          pkg-config --exists geocode-glib-2.0 || pkg-config --exists geocode-glib-1.0
+          pkg-config --exists geocode-glib-2.0
       - name: Configure
         run: cmake -S . -B build -DBUILD_TESTING=ON -DSYSTEM_SETTINGS_WARNINGS_AS_ERRORS=ON
       - name: Build
-        run: cmake --build build --config Release --parallel
+        run: cmake --build build --config Release --parallel 2
       - name: Test
         run: ctest --test-dir build -C Release --output-on-failure
       - name: Build Debian package
@@ -74,7 +75,7 @@ jobs:
 
 
   sanitizers:
-    runs-on: ${{ startsWith(github.event.head_commit.message, 'Release ') && 'ubuntu-latest' || 'linux-native' }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
@@ -83,7 +84,7 @@ jobs:
         if: runner.environment == 'github-hosted'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-4-dev libgeocode-glib-dev pkg-config
+          sudo apt-get install -y libgtk-4-dev libgeocode-glib-dev pkg-config xvfb dbus-x11
       - name: Verify self-hosted sanitizer dependencies
         if: runner.environment == 'self-hosted'
         shell: bash
@@ -93,7 +94,7 @@ jobs:
             command -v "$command_name" >/dev/null 2>&1 || exit 1
           done
           pkg-config --exists gtk4
-          pkg-config --exists geocode-glib-2.0 || pkg-config --exists geocode-glib-1.0
+          pkg-config --exists geocode-glib-2.0
       - name: Configure ASan and UBSan
         run: |
           cmake -S . -B build-sanitized \
@@ -104,7 +105,7 @@ jobs:
             -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
             -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address,undefined"
       - name: Build sanitized targets
-        run: cmake --build build-sanitized --parallel
+        run: cmake --build build-sanitized --parallel "$(($(nproc)>1?$(nproc)-1:1))"
       - name: Test with sanitizers
         env:
           ASAN_OPTIONS: detect_leaks=0:halt_on_error=1

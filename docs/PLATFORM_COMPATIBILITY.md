@@ -2,6 +2,12 @@
 
 # Platform Compatibility
 
+> Implementation scope: the current product has one built-in Linux GTK4 Date &
+> Time panel and a portable policy CLI/store. Multi-module navigation, global
+> search, deep links, the public dynamic ABI and a Windows GUI remain design
+> requirements, not implemented capabilities. See [Roadmap](ROADMAP.md).
+
+
 System Settings is one product with platform-specific authority adapters. Linux Mint/Cinnamon and Windows are first-class targets; neither is treated as a later port of the other.
 
 The rule is simple: keep settings semantics platform-neutral, reuse the operating system's documented authority when it already owns the setting, add an Infiltrator policy only when the platform cannot represent the concept faithfully, and hand off to the native Settings UI when the platform exposes no safe writable API.

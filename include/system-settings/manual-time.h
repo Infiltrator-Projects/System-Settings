@@ -33,7 +33,10 @@ bool ss_manual_time_format(const char *clock_mode,
 
 /**
  * Parse one selected-clock representation into microseconds after local
- * midnight. The result is in [0, 86400000000).
+ * midnight. The result is in [0, 86400000000), unchanged on failure.
+ * Accept H:M[:S] with one or two ASCII digits per field, plus AM/PM
+ * (case-insensitive, optional separating spaces/tabs) in 12-hour mode.
+ * Signs, leading/trailing whitespace, oversized fields and garbage fail.
  */
 bool ss_manual_time_parse(const char *clock_mode,
                           bool desktop_use_24h,

@@ -3,7 +3,6 @@
 
 #include <infiltratr/core.h>
 #include <infiltratr/temporal.h>
-#include <stdio.h>
 #include <string.h>
 
 #define US_PER_SECOND INT64_C(1000000)
@@ -67,113 +66,84 @@ bool ss_manual_time_format(const char *clock_mode,
         NULL);
 }
 
-static bool parse_24_hour(const char *text, int64_t *microseconds_of_day)
+/* Each field has at most two ASCII digits: reject signs, whitespace,
+ * overflow-length numbers and suffix garbage before any arithmetic. */
+static bool parse_field(const char **cursor, int *value)
 {
-    int hour = 0;
-    int minute = 0;
-    int second = 0;
-    char trailing = '\0';
-
-    if (sscanf(text, "%d:%d:%d%c",
-               &hour, &minute, &second, &trailing) != 3) {
-        second = 0;
-        if (sscanf(text, "%d:%d%c",
-                   &hour, &minute, &trailing) != 2) {
-            return false;
-        }
+    const char *p = *cursor;
+    int number = 0;
+    unsigned int digits = 0U;
+    while (*p >= '0' && *p <= '9' && digits < 2U) {
+        number = number * 10 + (*p++ - '0');
+        ++digits;
     }
-
-    if (hour < 0 || hour > 23 ||
-        minute < 0 || minute > 59 ||
-        second < 0 || second > 59) {
+    if (digits == 0U || (*p >= '0' && *p <= '9')) {
         return false;
     }
+    *cursor = p;
+    *value = number;
+    return true;
+}
 
-    *microseconds_of_day =
-        ((int64_t)hour * INT64_C(3600) +
-         (int64_t)minute * INT64_C(60) +
-         (int64_t)second) * US_PER_SECOND;
+static bool parse_fields(const char **cursor, int *hour, int *minute, int *second)
+{
+    if (!parse_field(cursor, hour) || **cursor != ':') {
+        return false;
+    }
+    ++*cursor;
+    if (!parse_field(cursor, minute)) {
+        return false;
+    }
+    *second = 0;
+    if (**cursor == ':') {
+        ++*cursor;
+        return parse_field(cursor, second);
+    }
+    return true;
+}
+
+static bool parse_24_hour(const char *text, int64_t *microseconds_of_day)
+{
+    int hour, minute, second;
+    if (!parse_fields(&text, &hour, &minute, &second) || *text != '\0' ||
+        hour > 23 || minute > 59 || second > 59) {
+        return false;
+    }
+    *microseconds_of_day = ((int64_t)hour * 3600 + minute * 60 + second) * US_PER_SECOND;
     return true;
 }
 
 static bool parse_12_hour(const char *text, int64_t *microseconds_of_day)
 {
-    int hour = 0;
-    int minute = 0;
-    int second = 0;
-    char suffix[3] = {0};
-    char trailing = '\0';
-    int fields;
-
-    fields = sscanf(text, "%d:%d:%d %2s%c",
-                    &hour, &minute, &second, suffix, &trailing);
-    if (fields != 4) {
-        second = 0;
-        memset(suffix, 0, sizeof(suffix));
-        fields = sscanf(text, "%d:%d %2s%c",
-                        &hour, &minute, suffix, &trailing);
-        if (fields != 3) {
-            return false;
-        }
-    }
-
-    if (hour < 1 || hour > 12 ||
-        minute < 0 || minute > 59 ||
-        second < 0 || second > 59 ||
-        (!infiltratr_ascii_equal_ci(suffix, "AM") &&
-         !infiltratr_ascii_equal_ci(suffix, "PM"))) {
+    int hour, minute, second;
+    if (!parse_fields(&text, &hour, &minute, &second) ||
+        hour < 1 || hour > 12 || minute > 59 || second > 59) {
         return false;
     }
-
-    if (hour == 12) {
-        hour = 0;
+    while (*text == ' ' || *text == '\t') {
+        ++text;
     }
-    if (infiltratr_ascii_equal_ci(suffix, "PM")) {
+    if (!infiltratr_ascii_equal_ci(text, "AM") &&
+        !infiltratr_ascii_equal_ci(text, "PM")) {
+        return false;
+    }
+    hour %= 12;
+    if (infiltratr_ascii_equal_ci(text, "PM")) {
         hour += 12;
     }
-
-    *microseconds_of_day =
-        ((int64_t)hour * INT64_C(3600) +
-         (int64_t)minute * INT64_C(60) +
-         (int64_t)second) * US_PER_SECOND;
+    *microseconds_of_day = ((int64_t)hour * 3600 + minute * 60 + second) * US_PER_SECOND;
     return true;
 }
 
 static bool parse_decimal(const char *text, int64_t *microseconds_of_day)
 {
-    int hour = 0;
-    int minute = 0;
-    int second = 0;
-    char trailing = '\0';
-    int64_t decimal_seconds;
-
-    if (sscanf(text, "%d:%d:%d%c",
-               &hour, &minute, &second, &trailing) != 3) {
-        second = 0;
-        if (sscanf(text, "%d:%d%c",
-                   &hour, &minute, &trailing) != 2) {
-            return false;
-        }
-    }
-
-    if (hour < 0 || hour > 9 ||
-        minute < 0 || minute > 99 ||
-        second < 0 || second > 99) {
+    int hour, minute, second;
+    if (!parse_fields(&text, &hour, &minute, &second) || *text != '\0' || hour > 9) {
         return false;
     }
-
-    decimal_seconds =
-        (int64_t)hour * INT64_C(10000) +
-        (int64_t)minute * INT64_C(100) +
-        (int64_t)second;
-
-    /*
-     * One decimal second is exactly 0.864 SI seconds, so integer decimal
-     * seconds map exactly to microseconds with no floating-point rounding.
-     */
-    *microseconds_of_day = decimal_seconds * INT64_C(864000);
-    return *microseconds_of_day >= 0 &&
-           *microseconds_of_day < US_PER_DAY;
+    /* One decimal second is exactly 864000 microseconds; no rounding needed. */
+    *microseconds_of_day = ((int64_t)hour * 10000 + minute * 100 + second) * INT64_C(864000);
+    return *microseconds_of_day < US_PER_DAY;
 }
 
 bool ss_manual_time_parse(const char *clock_mode,

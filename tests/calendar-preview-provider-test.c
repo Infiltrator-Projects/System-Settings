@@ -54,6 +54,12 @@ int main(int argc, char **argv)
     g_free(date_text);
 
     ss_calendar_preview_provider_free(provider);
+    /* GLib retains static types after provider teardown. They must stay valid. */
+    GType fixture_type = g_type_from_name("SsPreviewFixtureObject");
+    CHECK(fixture_type != G_TYPE_INVALID);
+    GObject *retained_type_object = g_object_new(fixture_type, NULL);
+    CHECK(retained_type_object != NULL);
+    g_object_unref(retained_type_object);
 
     {
         g_autofree gchar *root = NULL;

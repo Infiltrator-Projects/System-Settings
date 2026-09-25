@@ -11,7 +11,7 @@
 
 static void load_cinnamon_defaults(InfiltratrTemporalPolicyV3 *policy)
 {
-    GSettings *settings = ss_cinnamon_interface_settings_new();
+    g_autoptr(GSettings) settings = ss_cinnamon_interface_settings_new();
     const char *mode;
 
     if (policy == NULL || settings == NULL)
@@ -24,13 +24,13 @@ static void load_cinnamon_defaults(InfiltratrTemporalPolicyV3 *policy)
                            mode);
     policy->show_seconds =
         g_settings_get_boolean(settings, "clock-show-seconds") != FALSE;
-    g_object_unref(settings);
+
 }
 
 static void mirror_cinnamon_compatibility(
     const InfiltratrTemporalPolicyV3 *policy)
 {
-    GSettings *settings = ss_cinnamon_interface_settings_new();
+    g_autoptr(GSettings) settings = ss_cinnamon_interface_settings_new();
     gboolean ok = TRUE;
 
     if (policy == NULL || settings == NULL)
@@ -52,7 +52,7 @@ static void mirror_cinnamon_compatibility(
 
     if (!ok)
         g_warning("Unable to mirror temporal compatibility settings to Cinnamon.");
-    g_object_unref(settings);
+
 }
 
 static bool platform_load(InfiltratrTemporalPolicyV3 *policy, bool *found)
@@ -62,6 +62,9 @@ static bool platform_load(InfiltratrTemporalPolicyV3 *policy, bool *found)
      * defaults, then seed the conventional clock/seconds values from Cinnamon.
      * Permission/I/O failures remain real failures rather than being hidden.
      */
+    if (policy == NULL || found == NULL) {
+        return false;
+    }
     const InfiltratrIoResult result =
         infiltratr_temporal_posix_policy_load(policy, found);
 

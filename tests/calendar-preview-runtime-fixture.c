@@ -67,12 +67,31 @@ char *calendar_plus_format_time(
     return mode == 1 ? g_strdup("@481") : g_strdup("");
 }
 
+/* A callback in the DSO proves that retaining only the GType name is unsafe
+ * if the module is unloaded after its provider is freed. */
+static void fixture_finalize(GObject *object)
+{
+    GObjectClass *parent = g_type_class_peek_parent(G_OBJECT_GET_CLASS(object));
+    parent->finalize(object);
+}
+
+static void fixture_class_init(gpointer klass, gpointer data)
+{
+    (void)data;
+    G_OBJECT_CLASS(klass)->finalize = fixture_finalize;
+}
+
 GObject *calendar_plus_calendar_system_new(const char *calendar_id)
 {
     if (calendar_id == NULL || strcmp(calendar_id, "positivist") != 0) {
         return NULL;
     }
-    return g_object_new(G_TYPE_OBJECT, NULL);
+    GType type = g_type_from_name("SsPreviewFixtureObject");
+    if (type == G_TYPE_INVALID) {
+        type = g_type_register_static_simple(G_TYPE_OBJECT, "SsPreviewFixtureObject",
+            sizeof(GObjectClass), fixture_class_init, sizeof(GObject), NULL, 0);
+    }
+    return g_object_new(type, NULL);
 }
 
 char *calendar_plus_calendar_system_format_date(

@@ -7,7 +7,9 @@
  * small stable C ABI at runtime and degrades per capability when Calendar is
  * absent or exposes only part of that ABI.
  */
+#define _GNU_SOURCE
 #include "calendar-preview-provider.h"
+#include <dlfcn.h>
 
 #include <infiltratr/dynlib.h>
 
@@ -160,6 +162,17 @@ static bool open_runtime(
         infiltratr_dynlib_close(&provider->library);
         return false;
     }
+    /* Calendar may register static GTypes whose class/vtable callbacks remain
+     * in GLib's process-wide registry after the last object is released.
+     * Pin the accepted Linux runtime; closing this provider still releases its
+     * own loader reference, but registered type code must remain executable. */
+    void *resident = dlopen(library_name, RTLD_NOW | RTLD_LOCAL | RTLD_NODELETE);
+    if (resident == NULL) {
+        reset_bindings(provider);
+        infiltratr_dynlib_close(&provider->library);
+        return false;
+    }
+    (void)dlclose(resident);
     return true;
 }
 

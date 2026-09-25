@@ -6,6 +6,19 @@
 #include <stdio.h>
 #include <string.h>
 
+/* A command is one transaction: validation must not publish early options
+ * when a later option is malformed. The staging store owns no external state. */
+static bool stage_load(InfiltratrTemporalPolicyV3 *policy, bool *found)
+{
+    *found = false;
+    return infiltratr_temporal_policy_v3_default(policy);
+}
+
+static bool stage_save(const InfiltratrTemporalPolicyV3 *policy)
+{
+    return policy != NULL;
+}
+
 static void print_usage(const char *program)
 {
     fprintf(stderr,
@@ -18,12 +31,15 @@ int main(int argc, char **argv)
 {
     SsDateTimeModel model;
     int index;
+    const SsTemporalPolicyStore *platform = ss_platform_temporal_policy_store();
+    static const SsTemporalPolicyStore staging = {stage_load, stage_save};
 
     if (!ss_date_time_model_init(&model, ss_platform_temporal_policy_store())) {
         fputs("Unable to load temporal presentation policy.\n", stderr);
         return 1;
     }
 
+    model.store = &staging;
     for (index = 1; index < argc; ++index) {
         if (strcmp(argv[index], "--clock") == 0 && index + 1 < argc) {
             if (!ss_date_time_model_set_clock_mode(&model, argv[++index])) {
@@ -79,6 +95,11 @@ int main(int argc, char **argv)
             print_usage(argv[0]);
             return 2;
         }
+    }
+
+    if (argc > 1 && !platform->save(&model.policy)) {
+        fputs("Unable to save temporal presentation policy.\n", stderr);
+        return 2;
     }
 
     printf("clock-mode=%s\n"

@@ -11,11 +11,8 @@
 #define TIMEDATE_PATH "/org/freedesktop/timedate1"
 #define TIMEDATE_IFACE "org.freedesktop.timedate1"
 
-/*
- * The panel owns SsSystemTimeService. In-flight calls borrow it; panel teardown
- * cancels its shared cancellable before freeing the service. UI request
- * generation checks prevent a late cancelled reply from publishing stale state.
- */
+/* All operations run on the initiating main context. Each outstanding call
+ * retains the service until its completion callback has returned. */
 typedef struct SsSystemTimeCall {
     SsSystemTimeService *service;
     SsSystemTimeCompletionCallback callback;
@@ -28,8 +25,10 @@ typedef struct SsSystemTimeNewCall {
 } SsSystemTimeNewCall;
 
 struct SsSystemTimeService {
+    unsigned int references;
     GDBusProxy *proxy;
     gulong properties_changed_id;
+    gulong owner_changed_id;
     SsSystemTimeChangedCallback changed_callback;
     gpointer changed_user_data;
 };
@@ -56,6 +55,8 @@ bool ss_system_time_service_read(
     SsSystemTimeState *state)
 {
     g_autoptr(GVariant) timezone = NULL;
+    g_autoptr(GVariant) ntp = NULL;
+    g_autofree char *owner = NULL;
     const char *timezone_text;
 
     if (state == NULL) {
@@ -67,6 +68,13 @@ bool ss_system_time_service_read(
         return false;
     }
 
+    owner = g_dbus_proxy_get_name_owner(service->proxy);
+    ntp = g_dbus_proxy_get_cached_property(service->proxy, "NTP");
+    if (owner == NULL || ntp == NULL ||
+        !g_variant_is_of_type(ntp, G_VARIANT_TYPE_BOOLEAN)) {
+        return false;
+    }
+
     timezone = g_dbus_proxy_get_cached_property(
         service->proxy, "Timezone");
     if (timezone == NULL ||
@@ -75,10 +83,11 @@ bool ss_system_time_service_read(
     }
 
     timezone_text = g_variant_get_string(timezone, NULL);
-    if (timezone_text == NULL ||
+    if (timezone_text == NULL || timezone_text[0] == '\0' ||
         g_strlcpy(state->timezone,
                   timezone_text,
                   sizeof(state->timezone)) >= sizeof(state->timezone)) {
+        memset(state, 0, sizeof(*state));
         return false;
     }
 
@@ -93,11 +102,11 @@ static void emit_changed(SsSystemTimeService *service)
 {
     SsSystemTimeState state;
 
-    if (service == NULL || service->changed_callback == NULL ||
-        !ss_system_time_service_read(service, &state)) {
+    if (service == NULL || service->changed_callback == NULL) {
         return;
     }
 
+    (void)ss_system_time_service_read(service, &state);
     service->changed_callback(
         service, &state, service->changed_user_data);
 }
@@ -111,7 +120,14 @@ static void on_properties_changed(
     emit_changed(user_data);
 }
 
-/* Take ownership of a newly created proxy and attach the one change signal. */
+static void on_owner_changed(GObject *proxy G_GNUC_UNUSED,
+                             GParamSpec *property G_GNUC_UNUSED,
+                             gpointer user_data)
+{
+    emit_changed(user_data);
+}
+
+/* Take ownership of a proxy and observe both properties and service ownership. */
 static SsSystemTimeService *service_from_proxy(GDBusProxy *proxy)
 {
     SsSystemTimeService *service;
@@ -121,12 +137,15 @@ static SsSystemTimeService *service_from_proxy(GDBusProxy *proxy)
     }
 
     service = g_new0(SsSystemTimeService, 1);
+    service->references = 1U;
     service->proxy = proxy;
     service->properties_changed_id = g_signal_connect(
         service->proxy,
         "g-properties-changed",
         G_CALLBACK(on_properties_changed),
         service);
+    service->owner_changed_id = g_signal_connect(
+        service->proxy, "notify::g-name-owner", G_CALLBACK(on_owner_changed), service);
     return service;
 }
 
@@ -180,9 +199,12 @@ void ss_system_time_service_new_async(
         call);
 }
 
-void ss_system_time_service_free(SsSystemTimeService *service)
+static void service_unref(SsSystemTimeService *service)
 {
     if (service == NULL) {
+        return;
+    }
+    if (--service->references != 0U) {
         return;
     }
     if (service->proxy != NULL &&
@@ -190,8 +212,21 @@ void ss_system_time_service_free(SsSystemTimeService *service)
         g_signal_handler_disconnect(
             service->proxy, service->properties_changed_id);
     }
+    if (service->owner_changed_id != 0U) {
+        g_signal_handler_disconnect(service->proxy, service->owner_changed_id);
+    }
     g_clear_object(&service->proxy);
     g_free(service);
+}
+
+void ss_system_time_service_free(SsSystemTimeService *service)
+{
+    if (service == NULL) {
+        return;
+    }
+    service->changed_callback = NULL;
+    service->changed_user_data = NULL;
+    service_unref(service);
 }
 
 void ss_system_time_service_set_changed_callback(
@@ -235,6 +270,7 @@ static void call_finished(GObject *source,
             error != NULL ? error->message : NULL,
             call->user_data);
     }
+    service_unref(call->service);
     g_free(call);
 }
 
@@ -251,6 +287,9 @@ static void begin_call(SsSystemTimeService *service,
                        gpointer user_data)
 {
     SsSystemTimeCall *call;
+    /* Own the floating parameters even when no proxy is available. */
+    g_autoptr(GVariant) owned_parameters = parameters != NULL
+        ? g_variant_ref_sink(parameters) : NULL;
 
     if (service == NULL || service->proxy == NULL ||
         method == NULL || parameters == NULL) {
@@ -263,6 +302,7 @@ static void begin_call(SsSystemTimeService *service,
     }
 
     call = g_new0(SsSystemTimeCall, 1);
+    ++service->references;
     call->service = service;
     call->callback = callback;
     call->user_data = user_data;
@@ -270,7 +310,7 @@ static void begin_call(SsSystemTimeService *service,
     g_dbus_proxy_call(
         service->proxy,
         method,
-        parameters,
+        owned_parameters,
         G_DBUS_CALL_FLAGS_NONE,
         -1,
         cancellable,

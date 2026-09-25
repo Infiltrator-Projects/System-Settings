@@ -9,6 +9,7 @@
 #include "system-settings/date-time-model.h"
 
 #include <infiltratr/core.h>
+#include <math.h>
 
 /*
  * Persist-before-publish is the central model invariant. A failed write must
@@ -18,8 +19,13 @@ static bool save_candidate(SsDateTimeModel *model,
                            const InfiltratrTemporalPolicyV3 *candidate)
 {
     if (model == NULL || candidate == NULL ||
-        model->store == NULL || model->store->save == NULL ||
-        !model->store->save(candidate)) {
+        model->store == NULL || model->store->save == NULL || model->saving) {
+        return false;
+    }
+    model->saving = true;
+    const bool saved = model->store->save(candidate);
+    model->saving = false;
+    if (!saved) {
         return false;
     }
     model->policy = *candidate;
@@ -37,6 +43,7 @@ bool ss_date_time_model_init(SsDateTimeModel *model,
     }
     model->store = store;
     model->persisted_policy_present = false;
+    model->saving = false;
     return ss_date_time_model_reload(model);
 }
 
@@ -45,7 +52,7 @@ bool ss_date_time_model_reload(SsDateTimeModel *model)
     InfiltratrTemporalPolicyV3 loaded;
     bool found = false;
 
-    if (model == NULL ||
+    if (model == NULL || model->store == NULL || model->store->load == NULL || model->saving ||
         !infiltratr_temporal_policy_v3_default(&loaded) ||
         !model->store->load(&loaded, &found)) {
         return false;
@@ -123,7 +130,7 @@ bool ss_date_time_model_set_location(SsDateTimeModel *model,
 {
     InfiltratrTemporalPolicyV3 candidate;
 
-    if (model == NULL ||
+    if (model == NULL || !isfinite(latitude) || !isfinite(longitude) ||
         latitude < -90.0 || latitude > 90.0 ||
         longitude < -180.0 || longitude > 180.0) {
         return false;

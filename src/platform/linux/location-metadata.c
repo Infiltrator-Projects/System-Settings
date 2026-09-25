@@ -13,6 +13,7 @@
 #include <glib/gstdio.h>
 
 #include <errno.h>
+#include <math.h>
 #include <string.h>
 
 /* Resolve through GLib's XDG configuration directory contract. */
@@ -26,8 +27,24 @@ static gchar *metadata_path(void)
         NULL);
 }
 
+/* Validate fixed arrays before passing them to NUL-terminated GLib APIs. */
+static bool metadata_valid(const SsLocationMetadata *value)
+{
+    return value != NULL && value->display_name[0] != '\0' &&
+        memchr(value->display_name, '\0', sizeof(value->display_name)) != NULL &&
+        memchr(value->country_code, '\0', sizeof(value->country_code)) != NULL &&
+        memchr(value->timezone_id, '\0', sizeof(value->timezone_id)) != NULL &&
+        g_utf8_validate(value->display_name, -1, NULL) &&
+        g_utf8_validate(value->country_code, -1, NULL) &&
+        g_utf8_validate(value->timezone_id, -1, NULL) &&
+        isfinite(value->latitude) && isfinite(value->longitude) &&
+        value->latitude >= -90.0 && value->latitude <= 90.0 &&
+        value->longitude >= -180.0 && value->longitude <= 180.0;
+}
+
 bool ss_location_metadata_load(SsLocationMetadata *metadata)
 {
+    SsLocationMetadata candidate = {0};
     g_autoptr(GKeyFile) key_file = NULL;
     g_autofree gchar *path = NULL;
     g_autofree gchar *name = NULL;
@@ -57,34 +74,40 @@ bool ss_location_metadata_load(SsLocationMetadata *metadata)
     timezone = g_key_file_get_string(
         key_file, "Location", "Timezone", NULL);
 
-    metadata->latitude = g_key_file_get_double(
+    candidate.latitude = g_key_file_get_double(
         key_file, "Location", "Latitude", &error);
     if (error != NULL) {
         return false;
     }
-    metadata->longitude = g_key_file_get_double(
+    candidate.longitude = g_key_file_get_double(
         key_file, "Location", "Longitude", &error);
     if (error != NULL) {
         return false;
     }
 
     if (name == NULL ||
-        g_strlcpy(metadata->display_name,
+        g_strlcpy(candidate.display_name,
                   name,
-                  sizeof(metadata->display_name)) >=
-            sizeof(metadata->display_name)) {
+                  sizeof(candidate.display_name)) >=
+            sizeof(candidate.display_name)) {
         return false;
     }
     if (country != NULL) {
-        (void)g_strlcpy(metadata->country_code,
-                        country,
-                        sizeof(metadata->country_code));
+        if (g_strlcpy(candidate.country_code, country,
+                      sizeof(candidate.country_code)) >= sizeof(candidate.country_code)) {
+            return false;
+        }
     }
     if (timezone != NULL) {
-        (void)g_strlcpy(metadata->timezone_id,
-                        timezone,
-                        sizeof(metadata->timezone_id));
+        if (g_strlcpy(candidate.timezone_id, timezone,
+                      sizeof(candidate.timezone_id)) >= sizeof(candidate.timezone_id)) {
+            return false;
+        }
     }
+    if (!metadata_valid(&candidate)) {
+        return false;
+    }
+    *metadata = candidate;
     return true;
 }
 
@@ -96,9 +119,7 @@ bool ss_location_metadata_save(const SsLocationMetadata *metadata)
     g_autofree gchar *directory = NULL;
     gsize length = 0U;
 
-    if (metadata == NULL || metadata->display_name[0] == '\0' ||
-        metadata->latitude < -90.0 || metadata->latitude > 90.0 ||
-        metadata->longitude < -180.0 || metadata->longitude > 180.0) {
+    if (!metadata_valid(metadata)) {
         return false;
     }
 

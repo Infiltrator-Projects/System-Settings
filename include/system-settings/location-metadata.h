@@ -27,7 +27,9 @@ typedef struct SsLocationMetadata {
 
 /**
  * Load ~/.config/infiltrator/system-settings/location.ini.
- * The output is cleared before parsing; false covers missing or malformed data.
+ * Honors XDG_CONFIG_HOME. The output stays cleared on failure; false covers
+ * missing, unreadable or malformed data. Coordinates must be finite/in range
+ * and all text must fit, be terminated and contain valid UTF-8.
  */
 bool ss_location_metadata_load(SsLocationMetadata *metadata);
 

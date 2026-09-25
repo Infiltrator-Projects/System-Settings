@@ -8,7 +8,7 @@ System Settings is a native cross-platform settings environment for Linux Mint/C
 
 The project takes the strongest part of the classic Amiga/Control Panel model — small focused preference tools with clear ownership — and combines it with the strongest part of a modern settings application — one consistent window, global search, deep links, shared navigation and predictable privilege handling.
 
-**Status:** Phase 1 usable build with a working Linux GTK4 shell and complete Date & Time temporal-authority panel; Linux/Windows policy persistence is implemented and Calendar consumes the shared policy  
+**Status:** Phase 1 in progress: Linux GTK4 Date & Time panel, portable model, and Linux/Windows policy persistence. Windows currently builds the policy CLI and tests, not a settings GUI. Dynamic modules, global search and deep links remain planned.
 **Primary targets:** Linux Mint/Cinnamon and Windows desktop  
 **Implementation:** native C/C++, using the strongest style for each component  
 **Shared foundation:** pinned Infiltratr Common 1.19.25  
@@ -18,7 +18,7 @@ The project takes the strongest part of the classic Amiga/Control Panel model �
 
 System Settings is **one product, not one monolith**.
 
-The user sees one application:
+The planned product presents one application:
 
 ```text
 System Settings
@@ -29,7 +29,7 @@ System Settings
 └── Security
 ```
 
-Internally, the shell discovers focused modules:
+The intended module structure is (only Date & Time is currently built in):
 
 ```text
 system-settings
@@ -71,13 +71,13 @@ System Settings should:
 
 ## Current implementation
 
-The first implementation slice is Date & Time. The repository now contains the shared semantic Date & Time model, Linux and Windows per-user temporal-policy stores, module metadata, tests, Linux/Windows CI, and the first native System Settings shell. On Linux the GTK4 shell presents a real Date & Time panel with a live clock/date preview, all 21 shared clock systems, all 30 calendar systems, seconds policy, geographic location and current time-zone display. Changes are saved immediately through the same model used by non-UI consumers.
+The first implementation slice is Date & Time. The repository now contains the shared semantic Date & Time model, Linux and Windows per-user temporal-policy stores, module metadata, tests, Linux/Windows CI, and the first native System Settings shell. On Linux the GTK4 shell presents a real Date & Time panel with a live clock/date preview, the clock and calendar catalogues from the exact pinned Common revision, seconds policy, geographic location and current time-zone display. Changes are saved immediately through the same model used by non-UI consumers.
 
 The current temporal policy is version 3 in Common 1.19.25. System Settings is the sole Infiltrator authority for the richer clock system, calendar system, seconds and geographic-location policy; Calendar does not maintain competing local choices. The policy is deliberately optional for consumers: the installed Linux package publishes a versioned `temporal-v3` provider capability marker, but consumers still remain on their native platform defaults until a valid Infiltrator policy has actually been saved. On Mint/Cinnamon this means the Calendar replacement continues to follow Cinnamon/locale temporal preferences until System Settings publishes an extended policy.
 
 ## User experience
 
-The default window is category-oriented rather than an undifferentiated scrolling list. The initial category model is:
+The current window has a Date & Time page and sidebar. The planned multi-module category model is:
 
 - **Appearance** — theme, fonts, desktop and visual behaviour;
 - **Hardware** — displays, sound, keyboard, mouse/touchpad, Bluetooth and printers;
@@ -89,7 +89,7 @@ These categories are navigation aids, not code boundaries. A module may expose s
 
 ### Search
 
-Search is a first-class interface, not a filter over panel names.
+Global search is a planned interface; it is not implemented in the current shell.
 
 A module can publish searchable entries down to individual settings:
 
@@ -100,7 +100,7 @@ A module can publish searchable entries down to individual settings:
 "font" → Appearance → Fonts
 ```
 
-Search results deep-link directly to the relevant panel and setting. Search metadata must be available without constructing every panel, so startup remains fast.
+Planned search results will deep-link directly to the relevant panel and setting. Search metadata must be available without constructing every panel, so startup remains fast.
 
 ### Direct invocation
 
@@ -287,7 +287,36 @@ Normal development stays on `main`. The project does not use long-lived feature 
 
 Documentation is part of the implementation contract. A feature is not complete when code exists but architecture, behaviour, validation or privilege semantics are undocumented.
 
-Published releases, once introduced, will be produced only from an exact verified `main` revision and their tags/assets will be treated as immutable.
+Published releases are produced only from an exact verified `main` revision and their tags/assets will be treated as immutable.
+
+## Build and validation
+
+On Debian/Ubuntu/Mint, install `cmake`, a C11 compiler, `pkg-config`,
+`libgtk-4-dev`, `libgeocode-glib-dev`, `xvfb` and `dbus-x11`.
+The Linux build requires GTK >= 4.6 and geocode-glib **2.0**; the 1.0 pkg-config
+interface is not an alternative. Initialise the exact Common submodule first:
+
+```sh
+git submodule update --init --recursive
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON
+cmake --build build --parallel "$(($(nproc)>1?$(nproc)-1:1))"
+ctest --test-dir build --output-on-failure
+```
+
+The shell test needs Xvfb and a working local socket facility; the timedated
+fixture creates a private D-Bus and never changes the host clock. On Windows,
+configure with CMake/Visual Studio and use `--config Release` for the build and
+`-C Release` for CTest. Windows currently provides `system-settings-time`, the
+portable tests and the Windows persistence test.
+
+`system-settings-time` without options prints the policy. Its supported options
+are `--clock MODE`, `--calendar ID`, `--seconds on|off`, `--location LAT LON` and
+`--clear-location`. One invocation validates all options before one persistent
+write; malformed later options leave the existing file unchanged. This CLI
+edits presentation preferences, not the protected operating-system clock.
+
+See [the September 2026 audit](docs/AUDIT-2026-09-25.md) for findings, coverage,
+validation evidence and remaining product gaps.
 
 ## Documentation map
 

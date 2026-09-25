@@ -2,6 +2,12 @@
 
 # Design
 
+> Implementation scope: the current product has one built-in Linux GTK4 Date &
+> Time panel and a portable policy CLI/store. Multi-module navigation, global
+> search, deep links, the public dynamic ABI and a Windows GUI remain design
+> requirements, not implemented capabilities. See [Roadmap](ROADMAP.md).
+
+
 System Settings should feel like one deliberate operating-system component on both Linux Mint/Cinnamon and Windows even though its implementation is modular.
 
 The design goal is not to imitate a particular release of Windows, macOS, AmigaOS or Linux Mint. Those systems are evidence. System Settings keeps the strongest useful patterns and rejects weaknesses that are consequences of their historical architecture.

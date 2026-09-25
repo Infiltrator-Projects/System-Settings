@@ -5,6 +5,7 @@
 #include <glib/gstdio.h>
 
 #include <stdio.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -64,6 +65,24 @@ int main(void)
         NULL);
     CHECK(g_file_test(expected_file, G_FILE_TEST_IS_REGULAR));
 
+    saved.latitude = NAN;
+    CHECK(!ss_location_metadata_save(&saved));
+    saved.latitude = -36.3949;
+    memset(saved.display_name, 'x', sizeof(saved.display_name));
+    CHECK(!ss_location_metadata_save(&saved));
+    static const char *const malformed[] = {
+        "[Location]\nName=Bad\nLatitude=nan\nLongitude=0\n",
+        "[Location]\nName=Bad\nLatitude=91\nLongitude=0\n",
+        "[Location]\nName=\nLatitude=0\nLongitude=0\n",
+        "[Location]\nName=Bad\nLatitude=0\nLongitude=inf\n",
+        "[Location]\nName=Bad\nCountryCode=TOOLONGCOUNTRY\nLatitude=0\nLongitude=0\n"
+    };
+    for (size_t i = 0; i < G_N_ELEMENTS(malformed); ++i) {
+        CHECK(g_file_set_contents(expected_file, malformed[i], -1, NULL));
+        CHECK(!ss_location_metadata_load(&loaded));
+        CHECK(loaded.display_name[0] == '\0');
+        CHECK(loaded.latitude == 0.0 && loaded.longitude == 0.0);
+    }
     CHECK(g_remove(expected_file) == 0);
     {
         g_autofree gchar *settings_dir = g_path_get_dirname(expected_file);

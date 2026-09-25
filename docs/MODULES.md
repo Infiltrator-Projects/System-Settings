@@ -2,6 +2,12 @@
 
 # Module Contract
 
+> Implementation scope: the current product has one built-in Linux GTK4 Date &
+> Time panel and a portable policy CLI/store. Multi-module navigation, global
+> search, deep links, the public dynamic ABI and a Windows GUI remain design
+> requirements, not implemented capabilities. See [Roadmap](ROADMAP.md).
+
+
 This document owns the first-party System Settings module model.
 
 The contract is intentionally small. A module must be able to describe itself without executing code, and the shell must be able to load the implementation lazily through a versioned ABI.

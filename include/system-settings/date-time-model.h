@@ -26,6 +26,8 @@ typedef struct SsDateTimeModel {
     const SsTemporalPolicyStore *store;
     /** Whether the current policy came from an explicit persisted document. */
     bool persisted_policy_present;
+    /** Reject synchronous re-entry from compatibility notifications during save. */
+    bool saving;
 } SsDateTimeModel;
 
 /**
@@ -61,7 +63,7 @@ bool ss_date_time_model_set_show_seconds(SsDateTimeModel *model,
 /**
  * Persist geographic presentation context transactionally.
  * Latitude/longitude are validated even when configured is false so malformed
- * coordinates never enter the versioned policy.
+ * coordinates never enter the versioned policy. NaN and infinities fail.
  */
 bool ss_date_time_model_set_location(SsDateTimeModel *model,
                                      bool configured,

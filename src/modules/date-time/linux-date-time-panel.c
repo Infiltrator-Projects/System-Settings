@@ -305,7 +305,8 @@ static void fill_manual_time_entries(SsLinuxDateTimePanel *state)
     }
 
     date = g_date_time_format(now, "%Y-%m-%d");
-    unix_microseconds = g_get_real_time();
+    unix_microseconds = g_date_time_to_unix(now) * G_USEC_PER_SEC +
+        g_date_time_get_microsecond(now);
     offset_microseconds = g_date_time_get_utc_offset(now);
 
     if (date != NULL) {
@@ -362,6 +363,12 @@ static void sync_system_time_controls(SsLinuxDateTimePanel *state)
     if (state->timezone != NULL) {
         zone_index = timezone_index_for_id(
             state, system_state.timezone);
+        if (zone_index == GTK_INVALID_LIST_POSITION) {
+            GtkStringList *strings = GTK_STRING_LIST(gtk_drop_down_get_model(state->timezone));
+            g_ptr_array_add(state->timezone_ids, g_strdup(system_state.timezone));
+            gtk_string_list_append(strings, system_state.timezone);
+            zone_index = state->timezone_ids->len - 1U;
+        }
         if (zone_index != GTK_INVALID_LIST_POSITION) {
             gtk_drop_down_set_selected(
                 state->timezone, zone_index);
@@ -585,7 +592,8 @@ static bool format_preview(SsLinuxDateTimePanel *state,
                    mode->name) > 0;
     }
 
-    unix_us = g_get_real_time();
+    unix_us = g_date_time_to_unix(now) * G_USEC_PER_SEC +
+        g_date_time_get_microsecond(now);
     offset_us = g_date_time_get_utc_offset(now);
     return infiltratr_temporal_format_clock_mode(
         effective_mode,
@@ -730,7 +738,7 @@ static void on_cinnamon_interface_changed(
     bool native_value = false;
     bool changed = false;
 
-    if (state == NULL || key == NULL) {
+    if (state == NULL || key == NULL || state->updating_controls || state->model.saving) {
         return;
     }
 
@@ -869,6 +877,11 @@ static void system_time_changed(
         return;
     }
 
+    if (!system_state->available) {
+        sync_system_time_controls(state);
+        set_status(state, "The operating-system date/time service is unavailable.", true);
+        return;
+    }
     (void)ss_regional_context_detect(&state->regional_context);
 
     if (state->location_metadata_present &&
@@ -885,9 +898,9 @@ static void system_time_changed(
 
     if (state->location_follows_timezone_reference &&
         state->regional_context.has_reference_coordinates) {
-        if (ss_date_time_model_set_location(
-                &state->model,
-                true,
+        const InfiltratrTemporalPolicyV3 *policy = ss_date_time_model_policy(&state->model);
+        if (!policy->location_configured || ss_date_time_model_set_location(
+                &state->model, true,
                 state->regional_context.reference_latitude,
                 state->regional_context.reference_longitude)) {
             state->updating_controls = true;
@@ -1084,8 +1097,10 @@ static bool parse_manual_datetime(
     if (state == NULL || date_text == NULL || time_text == NULL ||
         unix_time_usec == NULL ||
         !manual_representation_supported(state) ||
+        strlen(date_text) != 10U || date_text[4] != '-' || date_text[7] != '-' ||
+        strspn(date_text, "0123456789-") != 10U ||
         sscanf(date_text,
-               "%d-%d-%d%c",
+               "%4d-%2d-%2d%c",
                &year, &month, &day, &trailing) != 3) {
         return false;
     }
@@ -1116,7 +1131,13 @@ static bool parse_manual_datetime(
 
     value = g_date_time_new_local(
         year, month, day, hour, minute, seconds);
-    if (value == NULL) {
+    /* GLib normalises nonexistent DST wall times. A protected clock write
+     * must reject that adjustment instead of setting a different time. Folds
+     * follow GLib's documented standard-time choice. */
+    if (value == NULL || g_date_time_get_year(value) != year ||
+        g_date_time_get_month(value) != month || g_date_time_get_day_of_month(value) != day ||
+        g_date_time_get_hour(value) != hour || g_date_time_get_minute(value) != minute ||
+        g_date_time_get_second(value) != (int)(whole_seconds % 60)) {
         return false;
     }
     *unix_time_usec =
@@ -1535,6 +1556,12 @@ static void system_time_service_ready(
         system_time_changed,
         state);
     sync_system_time_controls(state);
+    SsSystemTimeState initial;
+    if (!ss_system_time_service_read(service, &initial)) {
+        set_status(state, "The operating-system date/time service is unavailable.", true);
+        g_object_unref(window);
+        return;
+    }
     set_status(
         state,
         state->model.persisted_policy_present
@@ -1559,6 +1586,12 @@ static bool migrate_legacy_native_clock(
         return true;
     }
 
+    if (!state->model.persisted_policy_present) {
+        infiltratr_copy_string(state->model.policy.clock_mode,
+            sizeof(state->model.policy.clock_mode),
+            ss_native_clock_mode_id(desktop_uses_24h(state)));
+        return true;
+    }
     return ss_date_time_model_set_clock_mode(
         &state->model,
         ss_native_clock_mode_id(desktop_uses_24h(state)));
@@ -1619,8 +1652,14 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
     }
 
     legacy_migration_ok = migrate_legacy_native_clock(state);
-    state->root = ss_linux_date_time_panel_build_ui(state);
+    state->root = g_object_ref_sink(ss_linux_date_time_panel_build_ui(state));
 
+    gtk_widget_set_sensitive(GTK_WIDGET(state->show_date),
+        state->cinnamon_interface_settings != NULL &&
+        ss_cinnamon_interface_has_key("clock-show-date"));
+    gtk_widget_set_sensitive(GTK_WIDGET(state->first_day),
+        state->cinnamon_interface_settings != NULL &&
+        ss_cinnamon_interface_has_key("first-day-of-week"));
     sync_controls(state);
     if (!legacy_migration_ok) {
         set_status(
@@ -1656,6 +1695,16 @@ GtkWidget *ss_linux_date_time_panel_widget(
     return panel != NULL ? panel->root : NULL;
 }
 
+/* Detach every module signal before releasing widgets retained by the host. */
+static void disconnect_panel_widgets(GtkWidget *widget, gpointer state)
+{
+    for (GtkWidget *child = gtk_widget_get_first_child(widget); child != NULL;
+         child = gtk_widget_get_next_sibling(child)) {
+        disconnect_panel_widgets(child, state);
+    }
+    g_signal_handlers_disconnect_by_data(widget, state);
+}
+
 void ss_linux_date_time_panel_free(gpointer data)
 {
     SsLinuxDateTimePanel *state = data;
@@ -1689,5 +1738,9 @@ void ss_linux_date_time_panel_free(gpointer data)
     ss_system_time_service_free(state->system_time_service);
     state->system_time_service = NULL;
     g_clear_object(&state->cinnamon_interface_settings);
+    if (state->root != NULL) {
+        disconnect_panel_widgets(state->root, state);
+        g_clear_object(&state->root);
+    }
     g_free(state);
 }

@@ -54,6 +54,11 @@ bool ss_regional_context_city_name(const char *timezone_id,
 GPtrArray *ss_regional_context_list_timezones(
     const char *current_timezone_id);
 
+/** Parse one catalogue; malformed rows are skipped and UTC is always present.
+ * Returns a caller-owned string array. An explicit path permits fixture tests. */
+GPtrArray *ss_regional_context_list_timezones_from_file(
+    const char *zone_tab_path, const char *current_timezone_id);
+
 /**
  * Find the nearest representative IANA zone within a country.
  *

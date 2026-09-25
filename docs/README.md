@@ -16,6 +16,7 @@ This directory is the maintained engineering map for System Settings. Each docum
 - [DECISIONS.md](DECISIONS.md) — durable architectural decision records and their consequences.
 - [ROADMAP.md](ROADMAP.md) — ordered implementation direction; not a promise of dates.
 - [VALIDATION.md](VALIDATION.md) — evidence required before behaviour is described as working.
+- [AUDIT-2026-09-25.md](AUDIT-2026-09-25.md) — dated audit findings, verification and scope; not a substitute for the owning contracts.
 
 Repository-level [README.md](../README.md) is the product overview. [SECURITY.md](../SECURITY.md) owns vulnerability reporting and the privilege/trust model at a project level. [CONTRIBUTING.md](../CONTRIBUTING.md) owns development rules. [CHANGELOG.md](../CHANGELOG.md) records released/user-visible change history.
 

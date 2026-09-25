@@ -7,6 +7,7 @@
 
 #include <glib.h>
 
+#include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
@@ -398,7 +399,7 @@ bool ss_regional_context_nearest_timezone(
     size_t index;
 
     if (country_code == NULL || timezone_id == NULL ||
-        capacity == 0U ||
+        capacity == 0U || !isfinite(latitude) || !isfinite(longitude) ||
         latitude < -90.0 || latitude > 90.0 ||
         longitude < -180.0 || longitude > 180.0) {
         return false;
@@ -424,13 +425,10 @@ static gint timezone_compare(gconstpointer left, gconstpointer right)
     return g_strcmp0(*left_text, *right_text);
 }
 
-GPtrArray *ss_regional_context_list_timezones(
-    const char *current_timezone_id)
+GPtrArray *ss_regional_context_list_timezones_from_file(
+    const char *zone_tab_path, const char *current_timezone_id)
 {
-    static const char *const paths[] = {
-        "/usr/share/zoneinfo/zone.tab",
-        "/usr/share/zoneinfo/zone1970.tab"
-    };
+    const char *const paths[] = {zone_tab_path};
     GPtrArray *zones =
         g_ptr_array_new_with_free_func(g_free);
     GHashTable *seen =
@@ -447,7 +445,7 @@ GPtrArray *ss_regional_context_list_timezones(
         gchar **lines = NULL;
         size_t line_index;
 
-        if (!g_file_get_contents(
+        if (paths[path_index] == NULL || !g_file_get_contents(
                 paths[path_index], &contents, NULL, NULL)) {
             continue;
         }
@@ -465,7 +463,8 @@ GPtrArray *ss_regional_context_list_timezones(
             }
 
             fields = g_strsplit(lines[line_index], "\t", 4);
-            if (fields[2] == NULL) {
+            /* g_strsplit allocates only through its first NULL sentinel. */
+            if (fields[0] == NULL || fields[1] == NULL || fields[2] == NULL) {
                 g_strfreev(fields);
                 continue;
             }
@@ -507,6 +506,28 @@ GPtrArray *ss_regional_context_list_timezones(
     return zones;
 }
 
+GPtrArray *ss_regional_context_list_timezones(const char *current_timezone_id)
+{
+    GPtrArray *zones = ss_regional_context_list_timezones_from_file(
+        "/usr/share/zoneinfo/zone.tab", NULL);
+    if (zones->len == 1U) {
+        g_ptr_array_unref(zones);
+        return ss_regional_context_list_timezones_from_file(
+            "/usr/share/zoneinfo/zone1970.tab", current_timezone_id);
+    }
+    if (current_timezone_id != NULL && timezone_id_valid(current_timezone_id)) {
+        bool found = false;
+        for (guint i = 0U; i < zones->len; ++i) {
+            found = found || g_strcmp0(g_ptr_array_index(zones, i), current_timezone_id) == 0;
+        }
+        if (!found) {
+            g_ptr_array_add(zones, g_strdup(current_timezone_id));
+            g_ptr_array_sort(zones, timezone_compare);
+        }
+    }
+    return zones;
+}
+
 bool ss_regional_context_detect(SsRegionalContext *context)
 {
     static const char *const zone_tables[] = {
@@ -521,14 +542,14 @@ bool ss_regional_context_detect(SsRegionalContext *context)
     memset(context, 0, sizeof(*context));
 
     /*
-     * Prefer the distribution's explicit /etc/timezone identity, then the
-     * canonical /etc/localtime symlink, then GLib's local-zone fallback. This
+     * Prefer the active /etc/localtime symlink over the legacy /etc/timezone
+     * file, which timedated need not update, then GLib's fallback. This
      * preserves a stable IANA identifier where the platform exposes one.
      */
-    if (!read_timezone_file(context->timezone_id,
-                            sizeof(context->timezone_id)) &&
-        !read_timezone_localtime_link(context->timezone_id,
+    if (!read_timezone_localtime_link(context->timezone_id,
                                       sizeof(context->timezone_id)) &&
+        !read_timezone_file(context->timezone_id,
+                            sizeof(context->timezone_id)) &&
         !read_timezone_glib(context->timezone_id,
                             sizeof(context->timezone_id))) {
         return false;

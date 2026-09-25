@@ -5,6 +5,7 @@
 #include <glib/gstdio.h>
 
 #include <stdio.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -91,6 +92,12 @@ int main(void)
         CHECK(strcmp(nearest, "Australia/Melbourne") == 0);
     }
 
+    CHECK(g_file_set_contents(path,
+        "broken\nAU\tshort\nAU\t-3749+14458\tAustralia/Melbourne\n", -1, NULL));
+    GPtrArray *parsed = ss_regional_context_list_timezones_from_file(path, "US/Eastern");
+    CHECK(parsed->len == 3U);
+    g_ptr_array_unref(parsed);
+    CHECK(!ss_regional_context_nearest_timezone("AU", NAN, 0, city, sizeof(city)));
     CHECK(g_remove(path) == 0);
     return 0;
 }

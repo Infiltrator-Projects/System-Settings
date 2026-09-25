@@ -119,7 +119,8 @@ bool ss_windows_temporal_policy_load_file(
     }
 
     text[read_count] = '\0';
-    if (!infiltratr_temporal_policy_v3_parse(text, policy)) {
+    if (memchr(text, '\0', read_count) != NULL ||
+        !infiltratr_temporal_policy_v3_parse(text, policy)) {
         if (!infiltratr_temporal_policy_v3_default(policy)) {
             goto done;
         }
@@ -139,7 +140,9 @@ bool ss_windows_temporal_policy_save_file(
     const wchar_t *path,
     const InfiltratrTemporalPolicyV3 *policy)
 {
+    static volatile LONG sequence;
     wchar_t *temporary = NULL;
+    bool temporary_owned = false;
     char text[SS_POLICY_CAPACITY];
     size_t length = 0U;
     size_t path_length;
@@ -154,19 +157,31 @@ bool ss_windows_temporal_policy_save_file(
     }
 
     path_length = wcslen(path);
-    temporary = (wchar_t *)calloc(path_length + 5U, sizeof(wchar_t));
+    temporary = (wchar_t *)calloc(path_length + 40U, sizeof(wchar_t));
     if (temporary == NULL) {
         return false;
     }
     memcpy(temporary, path, path_length * sizeof(wchar_t));
-    memcpy(temporary + path_length, L".tmp", 5U * sizeof(wchar_t));
 
-    /*
-     * Write and flush a sibling temporary file, then publish it with replace +
-     * write-through. The destination is never intentionally exposed partially.
-     */
-    file = CreateFileW(temporary, GENERIC_WRITE, 0U, NULL, CREATE_ALWAYS,
-                       FILE_ATTRIBUTE_NORMAL, NULL);
+    /* Each writer exclusively creates its own sibling. CREATE_ALWAYS on a
+     * shared .tmp name allowed another process to replace our staged bytes
+     * between close and rename. Last completed publication wins. */
+    for (unsigned int attempt = 0U; attempt < 32U; ++attempt) {
+        if (swprintf(temporary + path_length, 40U, L".%lu.%lu.tmp",
+                     (unsigned long)GetCurrentProcessId(),
+                     (unsigned long)(DWORD)InterlockedIncrement(&sequence)) < 0) {
+            goto done;
+        }
+        file = CreateFileW(temporary, GENERIC_WRITE, 0U, NULL, CREATE_NEW,
+                           FILE_ATTRIBUTE_NORMAL, NULL);
+        if (file != INVALID_HANDLE_VALUE) {
+            temporary_owned = true;
+            break;
+        }
+        if (GetLastError() != ERROR_FILE_EXISTS && GetLastError() != ERROR_ALREADY_EXISTS) {
+            goto done;
+        }
+    }
     if (file == INVALID_HANDLE_VALUE) {
         goto done;
     }
@@ -187,7 +202,7 @@ done:
     if (file != INVALID_HANDLE_VALUE) {
         CloseHandle(file);
     }
-    if (!ok && temporary != NULL) {
+    if (!ok && temporary_owned) {
         DeleteFileW(temporary);
     }
     free(temporary);

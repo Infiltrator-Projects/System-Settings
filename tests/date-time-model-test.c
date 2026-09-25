@@ -2,6 +2,7 @@
 #include "system-settings/date-time-model.h"
 
 #include <stdio.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -16,10 +17,13 @@
 
 static InfiltratrTemporalPolicyV3 persisted;
 static bool persisted_found;
+static bool fail_save;
+static bool fail_load;
+static SsDateTimeModel *reenter_model;
 
 static bool fake_load(InfiltratrTemporalPolicyV3 *policy, bool *found)
 {
-    if (policy == NULL || found == NULL)
+    if (policy == NULL || found == NULL || fail_load)
         return false;
     if (persisted_found)
         *policy = persisted;
@@ -31,8 +35,10 @@ static bool fake_load(InfiltratrTemporalPolicyV3 *policy, bool *found)
 
 static bool fake_save(const InfiltratrTemporalPolicyV3 *policy)
 {
-    if (policy == NULL)
+    if (policy == NULL || fail_save)
         return false;
+    if (reenter_model != NULL)
+        CHECK(!ss_date_time_model_set_show_seconds(reenter_model, false));
     persisted = *policy;
     persisted_found = true;
     return true;
@@ -77,5 +83,24 @@ int main(void)
 
     CHECK(!ss_date_time_model_set_clock_mode(&model, "system"));
     CHECK(!ss_date_time_model_set_calendar(&model, "none"));
+    SsDateTimeModel empty = {0};
+    CHECK(!ss_date_time_model_reload(&empty));
+    CHECK(!ss_date_time_model_reload(NULL));
+    const InfiltratrTemporalPolicyV3 before = model.policy;
+    CHECK(!ss_date_time_model_set_location(&model, true, NAN, 0.0));
+    CHECK(!ss_date_time_model_set_location(&model, false, 0.0, NAN));
+    CHECK(!ss_date_time_model_set_location(&model, true, INFINITY, 0.0));
+    fail_save = true;
+    CHECK(!ss_date_time_model_set_clock_mode(&model, "decimal"));
+    CHECK(memcmp(&model.policy, &before, sizeof(before)) == 0);
+    fail_save = false;
+    fail_load = true;
+    CHECK(!ss_date_time_model_reload(&model));
+    CHECK(memcmp(&model.policy, &before, sizeof(before)) == 0);
+    fail_load = false;
+    reenter_model = &model;
+    CHECK(ss_date_time_model_set_clock_mode(&model, "decimal"));
+    CHECK(model.policy.show_seconds);
+    CHECK(!model.saving);
     return 0;
 }

@@ -92,7 +92,7 @@ The replacement Date & Time module adds specific invariants:
   module instance;
 - closing the window cancels outstanding module work and removes periodic
   sources before module destruction;
-- specialised clock previews use Calendar's real runtime formatter rather than
+- every clock preview uses Common's clock-mode formatter rather than
   the catalogue display name;
 - non-Gregorian previews use Calendar's chronology formatter rather than
   relabelling the Gregorian date;
@@ -174,7 +174,8 @@ The Mint/Cinnamon Date & Time replacement is validated at separate evidence leve
 
 Automated builds/tests must prove:
 
-- the full IANA zone catalogue can be built from installed tzdata;
+- the representative IANA zone catalogue can be built from installed tzdata,
+  with UTC and the current alias retained; it is not a list of every tzdata alias;
 - regional coordinate parsing remains bounded and deterministic;
 - Linux builds link the maintained geocode-glib API and package its runtime dependency;
 - Windows remains buildable even though Linux-native timedated/geocoding UI is not compiled there;
@@ -207,7 +208,7 @@ For backends that provide notifications:
 
 ## Sanitizers and static quality
 
-Current CI enforces strict compiler warnings on Linux and Windows and runs
+Current CI uses GNU/Clang strict warnings or MSVC `/W4 /WX`, and runs
 the Linux test suite under ASan and UBSan. The maintained hardening list is:
 
 - strict compiler warnings;
@@ -256,3 +257,23 @@ A release commit must:
 - include only modules whose advertised read/write contracts meet their evidence requirements;
 - build release assets from the exact tested revision;
 - retain immutable published tags/assets, with later fixes advancing the version.
+
+## Implemented audit regressions (2026-09-25)
+
+CTest contains eleven project tests on Linux with Xvfb available. Added checks
+exercise private-bus service lifetime after caller release, actual shell
+activation/dropdown ownership/close with pending construction, and CLI
+transaction rollback on malformed arguments. Existing tests cover non-finite
+coordinates, malformed locality records, truncated zone rows, bounded time
+parsing, save/reload failure, synchronous model re-entry and Windows embedded
+NUL input. Tests use isolated files and a memory settings backend.
+
+Manual acceptance still includes real Mint polkit cancellation/denial, network
+geocoding, desktop theme changes, screen-reader interaction, DST fold choice
+and Windows concurrent writers. A passing fixture is not proof of those cases.
+Manual Gregorian time rejects GLib's normalisation of nonexistent DST wall
+times; repeated wall times use GLib's documented standard-time occurrence.
+
+The hosted CI jobs run while home runners are offline. Self-hosted runner use
+requires an explicit future routing change; a label alone provides no automatic
+fallback when a runner is offline.

@@ -90,6 +90,14 @@ int main(void)
     CHECK(strcmp(policy.clock_mode, "standard-24") == 0);
     CHECK(policy.show_seconds);
 
+    /* A valid prefix followed by an embedded NUL and garbage is malformed. */
+    char nul_document[sizeof(valid) + 4U];
+    memcpy(nul_document, valid, sizeof(valid));
+    memcpy(nul_document + sizeof(valid), "junk", 4U);
+    write_policy_file(policy_path, nul_document, sizeof(nul_document));
+    CHECK(ss_windows_temporal_policy_load_file(policy_path, &policy, &found));
+    CHECK(!found);
+
     CHECK(infiltratr_temporal_policy_v3_default(&policy));
     strcpy(policy.clock_mode, "standard-12");
     CHECK(ss_windows_temporal_policy_save_file(policy_path, &policy));

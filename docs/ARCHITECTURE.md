@@ -111,6 +111,8 @@ Linux shell
           v
 Date & Time module
   linux-date-time-panel.c
+    backend coordination and policy
+  linux-date-time-panel-ui.c
     GTK panel construction
     temporal-policy model
     locality search
@@ -134,39 +136,51 @@ prematurely freezing an ABI around GTK widgets.
 
 ### Specialised temporal preview provider
 
-System Settings owns the temporal **selection**, not every algorithm used to
-render that selection. Calendar remains the implementation owner for the
-specialised clock and chronology engines.
+System Settings owns the temporal selection. Common 1.19.25 renders every
+clock mode through `infiltratr_temporal_format_clock_mode()`. Gregorian dates
+use GLib's local date formatter. Non-Gregorian chronology previews use the
+optional `libcalendar-plus.so.0` runtime ABI.
 
-The Date & Time module therefore discovers Calendar's versioned runtime C ABI
-dynamically for preview rendering:
+The Calendar bridge still exposes a clock-format compatibility entry point and
+its fixture tests that ABI, but the current panel's clock preview uses Common.
+Without Calendar, non-Gregorian dates explicitly report preview unavailable;
+clock selection, clock rendering and persistence remain available.
 
-```text
-System Settings policy
-        |
-        +-- conventional 12/24 + decimal --> Common formatter
-        |
-        +-- Internet / Roman / sidereal / solar / ...
-        |       --> libcalendar-plus.so.0 formatter
-        |
-        +-- Gregorian date --> native local Gregorian presentation
-        |
-        +-- Positivist / Hebrew / Persian / ...
-                --> libcalendar-plus.so.0 chronology formatter
-```
+Discovery checks fixed library roots and their compile-time multiarch child,
+then normal loader soname resolution. It does not recursively scan directories
+or verify ownership of files reached through the dynamic loader. This optional
+runtime executes with ordinary user authority; it is not the future trusted
+module loader. Missing-runtime retries are throttled to five seconds. Accepted Linux runtimes
+remain resident because GLib retains registered static GType callbacks after
+provider teardown; replacing an already loaded runtime requires restarting the
+process. Each provider still releases its objects and loader reference.
 
-This is deliberately a presentation dependency rather than a policy
-dependency. If Calendar is absent, System Settings remains fully usable and can
-still save the selected policy; a specialised preview is shown as unavailable
-rather than reimplementing Calendar's algorithms or substituting a misleading
-label/Gregorian date.
+### Current lifecycle and persistence boundaries
 
-Runtime discovery is resilient but bounded. On Linux the module first checks
-trusted system library locations, including the build platform's Debian/Mint
-multiarch directory, then bounded root-owned library subdirectories, and only
-then falls back to normal loader soname resolution. Discovery is retried at a
-low frequency while the panel is alive so an installed/upgraded Calendar
-runtime can become available without restarting System Settings.
+The application presents its existing window on repeated activation. On close,
+the host removes its panel data before destroying widgets. Panel cleanup removes
+sources, cancels requests, disconnects widget callbacks and releases its retained
+root. Pending UI requests retain a window reference, look up the panel again and
+check their generation before touching it. A removed panel means the reply is
+ignored; cancellation alone is not a lifetime guarantee.
+
+Each timedated call separately retains the service until its completion callback
+returns. Releasing caller ownership detaches the state observer immediately.
+These operations and the model run on one main context, not arbitrary threads.
+A D-Bus error/cancellation completes unsuccessfully; cancelling a dispatched
+operation does not undo a change already accepted by the operating system.
+
+Model setters persist a candidate before publishing it. Synchronous re-entry
+from native compatibility notifications is rejected while saving. The CLI stages
+all options and performs one final store write. Linux compatibility mirroring is
+best-effort after policy publication: failure is logged and does not roll back
+the already committed policy. Locality metadata and temporal policy are separate
+files and are not one atomic multi-file transaction.
+
+Windows writes use exclusively created per-process/per-call sibling temporary
+files, flush before replacement, and clean up only their own temporary file.
+Concurrent whole-policy writes use last-completed-publication-wins semantics;
+they do not merge unrelated edits. Embedded NUL policy documents are malformed.
 
 ### Settings authority versus storage authority
 

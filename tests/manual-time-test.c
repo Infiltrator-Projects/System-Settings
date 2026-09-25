@@ -55,5 +55,19 @@ int main(void)
         text, sizeof(text)));
     CHECK(strcmp(text, "5:00:00") == 0);
 
+    static const char *const invalid[] = {
+        "", "1", ":20", "12:", "12:00:", "12:00:00junk", "+1:00", "-1:00",
+        "9999999999999999999999999999:00", "1:999999999999999999", "1:00:9999999999999",
+        "12:00\n", " 12:00", "12:00:60", "23:60", "24:00"
+    };
+    for (size_t i = 0; i < sizeof(invalid) / sizeof(invalid[0]); ++i) {
+        us = -17;
+        CHECK(!ss_manual_time_parse("standard-24", true, invalid[i], &us));
+        CHECK(us == -17);
+    }
+    CHECK(!ss_manual_time_parse("standard-12", false, "12:00 PMjunk", &us));
+    CHECK(!ss_manual_time_parse("standard-12", false, "0:00 AM", &us));
+    CHECK(ss_manual_time_parse("standard-12", false, "1:02 pm", &us));
+    CHECK(!ss_manual_time_parse("decimal", true, "1:100:00", &us));
     return 0;
 }

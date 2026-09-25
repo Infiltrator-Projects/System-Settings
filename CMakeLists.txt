@@ -37,6 +37,11 @@ function(ss_configure target)
         if(SYSTEM_SETTINGS_WARNINGS_AS_ERRORS)
             target_compile_options(${target} PRIVATE -Werror)
         endif()
+    elseif(MSVC)
+        target_compile_options(${target} PRIVATE /W4)
+        if(SYSTEM_SETTINGS_WARNINGS_AS_ERRORS)
+            target_compile_options(${target} PRIVATE /WX)
+        endif()
     endif()
 endfunction()
 
@@ -80,7 +85,7 @@ if(WIN32)
         src/platform/windows/temporal-policy-store.c)
     target_link_libraries(system-settings-platform
         PUBLIC InfiltratrCommon::Portable shell32 ole32)
-elseif(UNIX)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(GIO2 REQUIRED IMPORTED_TARGET gio-2.0)
     pkg_check_modules(GTK4 REQUIRED IMPORTED_TARGET gtk4>=4.6)
@@ -152,7 +157,7 @@ elseif(UNIX)
     install(FILES modules/date-time.settings-module
         DESTINATION "${CMAKE_INSTALL_DATADIR}/infiltrator/system-settings/modules")
 else()
-    message(FATAL_ERROR "System Settings currently supports Windows and POSIX/Linux.")
+    message(FATAL_ERROR "System Settings currently supports Windows policy tools and the Linux GUI.")
 endif()
 ss_configure(system-settings-platform)
 
@@ -197,12 +202,41 @@ if(BUILD_TESTING)
     endif()
 
     if(UNIX)
+        add_executable(system-time-service-test tests/system-time-service-test.c)
+        ss_configure(system-time-service-test)
+        target_link_libraries(system-time-service-test PRIVATE system-settings-platform)
+        add_test(NAME system-time-service COMMAND system-time-service-test)
+        set_tests_properties(system-time-service PROPERTIES TIMEOUT 15)
+
+        add_test(NAME cli-transaction COMMAND ${CMAKE_COMMAND}
+            -DCLI=$<TARGET_FILE:system-settings-time>
+            -DROOT=${CMAKE_CURRENT_BINARY_DIR}/cli-test-config
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/cli-transaction-test.cmake)
+        add_executable(linux-shell-test tests/linux-shell-test.c)
+        ss_configure(linux-shell-test)
+        target_include_directories(linux-shell-test PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/modules/date-time"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux")
+        target_link_libraries(linux-shell-test PRIVATE
+            system-settings-date-time-linux system-settings-linux-ui
+            system-settings-core system-settings-platform PkgConfig::GTK4)
+        find_program(SS_XVFB_RUN xvfb-run)
+        if(SS_XVFB_RUN)
+            add_test(NAME linux-shell COMMAND ${SS_XVFB_RUN} -a $<TARGET_FILE:linux-shell-test>)
+            set_tests_properties(linux-shell PROPERTIES TIMEOUT 30 ENVIRONMENT
+                "G_DEBUG=fatal-criticals;GTK_A11Y=none;GSK_RENDERER=cairo;GSETTINGS_BACKEND=memory")
+        else()
+            message(WARNING "xvfb-run missing: linux-shell regression is not registered")
+        endif()
         add_executable(temporal-policy-store-test
             tests/temporal-policy-store-test.c)
         ss_configure(temporal-policy-store-test)
         target_link_libraries(temporal-policy-store-test PRIVATE
             system-settings-platform)
         add_test(NAME temporal-policy-store COMMAND temporal-policy-store-test)
+        file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/empty-schemas")
+        set_tests_properties(temporal-policy-store PROPERTIES ENVIRONMENT
+            "GSETTINGS_BACKEND=memory;GSETTINGS_SCHEMA_DIR=${CMAKE_CURRENT_BINARY_DIR}/empty-schemas;XDG_DATA_DIRS=${CMAKE_CURRENT_BINARY_DIR}/empty-schemas")
 
         add_executable(regional-context-test
             tests/regional-context-test.c)

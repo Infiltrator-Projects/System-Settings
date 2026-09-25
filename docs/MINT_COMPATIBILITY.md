@@ -136,10 +136,10 @@ Example:
 Selected policy: decimal 10-hour clock
 
 Infiltrator policy:
-    decimal-10
+    decimal
 
 Common-aware applications:
-    decimal-10 presentation
+    decimal presentation
 
 Unmodified Cinnamon/Mint applications:
     conventional compatible fallback
@@ -206,15 +206,15 @@ Conceptually:
 
 ```text
 12-hour selected
-  Infiltrator temporal policy = conventional-12
+  Infiltrator temporal policy = standard-12
   Mint conventional setting   = 12-hour
 
 24-hour selected
-  Infiltrator temporal policy = conventional-24
+  Infiltrator temporal policy = standard-24
   Mint conventional setting   = 24-hour
 
 decimal 10-hour selected
-  Infiltrator temporal policy = decimal-10
+  Infiltrator temporal policy = decimal
   Mint conventional setting   = compatible conventional fallback
 ```
 

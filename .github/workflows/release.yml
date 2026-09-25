@@ -30,7 +30,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake libgtk-4-dev libgeocode-glib-dev pkg-config
+          sudo apt-get install -y cmake libgtk-4-dev libgeocode-glib-dev pkg-config xvfb dbus-x11
 
       - name: Verify release identity
         shell: bash
@@ -48,7 +48,7 @@ jobs:
         run: |
           cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON \
             -DSYSTEM_SETTINGS_BUILD_PROFILE=generic
-          cmake --build build --parallel
+          cmake --build build --parallel "$(($(nproc)>1?$(nproc)-1:1))"
           ctest --test-dir build --output-on-failure
           cd build
           cpack -G DEB

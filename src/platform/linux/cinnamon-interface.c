@@ -82,8 +82,8 @@ bool ss_cinnamon_interface_set_boolean(
     const char *key,
     bool value)
 {
-    if (settings == NULL || key == NULL ||
-        !ss_cinnamon_interface_has_key(key)) {
+    bool current;
+    if (!ss_cinnamon_interface_get_boolean(settings, key, &current)) {
         return false;
     }
     return g_settings_set_boolean(
@@ -114,9 +114,9 @@ bool ss_cinnamon_interface_set_first_day(
     GSettings *settings,
     int value)
 {
-    if (settings == NULL ||
-        (value != 7 && value != 0 && value != 1) ||
-        !ss_cinnamon_interface_has_key("first-day-of-week")) {
+    int current;
+    if ((value != 7 && value != 0 && value != 1) ||
+        !ss_cinnamon_interface_get_first_day(settings, &current)) {
         return false;
     }
     return g_settings_set_int(

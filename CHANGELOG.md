@@ -2,6 +2,22 @@
 
 # Changelog
 
+## Unreleased — forensic correctness and documentation audit
+
+- Fix GTK dropdown model ownership, repeated activation and close-time cleanup.
+- Keep timedated services alive through pending completions and report missing
+  service/property state without enabling manual writes on an unknown NTP state.
+- Reject non-finite coordinates, malformed locality metadata, oversized manual
+  clock fields, DST-gap normalisation and embedded-NUL Windows policies.
+- Prevent re-entrant saves, partial CLI writes and Windows temporary-file races.
+- Prefer the active localtime zone over stale legacy configuration; retain newly
+  reported aliases and skip malformed zone rows safely.
+- Add model/parser/metadata regressions, private D-Bus and GTK lifecycle tests,
+  transaction tests and precise ownership/failure comments.
+- Correct documentation that overstated implemented features and preview owners;
+  document build instructions, evidence limits and remaining milestones.
+
+
 All notable user-visible and architectural changes are recorded here.
 
 ## Unreleased

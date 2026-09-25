@@ -2,6 +2,12 @@
 
 # Windows Compatibility
 
+> Implementation scope: the current product has one built-in Linux GTK4 Date &
+> Time panel and a portable policy CLI/store. Multi-module navigation, global
+> search, deep links, the public dynamic ABI and a Windows GUI remain design
+> requirements, not implemented capabilities. See [Roadmap](ROADMAP.md).
+
+
 Windows is a first-class System Settings target, not a later port of the Linux implementation.
 
 This document applies PLATFORM_COMPATIBILITY.md to Windows.

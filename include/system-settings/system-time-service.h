@@ -34,7 +34,7 @@ typedef struct SsSystemTimeState {
  * State-change callback.
  *
  * service and state are borrowed for the duration of the callback. user_data
- * remains caller-owned.
+ * remains caller-owned. On service loss, state is cleared with available=false.
  */
 typedef void (*SsSystemTimeChangedCallback)(
     SsSystemTimeService *service,
@@ -44,7 +44,9 @@ typedef void (*SsSystemTimeChangedCallback)(
 /**
  * Completion for one mutation request.
  *
- * error_message is borrowed and valid only during the callback. Cancellation
+ * service and error_message are borrowed during the callback. Validation
+ * errors may complete synchronously; accepted calls finish on the initiating
+ * main context. Cancellation
  * is reported as an unsuccessful completion; callers that supersede requests
  * should generation-gate their own UI state.
  */
@@ -76,12 +78,15 @@ void ss_system_time_service_new_async(
     GCancellable *cancellable,
     SsSystemTimeReadyCallback callback,
     gpointer user_data);
+/** Release caller ownership and detach the observer. Outstanding operations
+ * retain the service until completion; their callbacks still run. Use on the
+ * same main context as construction, never free a callback's borrowed service. */
 void ss_system_time_service_free(SsSystemTimeService *service);
 
 /**
  * Snapshot cached timedated properties without performing synchronous D-Bus
  * I/O. The output is cleared first and populated only when the required
- * Timezone property is available and valid.
+ * Timezone and NTP properties are valid and the bus name has an owner.
  */
 bool ss_system_time_service_read(
     SsSystemTimeService *service,

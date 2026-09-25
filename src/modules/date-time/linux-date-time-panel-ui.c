@@ -263,7 +263,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     strings = timezone_strings(state);
     state->timezone = GTK_DROP_DOWN(
         gtk_drop_down_new(G_LIST_MODEL(strings), NULL));
-    g_object_unref(strings);
+    /* gtk_drop_down_new() consumes the model reference (transfer full). */
     expression = gtk_property_expression_new(
         GTK_TYPE_STRING_OBJECT, NULL, "string");
     gtk_drop_down_set_expression(state->timezone, expression);
@@ -332,7 +332,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     strings = clock_mode_strings(state);
     state->clock_mode = GTK_DROP_DOWN(
         gtk_drop_down_new(G_LIST_MODEL(strings), NULL));
-    g_object_unref(strings);
+    /* gtk_drop_down_new() consumes the model reference (transfer full). */
     gtk_widget_add_css_class(
         GTK_WIDGET(state->clock_mode), "setting-dropdown");
     gtk_widget_set_size_request(GTK_WIDGET(state->clock_mode), 190, -1);
@@ -346,7 +346,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     strings = calendar_strings();
     state->calendar = GTK_DROP_DOWN(
         gtk_drop_down_new(G_LIST_MODEL(strings), NULL));
-    g_object_unref(strings);
+    /* gtk_drop_down_new() consumes the model reference (transfer full). */
     gtk_widget_add_css_class(
         GTK_WIDGET(state->calendar), "setting-dropdown");
     gtk_widget_set_size_request(GTK_WIDGET(state->calendar), 190, -1);
@@ -380,7 +380,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     strings = first_day_strings();
     state->first_day = GTK_DROP_DOWN(
         gtk_drop_down_new(G_LIST_MODEL(strings), NULL));
-    g_object_unref(strings);
+    /* gtk_drop_down_new() consumes the model reference (transfer full). */
     gtk_widget_add_css_class(
         GTK_WIDGET(state->first_day), "setting-dropdown");
     gtk_widget_set_size_request(GTK_WIDGET(state->first_day), 180, -1);

@@ -415,6 +415,14 @@ static GtkWidget *build_unavailable_panel(const char *message)
     return page;
 }
 
+static gboolean on_close_requested(GtkWindow *window, gpointer user_data)
+{
+    (void)user_data;
+    /* Pending replies retain the window, but may no longer find its panel. */
+    g_object_set_data(G_OBJECT(window), "system-settings-date-time-panel", NULL);
+    return FALSE;
+}
+
 static void on_activate(GtkApplication *application, gpointer user_data)
 {
     const InfiltratrProjectInfo *info = ss_project_info();
@@ -427,6 +435,11 @@ static void on_activate(GtkApplication *application, gpointer user_data)
 
     (void)user_data;
 
+    window = gtk_application_get_active_window(application);
+    if (window != NULL) {
+        gtk_window_present(window);
+        return;
+    }
     install_common_theme();
 
     window = GTK_WINDOW(
@@ -434,6 +447,7 @@ static void on_activate(GtkApplication *application, gpointer user_data)
     gtk_window_set_title(window, info->program_name);
     gtk_window_set_default_size(window, 1180, 820);
     gtk_window_set_resizable(window, TRUE);
+    g_signal_connect(window, "close-request", G_CALLBACK(on_close_requested), NULL);
 
     root = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     gtk_widget_add_css_class(root, "app-shell");
@@ -445,8 +459,8 @@ static void on_activate(GtkApplication *application, gpointer user_data)
     if (date_time != NULL) {
         /*
          * The host window owns the current built-in module instance. Async
-         * module operations retain a window reference while in flight, so the
-         * module data cannot disappear beneath their completion callbacks.
+         * module operations retain a window reference while in flight. Closing
+         * detaches the panel first, so late replies find NULL rather than widgets.
          */
         g_object_set_data_full(
             G_OBJECT(window),
