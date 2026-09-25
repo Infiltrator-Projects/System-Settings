@@ -23,6 +23,10 @@
 
 typedef struct {
     GtkListBox *list;
+    GtkWindow *parent;
+    GtkStack *stack;
+    GtkListBoxRow *home_row;
+    GtkListBoxRow *date_row;
     gchar *query;
 } ShellSearchState;
 
@@ -459,6 +463,26 @@ static void install_common_theme(void)
         success, (unsigned int)type->ui_bold_weight,
         fault, (unsigned int)type->ui_bold_weight);
 
+    g_string_append_printf(
+        css,
+        ".settings-sidebar { min-width: 300px; }\n"
+        ".settings-sidebar list { padding: 2px 0; }\n"
+        ".nav-row { min-height: 52px; }\n"
+        ".nav-row image { min-width: 30px; }\n"
+        ".nav-row.nav-gold image { color: %s; }\n"
+        ".nav-row.nav-cyan image { color: %s; }\n"
+        ".nav-row.nav-green image { color: %s; }\n"
+        ".nav-row:disabled { opacity: 0.42; }\n"
+        ".nav-row:selected { box-shadow: inset 0 0 0 1px %s; }\n"
+        ".nav-row:selected .nav-primary { color: %s; }\n"
+        ".sidebar-footer { margin: 10px 8px 0 8px; }\n"
+        ".sidebar-version { padding: 5px 2px; }\n",
+        warm,
+        accent,
+        success,
+        accent,
+        title);
+
     provider = gtk_css_provider_new();
 #if GTK_CHECK_VERSION(4, 12, 0)
     gtk_css_provider_load_from_string(provider, css->str);
@@ -552,6 +576,81 @@ static void on_navigation_selected(GtkListBox *box,
     }
 }
 
+static gboolean launch_command(GtkWidget *source,
+                               const char *program,
+                               const char *argument)
+{
+    const char *argv[3] = { program, argument, NULL };
+    g_autoptr(GError) error = NULL;
+    g_autoptr(GSubprocess) process = NULL;
+
+    if (program == NULL || program[0] == '\0') {
+        return FALSE;
+    }
+
+    if (argument == NULL || argument[0] == '\0') {
+        argv[1] = NULL;
+    }
+
+    process = g_subprocess_newv(
+        argv,
+        G_SUBPROCESS_FLAGS_NONE,
+        &error);
+    if (process == NULL) {
+        if (source != NULL && error != NULL) {
+            gtk_widget_set_tooltip_text(source, error->message);
+        }
+        return FALSE;
+    }
+    return TRUE;
+}
+
+static void restore_navigation_selection(ShellSearchState *state)
+{
+    const char *visible_name;
+
+    if (state == NULL || state->list == NULL || state->stack == NULL) {
+        return;
+    }
+
+    visible_name = gtk_stack_get_visible_child_name(state->stack);
+    if (g_strcmp0(visible_name, "date-time") == 0 &&
+        state->date_row != NULL) {
+        gtk_list_box_select_row(state->list, state->date_row);
+    } else if (state->home_row != NULL) {
+        gtk_list_box_select_row(state->list, state->home_row);
+    }
+}
+
+static void on_navigation_activated(GtkListBox *box,
+                                    GtkListBoxRow *row,
+                                    gpointer user_data)
+{
+    ShellSearchState *state = user_data;
+    const char *program;
+    const char *argument;
+    gboolean show_about_row;
+
+    (void)box;
+    if (row == NULL || state == NULL) {
+        return;
+    }
+
+    program = g_object_get_data(G_OBJECT(row), "action-program");
+    argument = g_object_get_data(G_OBJECT(row), "action-argument");
+    show_about_row =
+        GPOINTER_TO_INT(
+            g_object_get_data(G_OBJECT(row), "action-about")) != 0;
+
+    if (program != NULL) {
+        (void)launch_command(GTK_WIDGET(row), program, argument);
+        restore_navigation_selection(state);
+    } else if (show_about_row) {
+        show_about(NULL, state->parent);
+        restore_navigation_selection(state);
+    }
+}
+
 static GtkWidget *make_navigation_row(const char *icon_name,
                                       const char *title,
                                       const char *subtitle,
@@ -578,6 +677,60 @@ static GtkWidget *make_navigation_row(const char *icon_name,
         G_OBJECT(row), "page-name", g_strdup(page_name), g_free);
     g_object_set_data_full(
         G_OBJECT(row), "search-text", g_strdup(search_text), g_free);
+    return row;
+}
+
+static GtkWidget *make_external_navigation_row(const char *icon_name,
+                                               const char *title,
+                                               const char *subtitle,
+                                               const char *search_text,
+                                               const char *program,
+                                               const char *argument,
+                                               const char *accent_class)
+{
+    GtkWidget *row = make_navigation_row(
+        icon_name,
+        title,
+        subtitle,
+        NULL,
+        search_text);
+    g_autofree gchar *path =
+        program != NULL ? g_find_program_in_path(program) : NULL;
+
+    if (accent_class != NULL) {
+        gtk_widget_add_css_class(row, accent_class);
+    }
+    g_object_set_data_full(
+        G_OBJECT(row),
+        "action-program",
+        g_strdup(program),
+        g_free);
+    g_object_set_data_full(
+        G_OBJECT(row),
+        "action-argument",
+        g_strdup(argument),
+        g_free);
+    if (path == NULL) {
+        gtk_widget_set_sensitive(row, FALSE);
+        gtk_widget_set_tooltip_text(
+            row, "This system tool is not installed.");
+    }
+    return row;
+}
+
+static GtkWidget *make_about_navigation_row(void)
+{
+    GtkWidget *row = make_navigation_row(
+        "help-about-symbolic",
+        "About",
+        "System information",
+        NULL,
+        "about system information version");
+    gtk_widget_add_css_class(row, "nav-cyan");
+    g_object_set_data(
+        G_OBJECT(row),
+        "action-about",
+        GINT_TO_POINTER(1));
     return row;
 }
 
@@ -632,13 +785,23 @@ static GtkWidget *build_sidebar(GtkWindow *parent,
     GtkWidget *list = gtk_list_box_new();
     GtkWidget *home_row;
     GtkWidget *date_row;
+    GtkWidget *region_row;
+    GtkWidget *appearance_row;
+    GtkWidget *sound_row;
+    GtkWidget *network_row;
+    GtkWidget *bluetooth_row;
+    GtkWidget *power_row;
+    GtkWidget *users_row;
+    GtkWidget *privacy_row;
+    GtkWidget *hardware_row;
+    GtkWidget *software_row;
+    GtkWidget *about_row;
     GtkWidget *spacer = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     GtkWidget *footer = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-    GtkWidget *about = gtk_button_new_with_label("About");
     g_autofree gchar *version =
         g_strdup_printf("Version %s", info->version);
 
-    gtk_widget_set_size_request(sidebar, 292, -1);
+    gtk_widget_set_size_request(sidebar, 312, -1);
     gtk_widget_add_css_class(sidebar, "settings-sidebar");
 
     gtk_box_append(
@@ -651,22 +814,137 @@ static GtkWidget *build_sidebar(GtkWindow *parent,
         "Overview & quick access",
         "home",
         "home overview quick access system");
+    gtk_widget_add_css_class(home_row, "nav-gold");
+
     date_row = make_navigation_row(
         "preferences-system-time-symbolic",
         "Date & Time",
         "Clock, calendar & location",
         "date-time",
         "date time clock calendar location timezone");
+    gtk_widget_add_css_class(date_row, "nav-gold");
+
+    region_row = make_external_navigation_row(
+        "preferences-desktop-locale-symbolic",
+        "Region & Language",
+        "Language, formats & input",
+        "region language locale formats input",
+        "mintlocale",
+        NULL,
+        "nav-gold");
+
+    appearance_row = make_external_navigation_row(
+        "preferences-desktop-theme-symbolic",
+        "Display & Appearance",
+        "Theme, scaling & desktop",
+        "display appearance theme scaling desktop",
+        "cinnamon-settings",
+        "themes",
+        "nav-gold");
+
+    sound_row = make_external_navigation_row(
+        "audio-volume-high-symbolic",
+        "Sound",
+        "Audio devices & volume",
+        "sound audio devices volume speakers",
+        "cinnamon-settings",
+        "sound",
+        "nav-gold");
+
+    network_row = make_external_navigation_row(
+        "network-wired-symbolic",
+        "Network",
+        "Wi-Fi, wired & internet",
+        "network wifi wireless ethernet internet",
+        "cinnamon-settings",
+        "network",
+        "nav-cyan");
+
+    bluetooth_row = make_external_navigation_row(
+        "bluetooth-active-symbolic",
+        "Bluetooth",
+        "Devices & pairing",
+        "bluetooth devices pairing",
+        "blueman-manager",
+        NULL,
+        "nav-cyan");
+
+    power_row = make_external_navigation_row(
+        "battery-good-symbolic",
+        "Power",
+        "Battery & power management",
+        "power battery energy management",
+        "cinnamon-settings",
+        "power",
+        "nav-gold");
+
+    users_row = make_external_navigation_row(
+        "system-users-symbolic",
+        "Users & Accounts",
+        "Account settings & login",
+        "users accounts login password",
+        "cinnamon-settings",
+        "user",
+        "nav-gold");
+
+    privacy_row = make_external_navigation_row(
+        "security-high-symbolic",
+        "Privacy & Security",
+        "Permissions & system security",
+        "privacy security permissions",
+        "cinnamon-settings",
+        "privacy",
+        "nav-gold");
+
+    hardware_row = make_external_navigation_row(
+        "computer-symbolic",
+        "Hardware",
+        "Devices, drivers & system info",
+        "hardware devices drivers system info",
+        "cinnamon-settings",
+        "info",
+        "nav-gold");
+
+    software_row = make_external_navigation_row(
+        "system-software-install-symbolic",
+        "Software & Updates",
+        "Updates, drivers & repositories",
+        "software updates drivers repositories packages",
+        "infiltrator-software",
+        NULL,
+        "nav-gold");
+
+    about_row = make_about_navigation_row();
+
     gtk_list_box_append(GTK_LIST_BOX(list), home_row);
     gtk_list_box_append(GTK_LIST_BOX(list), date_row);
+    gtk_list_box_append(GTK_LIST_BOX(list), region_row);
+    gtk_list_box_append(GTK_LIST_BOX(list), appearance_row);
+    gtk_list_box_append(GTK_LIST_BOX(list), sound_row);
+    gtk_list_box_append(GTK_LIST_BOX(list), network_row);
+    gtk_list_box_append(GTK_LIST_BOX(list), bluetooth_row);
+    gtk_list_box_append(GTK_LIST_BOX(list), power_row);
+    gtk_list_box_append(GTK_LIST_BOX(list), users_row);
+    gtk_list_box_append(GTK_LIST_BOX(list), privacy_row);
+    gtk_list_box_append(GTK_LIST_BOX(list), hardware_row);
+    gtk_list_box_append(GTK_LIST_BOX(list), software_row);
+    gtk_list_box_append(GTK_LIST_BOX(list), about_row);
+
     gtk_list_box_set_selection_mode(
         GTK_LIST_BOX(list), GTK_SELECTION_SINGLE);
     g_signal_connect(
         list, "row-selected",
         G_CALLBACK(on_navigation_selected), stack);
+    g_signal_connect(
+        list, "row-activated",
+        G_CALLBACK(on_navigation_activated), search_state);
 
     if (search_state != NULL) {
         search_state->list = GTK_LIST_BOX(list);
+        search_state->parent = parent;
+        search_state->stack = stack;
+        search_state->home_row = GTK_LIST_BOX_ROW(home_row);
+        search_state->date_row = GTK_LIST_BOX_ROW(date_row);
         gtk_list_box_set_filter_func(
             GTK_LIST_BOX(list),
             navigation_filter,
@@ -691,11 +969,6 @@ static GtkWidget *build_sidebar(GtkWindow *parent,
     gtk_box_append(
         GTK_BOX(footer),
         ss_linux_ui_make_label(version, "sidebar-version"));
-    gtk_widget_set_hexpand(
-        gtk_widget_get_first_child(footer), TRUE);
-    gtk_widget_add_css_class(about, "sidebar-about");
-    g_signal_connect(about, "clicked", G_CALLBACK(show_about), parent);
-    gtk_box_append(GTK_BOX(footer), about);
     gtk_box_append(GTK_BOX(sidebar), footer);
     return sidebar;
 }
@@ -753,23 +1026,11 @@ static void focus_settings_search(GtkButton *button, gpointer user_data)
 
 static void launch_external_program(GtkButton *button, gpointer user_data)
 {
-    const char *program = user_data;
-    g_autoptr(GError) error = NULL;
-    g_autoptr(GSubprocess) process = NULL;
-
-    if (program == NULL || program[0] == '\0') {
-        return;
-    }
-
-    process = g_subprocess_new(
-        G_SUBPROCESS_FLAGS_NONE,
-        &error,
-        program,
-        NULL);
-    if (process == NULL && error != NULL) {
-        gtk_widget_set_tooltip_text(
-            GTK_WIDGET(button), error->message);
-    }
+    (void)user_data;
+    (void)launch_command(
+        GTK_WIDGET(button),
+        g_object_get_data(G_OBJECT(button), "action-program"),
+        g_object_get_data(G_OBJECT(button), "action-argument"));
 }
 
 static GtkWidget *make_quick_action(const char *icon_name,
@@ -798,11 +1059,23 @@ static GtkWidget *make_quick_action(const char *icon_name,
 static GtkWidget *make_program_action(const char *icon_name,
                                       const char *title,
                                       const char *copy,
-                                      const char *program)
+                                      const char *program,
+                                      const char *argument)
 {
     GtkWidget *button = make_quick_action(icon_name, title, copy);
     g_autofree gchar *path =
         program != NULL ? g_find_program_in_path(program) : NULL;
+
+    g_object_set_data_full(
+        G_OBJECT(button),
+        "action-program",
+        g_strdup(program),
+        g_free);
+    g_object_set_data_full(
+        G_OBJECT(button),
+        "action-argument",
+        g_strdup(argument),
+        g_free);
 
     if (path == NULL) {
         gtk_widget_set_sensitive(button, FALSE);
@@ -812,7 +1085,7 @@ static GtkWidget *make_program_action(const char *icon_name,
         g_signal_connect(
             button, "clicked",
             G_CALLBACK(launch_external_program),
-            (gpointer)program);
+            NULL);
     }
     return button;
 }
@@ -1055,30 +1328,29 @@ static GtkWidget *build_home_page(GtkWindow *parent,
         G_CALLBACK(open_date_time), stack);
     gtk_grid_attach(GTK_GRID(quick_grid), date_action, 0, 0, 1, 1);
 
+    GtkWidget *region_action = make_program_action(
+        "preferences-desktop-locale-symbolic",
+        "Change Region",
+        "Language, formats & location",
+        "mintlocale",
+        NULL);
+    gtk_grid_attach(GTK_GRID(quick_grid), region_action, 1, 0, 1, 1);
+
+    GtkWidget *display_action = make_program_action(
+        "video-display-symbolic",
+        "Configure Display",
+        "Scaling, layout & monitors",
+        "cinnamon-settings",
+        "display");
+    gtk_grid_attach(GTK_GRID(quick_grid), display_action, 0, 1, 1, 1);
+
     GtkWidget *software_action = make_program_action(
         "system-software-install-symbolic",
         "Software & Updates",
         "Apps, packages & updates",
-        "infiltrator-software");
-    gtk_grid_attach(GTK_GRID(quick_grid), software_action, 1, 0, 1, 1);
-
-    GtkWidget *search_action = make_quick_action(
-        "system-search-symbolic",
-        "Search Settings",
-        "Find available controls");
-    g_signal_connect(
-        search_action, "clicked",
-        G_CALLBACK(focus_settings_search), search_entry);
-    gtk_grid_attach(GTK_GRID(quick_grid), search_action, 0, 1, 1, 1);
-
-    GtkWidget *about_action = make_quick_action(
-        "help-about-symbolic",
-        "About",
-        "Version, build & project");
-    g_signal_connect(
-        about_action, "clicked",
-        G_CALLBACK(show_about), parent);
-    gtk_grid_attach(GTK_GRID(quick_grid), about_action, 1, 1, 1, 1);
+        "infiltrator-software",
+        NULL);
+    gtk_grid_attach(GTK_GRID(quick_grid), software_action, 1, 1, 1, 1);
 
     gtk_box_append(GTK_BOX(quick), quick_grid);
     gtk_grid_attach(GTK_GRID(grid), quick, 1, 0, 1, 1);
@@ -1293,6 +1565,10 @@ static void on_activate(GtkApplication *application, gpointer user_data)
         GTK_BOX(root),
         build_sidebar(
             window, stack, search_entry, search_state));
+    g_object_set_data(
+        G_OBJECT(window),
+        "system-settings-navigation-list",
+        search_state->list);
 
     date_time = ss_linux_date_time_panel_new(
         window, &panel_error);

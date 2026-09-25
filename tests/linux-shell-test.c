@@ -38,6 +38,16 @@ int main(void)
         GtkStack *stack = g_object_get_data(
             G_OBJECT(window), "system-settings-stack");
         g_assert_true(GTK_IS_STACK(stack));
+        GtkListBox *navigation = g_object_get_data(
+            G_OBJECT(window), "system-settings-navigation-list");
+        g_assert_true(GTK_IS_LIST_BOX(navigation));
+        guint navigation_rows = 0U;
+        for (GtkWidget *row = gtk_widget_get_first_child(GTK_WIDGET(navigation));
+             row != NULL;
+             row = gtk_widget_get_next_sibling(row)) {
+            navigation_rows++;
+        }
+        g_assert_cmpuint(navigation_rows, >=, 13U);
         g_assert_cmpstr(
             gtk_stack_get_visible_child_name(stack), ==, "home");
         gtk_stack_set_visible_child_name(stack, "date-time");

@@ -2,6 +2,22 @@
 
 # Changelog
 
+## 0.4.16 — 2026-09-25 — full graphical navigation rail
+
+- Expand the left rail to the full north-star category density instead of
+  leaving the shell with only Home and Date & Time.
+- Keep Home and Date & Time native inside System Settings while wiring the
+  remaining visible categories to real installed system tools: region/language,
+  themes, sound, network, Bluetooth, power, users, privacy and hardware.
+- Route Software & Updates to the real Infiltrator Software application and
+  move About into the same visual navigation language as the target.
+- Alternate warm-gold and cyan icon accents, enlarge the navigation treatment
+  and keep unavailable external tools visibly disabled rather than pretending
+  they work.
+- Make the Home quick-action block match the north-star structure more closely:
+  Set Date & Time, Change Region, Configure Display and Software & Updates.
+- Extend Linux shell qualification to require the expanded navigation rail.
+
 ## 0.4.15 — 2026-09-25 — live dashboard density polish
 
 - Push the Home page materially closer to the committed north-star dashboard
