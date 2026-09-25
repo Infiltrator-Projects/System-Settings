@@ -2,6 +2,22 @@
 
 # Changelog
 
+## 0.4.15 — 2026-09-25 — live dashboard density polish
+
+- Push the Home page materially closer to the committed north-star dashboard
+  with a denser two-column information layout and a more purposeful hero visual.
+- Expand Quick Actions to a real 2x2 surface: Date & Time, Software & Updates,
+  Search Settings and About. Software launches the installed Infiltrator
+  Software application and disables cleanly when it is absent.
+- Add four real system-state cards for Date & Time, Region & Language, Display &
+  Appearance and Network rather than placeholder modules.
+- Populate those cards from the running system: local date/time, locale, GTK
+  theme/dark preference and GIO network connectivity/metering state.
+- Add architecture to System Overview and retain OS, kernel, desktop and
+  hostname reporting.
+- Extend the Linux shell regression to prove Home is the default stack page and
+  Date & Time navigation remains intact.
+
 ## 0.4.14 — 2026-09-25 — home dashboard and shell convergence
 
 - Add a real Home landing page so System Settings opens as a graphical control

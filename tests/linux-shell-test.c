@@ -35,6 +35,15 @@ int main(void)
         SsLinuxDateTimePanel *panel = g_object_get_data(
             G_OBJECT(window), "system-settings-date-time-panel");
         g_assert_nonnull(panel);
+        GtkStack *stack = g_object_get_data(
+            G_OBJECT(window), "system-settings-stack");
+        g_assert_true(GTK_IS_STACK(stack));
+        g_assert_cmpstr(
+            gtk_stack_get_visible_child_name(stack), ==, "home");
+        gtk_stack_set_visible_child_name(stack, "date-time");
+        g_assert_cmpstr(
+            gtk_stack_get_visible_child_name(stack), ==, "date-time");
+        gtk_stack_set_visible_child_name(stack, "home");
         GtkDropDown *dropdowns[] = {panel->timezone, panel->clock_mode,
                                     panel->calendar, panel->first_day};
         for (size_t j = 0; j < G_N_ELEMENTS(dropdowns); ++j) {
