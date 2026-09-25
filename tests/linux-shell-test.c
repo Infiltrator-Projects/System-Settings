@@ -41,6 +41,27 @@ int main(void)
         GtkListBox *navigation = g_object_get_data(
             G_OBJECT(window), "system-settings-navigation-list");
         g_assert_true(GTK_IS_LIST_BOX(navigation));
+        GtkWidget *minimize = g_object_get_data(
+            G_OBJECT(window), "system-settings-minimize-button");
+        GtkWidget *maximize = g_object_get_data(
+            G_OBJECT(window), "system-settings-maximize-button");
+        GtkWidget *close = g_object_get_data(
+            G_OBJECT(window), "system-settings-close-button");
+        g_assert_true(GTK_IS_BUTTON(minimize));
+        g_assert_true(GTK_IS_BUTTON(maximize));
+        g_assert_true(GTK_IS_BUTTON(close));
+        GtkScrolledWindow *nav_scroller = g_object_get_data(
+            G_OBJECT(window), "system-settings-navigation-scroller");
+        GtkScrolledWindow *date_scroller = g_object_get_data(
+            G_OBJECT(window), "system-settings-date-scroller");
+        GtkScrolledWindow *home_scroller = g_object_get_data(
+            G_OBJECT(stack), "system-settings-home-scroller");
+        g_assert_true(GTK_IS_SCROLLED_WINDOW(nav_scroller));
+        g_assert_true(GTK_IS_SCROLLED_WINDOW(date_scroller));
+        g_assert_true(GTK_IS_SCROLLED_WINDOW(home_scroller));
+        g_assert_false(gtk_scrolled_window_get_overlay_scrolling(nav_scroller));
+        g_assert_false(gtk_scrolled_window_get_overlay_scrolling(date_scroller));
+        g_assert_false(gtk_scrolled_window_get_overlay_scrolling(home_scroller));
         guint navigation_rows = 0U;
         for (GtkWidget *row = gtk_widget_get_first_child(GTK_WIDGET(navigation));
              row != NULL;

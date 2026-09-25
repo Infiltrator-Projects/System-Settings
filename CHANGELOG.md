@@ -2,6 +2,19 @@
 
 # Changelog
 
+## 0.4.18 — 2026-09-25 — window controls and scrolling repair
+
+- Replace the unreliable implicit title-bar minimize/maximize controls with
+  explicit GTK buttons wired directly to minimize, maximize/restore and close.
+- Make the long navigation rail independently scrollable so Software & Updates,
+  About and later categories remain reachable on shorter displays.
+- Make Home and Date & Time use non-overlay GTK scrollbars, kinetic scrolling,
+  full expansion and a natural-height Home child so wheel/trackpad and scrollbar
+  scrolling work reliably instead of clipping the lower dashboard.
+- Add visible scrollbar styling consistent with the cyan/gold system palette.
+- Extend Linux shell qualification to require all three window controls and all
+  three scrollers, including non-overlay scrolling.
+
 ## 0.4.17 — 2026-09-25 — graphical dashboard content pass
 
 - Replace the generic hero monitor block with a real programmatic scenic

@@ -517,6 +517,19 @@ static void install_common_theme(void)
         border,
         muted);
 
+    g_string_append_printf(
+        css,
+        ".window-control { min-width: 30px; min-height: 30px; padding: 4px; background: transparent; border: 1px solid transparent; border-radius: 8px; }\n"
+        ".window-control:hover { background: %s; border-color: %s; }\n"
+        ".window-control-close:hover { background: %s; color: %s; }\n"
+        "scrollbar { background: transparent; min-width: 10px; min-height: 10px; }\n"
+        "scrollbar slider { min-width: 8px; min-height: 28px; border-radius: 999px; background: %s; }\n"
+        "scrollbar slider:hover { background: %s; }\n",
+        surface_hover, border,
+        fault, accent_foreground,
+        subtle,
+        accent);
+
     provider = gtk_css_provider_new();
 #if GTK_CHECK_VERSION(4, 12, 0)
     gtk_css_provider_load_from_string(provider, css->str);
@@ -768,6 +781,45 @@ static GtkWidget *make_about_navigation_row(void)
     return row;
 }
 
+static void minimize_window(GtkButton *button, gpointer user_data)
+{
+    (void)button;
+    gtk_window_minimize(GTK_WINDOW(user_data));
+}
+
+static void toggle_maximize_window(GtkButton *button, gpointer user_data)
+{
+    GtkWindow *window = GTK_WINDOW(user_data);
+
+    (void)button;
+    if (gtk_window_is_maximized(window)) {
+        gtk_window_unmaximize(window);
+    } else {
+        gtk_window_maximize(window);
+    }
+}
+
+static void close_window(GtkButton *button, gpointer user_data)
+{
+    (void)button;
+    gtk_window_close(GTK_WINDOW(user_data));
+}
+
+static GtkWidget *make_window_control(const char *icon_name,
+                                      const char *tooltip,
+                                      const char *css_class)
+{
+    GtkWidget *button = gtk_button_new_from_icon_name(icon_name);
+
+    gtk_widget_add_css_class(button, "window-control");
+    if (css_class != NULL) {
+        gtk_widget_add_css_class(button, css_class);
+    }
+    gtk_widget_set_tooltip_text(button, tooltip);
+    gtk_widget_set_focusable(button, FALSE);
+    return button;
+}
+
 static GtkWidget *build_header(GtkWindow *parent, GtkSearchEntry **search_out)
 {
     const InfiltratrProjectInfo *info = ss_project_info();
@@ -777,10 +829,17 @@ static GtkWidget *build_header(GtkWindow *parent, GtkSearchEntry **search_out)
     GtkWidget *icon = gtk_image_new_from_icon_name(info->icon_name);
     GtkWidget *copy = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     GtkWidget *search = gtk_search_entry_new();
+    GtkWidget *minimize = make_window_control(
+        "window-minimize-symbolic", "Minimize", NULL);
+    GtkWidget *maximize = make_window_control(
+        "window-maximize-symbolic", "Maximize / Restore", NULL);
+    GtkWidget *close = make_window_control(
+        "window-close-symbolic", "Close", "window-control-close");
     GtkWidget *empty_title = gtk_label_new("");
 
     (void)parent;
     gtk_widget_add_css_class(header, "shell-header");
+    gtk_header_bar_set_show_title_buttons(GTK_HEADER_BAR(header), FALSE);
     gtk_header_bar_set_title_widget(GTK_HEADER_BAR(header), empty_title);
 
     gtk_widget_add_css_class(brand, "header-brand");
@@ -803,6 +862,23 @@ static GtkWidget *build_header(GtkWindow *parent, GtkSearchEntry **search_out)
     gtk_widget_set_size_request(search, 320, -1);
     gtk_header_bar_pack_end(GTK_HEADER_BAR(header), search);
 
+    g_signal_connect(
+        minimize, "clicked", G_CALLBACK(minimize_window), parent);
+    g_signal_connect(
+        maximize, "clicked", G_CALLBACK(toggle_maximize_window), parent);
+    g_signal_connect(
+        close, "clicked", G_CALLBACK(close_window), parent);
+    gtk_header_bar_pack_end(GTK_HEADER_BAR(header), minimize);
+    gtk_header_bar_pack_end(GTK_HEADER_BAR(header), maximize);
+    gtk_header_bar_pack_end(GTK_HEADER_BAR(header), close);
+
+    g_object_set_data(
+        G_OBJECT(parent), "system-settings-minimize-button", minimize);
+    g_object_set_data(
+        G_OBJECT(parent), "system-settings-maximize-button", maximize);
+    g_object_set_data(
+        G_OBJECT(parent), "system-settings-close-button", close);
+
     if (search_out != NULL) {
         *search_out = GTK_SEARCH_ENTRY(search);
     }
@@ -817,6 +893,7 @@ static GtkWidget *build_sidebar(GtkWindow *parent,
     const InfiltratrProjectInfo *info = ss_project_info();
     GtkWidget *sidebar = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
     GtkWidget *list = gtk_list_box_new();
+    GtkWidget *nav_scroller = gtk_scrolled_window_new();
     GtkWidget *home_row;
     GtkWidget *date_row;
     GtkWidget *region_row;
@@ -830,7 +907,6 @@ static GtkWidget *build_sidebar(GtkWindow *parent,
     GtkWidget *hardware_row;
     GtkWidget *software_row;
     GtkWidget *about_row;
-    GtkWidget *spacer = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     GtkWidget *footer = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
     g_autofree gchar *version =
         g_strdup_printf("Version %s", info->version);
@@ -993,10 +1069,21 @@ static GtkWidget *build_sidebar(GtkWindow *parent,
 
     gtk_list_box_select_row(
         GTK_LIST_BOX(list), GTK_LIST_BOX_ROW(home_row));
-    gtk_box_append(GTK_BOX(sidebar), list);
 
-    gtk_widget_set_vexpand(spacer, TRUE);
-    gtk_box_append(GTK_BOX(sidebar), spacer);
+    gtk_scrolled_window_set_policy(
+        GTK_SCROLLED_WINDOW(nav_scroller),
+        GTK_POLICY_NEVER,
+        GTK_POLICY_AUTOMATIC);
+    gtk_scrolled_window_set_overlay_scrolling(
+        GTK_SCROLLED_WINDOW(nav_scroller), FALSE);
+    gtk_widget_set_vexpand(nav_scroller, TRUE);
+    gtk_scrolled_window_set_child(
+        GTK_SCROLLED_WINDOW(nav_scroller), list);
+    gtk_box_append(GTK_BOX(sidebar), nav_scroller);
+    g_object_set_data(
+        G_OBJECT(parent),
+        "system-settings-navigation-scroller",
+        nav_scroller);
 
     gtk_widget_add_css_class(footer, "sidebar-footer");
     gtk_widget_set_hexpand(footer, TRUE);
@@ -1774,8 +1861,20 @@ static GtkWidget *build_home_page(GtkStack *stack)
         GTK_SCROLLED_WINDOW(scroller),
         GTK_POLICY_NEVER,
         GTK_POLICY_AUTOMATIC);
+    gtk_scrolled_window_set_overlay_scrolling(
+        GTK_SCROLLED_WINDOW(scroller), FALSE);
+    gtk_scrolled_window_set_kinetic_scrolling(
+        GTK_SCROLLED_WINDOW(scroller), TRUE);
+    gtk_widget_set_hexpand(scroller, TRUE);
+    gtk_widget_set_vexpand(scroller, TRUE);
+    gtk_widget_set_valign(page, GTK_ALIGN_START);
+    gtk_widget_set_vexpand(page, FALSE);
     gtk_scrolled_window_set_child(
         GTK_SCROLLED_WINDOW(scroller), page);
+    g_object_set_data(
+        G_OBJECT(stack),
+        "system-settings-home-scroller",
+        scroller);
 
     g_free(theme_name);
     return scroller;
@@ -1958,9 +2057,19 @@ static void on_activate(GtkApplication *application, gpointer user_data)
         GTK_SCROLLED_WINDOW(date_scroller),
         GTK_POLICY_NEVER,
         GTK_POLICY_AUTOMATIC);
+    gtk_scrolled_window_set_overlay_scrolling(
+        GTK_SCROLLED_WINDOW(date_scroller), FALSE);
+    gtk_scrolled_window_set_kinetic_scrolling(
+        GTK_SCROLLED_WINDOW(date_scroller), TRUE);
+    gtk_widget_set_hexpand(date_scroller, TRUE);
+    gtk_widget_set_vexpand(date_scroller, TRUE);
     gtk_scrolled_window_set_child(
         GTK_SCROLLED_WINDOW(date_scroller),
         panel_widget);
+    g_object_set_data(
+        G_OBJECT(window),
+        "system-settings-date-scroller",
+        date_scroller);
     gtk_stack_add_named(
         stack,
         build_home_page(stack),
