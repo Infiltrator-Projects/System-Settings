@@ -75,6 +75,7 @@ static void install_common_theme(void)
     gchar *fault;
     gchar *surface_hover;
     gchar *status_border;
+    gchar *warm;
 
     if (palette == NULL || metrics == NULL || type == NULL) {
         return;
@@ -98,6 +99,7 @@ static void install_common_theme(void)
     fault = rgb_css(palette->fault_rgb);
     surface_hover = rgb_css(palette->surface_hover_rgb);
     status_border = rgb_css(palette->status_border_rgb);
+    warm = rgb_css(palette->warning_rgb);
 
     /*
      * The shell deliberately uses one restrained surface hierarchy:
@@ -227,6 +229,60 @@ static void install_common_theme(void)
         card, border,
         surface_hover);
 
+    /*
+     * First north-star polish pass. These rules deliberately remain styling
+     * only: no placeholder settings or dead controls are introduced merely to
+     * imitate the concept image. The existing working Date & Time surface gets
+     * the stronger hierarchy, colour, geometry and visual confidence first.
+     */
+    g_string_append_printf(
+        css,
+        "headerbar { background: %s; border-bottom: 1px solid %s; min-height: 46px; }\n"
+        ".app-shell { background-image: linear-gradient(to bottom right, %s, %s); }\n"
+        ".settings-sidebar { background-image: linear-gradient(to bottom, %s, %s); padding: 18px 14px 14px 14px; }\n"
+        ".brand-block { background: %s; border: 1px solid %s; border-radius: 16px; padding: 13px; margin: 0 4px 18px 4px; }\n"
+        ".brand-icon { color: %s; border-radius: 13px; padding: 10px; }\n"
+        ".brand-title { font-size: 21px; }\n"
+        ".brand-subtitle { font-size: 12px; }\n"
+        ".nav-title { color: %s; margin: 0 10px 8px 10px; }\n"
+        ".nav-row { border-radius: 12px; padding: 12px 13px; margin: 4px 5px; }\n"
+        ".nav-row image { color: %s; }\n"
+        ".nav-row:selected { background-image: linear-gradient(to right, %s, %s); border-width: 1px; border-color: %s; }\n"
+        ".nav-row:selected image { color: %s; }\n"
+        ".nav-primary { font-size: 14px; }\n"
+        ".settings-content { padding: 26px 30px 30px 30px; }\n"
+        ".page-eyebrow { color: %s; }\n"
+        ".page-title { font-size: 36px; }\n"
+        ".page-summary { font-size: 13px; margin-bottom: 8px; }\n"
+        ".hero-card { background-image: linear-gradient(to bottom right, %s, %s); border-color: %s; border-radius: 20px; padding: 24px 26px; box-shadow: 0 6px 18px rgba(0,0,0,0.22); }\n"
+        ".hero-kicker { color: %s; }\n"
+        ".preview-time { font-size: 46px; }\n"
+        ".hero-note { margin-top: 6px; }\n"
+        ".settings-card { border-radius: 16px; padding: 20px; box-shadow: 0 4px 14px rgba(0,0,0,0.16); }\n"
+        ".section-heading { margin-bottom: 8px; }\n"
+        ".section-icon-wrap { border: 1px solid %s; background: %s; border-radius: 12px; padding: 9px; }\n"
+        ".section-icon-wrap image { color: %s; }\n"
+        ".section-title { font-size: 17px; }\n"
+        ".setting-row { border-radius: 10px; padding: 11px 12px; }\n"
+        ".setting-row:hover { background: %s; }\n"
+        ".setting-button, .setting-entry, .setting-dropdown, .setting-spin { min-height: 38px; }\n"
+        ".primary-button { box-shadow: 0 2px 10px rgba(0,0,0,0.18); }\n",
+        panel, border,
+        background, panel,
+        panel, background,
+        card, border,
+        accent,
+        warm,
+        muted,
+        selected, card, accent,
+        warm,
+        warm,
+        card, surface, accent,
+        warm,
+        warm, surface,
+        warm,
+        surface_hover);
+
     provider = gtk_css_provider_new();
 #if GTK_CHECK_VERSION(4, 12, 0)
     gtk_css_provider_load_from_string(provider, css->str);
@@ -258,6 +314,7 @@ static void install_common_theme(void)
     g_free(fault);
     g_free(surface_hover);
     g_free(status_border);
+    g_free(warm);
 }
 
 static void show_about(GtkButton *button, gpointer user_data);
@@ -282,12 +339,12 @@ static GtkWidget *build_sidebar(GtkWindow *parent)
     g_autofree gchar *version =
         g_strdup_printf("Version %s", info->version);
 
-    gtk_widget_set_size_request(sidebar, 248, -1);
+    gtk_widget_set_size_request(sidebar, 276, -1);
     gtk_widget_add_css_class(sidebar, "settings-sidebar");
 
     gtk_widget_add_css_class(brand, "brand-block");
     gtk_widget_add_css_class(brand_icon_wrap, "brand-icon");
-    gtk_image_set_pixel_size(GTK_IMAGE(brand_icon), 22);
+    gtk_image_set_pixel_size(GTK_IMAGE(brand_icon), 30);
     gtk_box_append(GTK_BOX(brand_icon_wrap), brand_icon);
     gtk_box_append(GTK_BOX(brand), brand_icon_wrap);
     gtk_box_append(
@@ -295,7 +352,7 @@ static GtkWidget *build_sidebar(GtkWindow *parent)
         ss_linux_ui_make_label("System Settings", "brand-title"));
     gtk_box_append(
         GTK_BOX(brand_copy),
-        ss_linux_ui_make_label("Infiltrator system control", "brand-subtitle"));
+        ss_linux_ui_make_label("Infiltrator OS", "brand-subtitle"));
     gtk_box_append(GTK_BOX(brand), brand_copy);
     gtk_box_append(GTK_BOX(sidebar), brand);
 
@@ -303,7 +360,7 @@ static GtkWidget *build_sidebar(GtkWindow *parent)
         GTK_BOX(sidebar),
         ss_linux_ui_make_label("SYSTEM", "nav-title"));
 
-    gtk_image_set_pixel_size(GTK_IMAGE(icon), 18);
+    gtk_image_set_pixel_size(GTK_IMAGE(icon), 22);
     gtk_box_append(GTK_BOX(row_box), icon);
     gtk_box_append(
         GTK_BOX(row_copy),
@@ -445,7 +502,7 @@ static void on_activate(GtkApplication *application, gpointer user_data)
     window = GTK_WINDOW(
         gtk_application_window_new(application));
     gtk_window_set_title(window, info->program_name);
-    gtk_window_set_default_size(window, 1180, 820);
+    gtk_window_set_default_size(window, 1260, 860);
     gtk_window_set_resizable(window, TRUE);
     g_signal_connect(window, "close-request", G_CALLBACK(on_close_requested), NULL);
 

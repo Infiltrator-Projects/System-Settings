@@ -142,8 +142,7 @@ static GtkWidget *make_manual_setting_block(
 {
     GtkWidget *block = gtk_box_new(GTK_ORIENTATION_VERTICAL, 7);
     GtkWidget *description = ss_linux_ui_make_label(
-        "Available when Network time is off and the selected clock/calendar "
-        "can be converted safely back to one system instant.",
+        "Available when Network time is off.",
         "setting-description");
 
     gtk_widget_add_css_class(block, "setting-row");
@@ -161,9 +160,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
 {
     GtkWidget *page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 18);
     GtkWidget *summary = ss_linux_ui_make_label(
-        "Choose how the system represents time, calendar and location. "
-        "Native Mint/Linux services remain authoritative where they already "
-        "exist; richer presentation is shared through Common.",
+        "Clock, calendar, location and system time — live, visual and immediate.",
         "page-summary");
     GtkWidget *hero_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 3);
     GtkWidget *location_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
@@ -207,8 +204,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     gtk_box_append(
         GTK_BOX(hero_card),
         ss_linux_ui_make_label(
-            "Preview updates immediately; system-clock writes still use the "
-            "operating system's protected time service.",
+            "Live preview — presentation changes appear here immediately.",
             "hero-note"));
     gtk_box_append(GTK_BOX(page), hero_card);
 
@@ -222,8 +218,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         make_section_heading(
             "mark-location-symbolic",
             "Location & time zone",
-            "Find a locality, keep the real Linux time zone visible, and "
-            "fine-tune coordinates only when needed."));
+            "Locality, time zone and coordinates."));
 
     state->location_summary = ss_linux_ui_make_label("", "accent-note");
     gtk_label_set_wrap(GTK_LABEL(state->location_summary), TRUE);
@@ -250,8 +245,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         GTK_BOX(location_card),
         ss_linux_ui_make_setting_row(
             "Locality",
-            "Selecting a result stores its coordinates and proposes the "
-            "nearest matching IANA zone.",
+            "Search by town, suburb, city or place.",
             search_box));
 
     state->location_results = GTK_LIST_BOX(gtk_list_box_new());
@@ -276,8 +270,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         GTK_BOX(location_card),
         ss_linux_ui_make_setting_row(
             "Time zone",
-            "The actual operating-system IANA zone; always editable after a "
-            "locality suggestion.",
+            "Operating-system IANA time zone.",
             GTK_WIDGET(state->timezone)));
 
     state->latitude = GTK_SPIN_BUTTON(
@@ -302,7 +295,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         GTK_BOX(location_card),
         ss_linux_ui_make_setting_row(
             "Coordinates",
-            "Advanced location override in decimal degrees.",
+            "Advanced decimal-degree override.",
             coordinate_box));
     gtk_box_append(GTK_BOX(page), location_card);
 
@@ -327,7 +320,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         make_section_heading(
             "preferences-desktop-display-symbolic",
             "Presentation",
-            "Clock, calendar and desktop formatting in one place."));
+            "Choose how time and dates look."));
 
     strings = clock_mode_strings(state);
     state->clock_mode = GTK_DROP_DOWN(
@@ -340,7 +333,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         GTK_BOX(presentation_card),
         ss_linux_ui_make_setting_row(
             "Clock system",
-            "Human-readable clock representation.",
+            "Choose the clock style.",
             GTK_WIDGET(state->clock_mode)));
 
     strings = calendar_strings();
@@ -354,7 +347,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         GTK_BOX(presentation_card),
         ss_linux_ui_make_setting_row(
             "Calendar",
-            "Calendar used by Common-aware applications.",
+            "Choose the calendar system.",
             GTK_WIDGET(state->calendar)));
 
     state->show_seconds = GTK_SWITCH(gtk_switch_new());
@@ -364,7 +357,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         GTK_BOX(presentation_card),
         ss_linux_ui_make_setting_row(
             "Show seconds",
-            "Or the closest finer unit supported by the clock.",
+            "Show seconds or the closest finer unit.",
             GTK_WIDGET(state->show_seconds)));
 
     state->show_date = GTK_SWITCH(gtk_switch_new());
@@ -374,7 +367,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         GTK_BOX(presentation_card),
         ss_linux_ui_make_setting_row(
             "Panel date",
-            "Show the date in Cinnamon's panel clock.",
+            "Show the date in the Cinnamon panel.",
             GTK_WIDGET(state->show_date)));
 
     strings = first_day_strings();
@@ -388,7 +381,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         GTK_BOX(presentation_card),
         ss_linux_ui_make_setting_row(
             "First day of week",
-            "Locale default, Sunday or Monday.",
+            "Locale, Sunday or Monday.",
             GTK_WIDGET(state->first_day)));
 
     gtk_widget_add_css_class(system_card, "settings-card");
@@ -398,7 +391,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         make_section_heading(
             "preferences-system-time-symbolic",
             "System clock",
-            "Network synchronisation and protected manual clock changes."));
+            "Network sync and manual time."));
 
     state->network_time = GTK_SWITCH(gtk_switch_new());
     gtk_widget_add_css_class(
@@ -407,7 +400,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         GTK_BOX(system_card),
         ss_linux_ui_make_setting_row(
             "Network time",
-            "Synchronise through the operating system's configured service.",
+            "Synchronise automatically with the system service.",
             GTK_WIDGET(state->network_time)));
 
     manual_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 7);
@@ -435,8 +428,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         make_manual_setting_block(state, manual_box));
 
     state->manual_unavailable = ss_linux_ui_make_label(
-        "Manual setting is unavailable for this presentation because it "
-        "cannot yet be converted safely back to one canonical instant.",
+        "Manual setting is unavailable for this clock/calendar combination.",
         "accent-note");
     gtk_label_set_wrap(GTK_LABEL(state->manual_unavailable), TRUE);
     gtk_widget_set_visible(state->manual_unavailable, FALSE);

@@ -2,6 +2,21 @@
 
 # Changelog
 
+## 0.4.10 — 2026-09-25 — first UI north-star polish
+
+- Apply the first working-program polish pass toward the committed UI north star
+  without introducing placeholder controls or fake functionality.
+- Strengthen the shell with a wider graphical sidebar, larger brand treatment,
+  cyan/gold icon emphasis, rounded active navigation and a deeper dark surface
+  hierarchy.
+- Give the live Date & Time preview a stronger visual anchor with larger type,
+  richer card geometry and restrained depth.
+- Round and visually separate settings cards and rows, increase control height,
+  and make section icons more prominent.
+- Cut explanatory copy substantially so the GUI communicates state and actions
+  visually instead of reading like an administrative form.
+- Preserve all existing Date & Time behaviour and backend authority boundaries.
+
 ## 0.4.9 — 2026-09-25 — forensic follow-up hardening
 
 - Add a private-D-Bus regression for timedated owner loss and reacquisition,
