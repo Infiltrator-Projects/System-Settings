@@ -151,6 +151,17 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         DESTINATION "${CMAKE_INSTALL_DATADIR}/applications")
     install(FILES data/org.infiltrator.SystemSettings.svg
         DESTINATION "${CMAKE_INSTALL_DATADIR}/icons/hicolor/scalable/apps")
+    install(FILES
+        assets/ui/hero-sunset.svg
+        assets/ui/overview-mountain.svg
+        assets/ui/date-city.svg
+        assets/ui/region-sydney.svg
+        assets/ui/network-globe.svg
+        assets/ui/theme-light.svg
+        assets/ui/theme-dark.svg
+        assets/ui/theme-follow.svg
+        assets/ui/theme-mercedes.svg
+        DESTINATION "${CMAKE_INSTALL_DATADIR}/infiltrator/system-settings/ui")
     install(FILES data/temporal-v3.provider
         DESTINATION "${CMAKE_INSTALL_DATADIR}/infiltrator/policy-providers"
         RENAME temporal-v3)

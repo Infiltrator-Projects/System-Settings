@@ -578,6 +578,28 @@ static void install_common_theme(void)
         muted,
         accent);
 
+    g_string_append_printf(
+        css,
+        ".home-hero { box-shadow: 0 0 28px rgba(0,160,220,0.13); }\n"
+        ".hero-copy-overlay { background: linear-gradient(to right, rgba(2,8,14,0.78), rgba(2,8,14,0.34), rgba(2,8,14,0.06)); border: 0; min-width: 610px; }\n"
+        ".hero-brand-overlay { background: rgba(2,9,15,0.42); border-color: rgba(70,210,255,0.38); }\n"
+        ".home-card, .status-card { background-image: linear-gradient(145deg, %s, %s); box-shadow: 0 6px 18px rgba(0,0,0,0.18); }\n"
+        ".home-card:hover, .status-card:hover { border-color: %s; }\n"
+        ".overview-scene, .date-scene, .region-scene, .network-visual { border: 1px solid %s; border-radius: 13px; }\n"
+        ".overview-link-button { background: transparent; border: 0; color: %s; font-size: 11px; padding: 4px 8px; }\n"
+        ".overview-link-button:hover { color: %s; text-decoration-line: underline; }\n"
+        ".quick-action-icon { box-shadow: 0 0 18px rgba(0,183,255,0.12); }\n"
+        ".region-status-card { background-image: linear-gradient(135deg, %s, #071725); }\n"
+        ".network-status-card { background-image: linear-gradient(135deg, %s, #04131f); }\n"
+        ".appearance-status-card { background-image: linear-gradient(135deg, %s, #141719); }\n"
+        ".date-status-card { background-image: linear-gradient(135deg, %s, #11161b); }\n",
+        card, panel,
+        accent,
+        border,
+        accent,
+        warm,
+        card, card, card, card);
+
     provider = gtk_css_provider_new();
 #if GTK_CHECK_VERSION(4, 12, 0)
     gtk_css_provider_load_from_string(provider, css->str);
@@ -1318,6 +1340,41 @@ static const char *network_connectivity_text(GNetworkConnectivity connectivity)
     }
 }
 
+#define SYSTEM_SETTINGS_UI_ASSET_DIR "/usr/share/infiltrator/system-settings/ui"
+
+static GtkWidget *make_ui_asset_picture(const char *filename,
+                                        int width,
+                                        int height,
+                                        const char *css_class)
+{
+    g_autofree gchar *path = NULL;
+    GtkWidget *picture;
+
+    if (filename == NULL || filename[0] == '\0') {
+        return NULL;
+    }
+    path = g_build_filename(
+        SYSTEM_SETTINGS_UI_ASSET_DIR, filename, NULL);
+    if (!g_file_test(path, G_FILE_TEST_IS_REGULAR)) {
+        return NULL;
+    }
+
+    picture = gtk_picture_new_for_filename(path);
+    gtk_picture_set_can_shrink(GTK_PICTURE(picture), TRUE);
+#if GTK_CHECK_VERSION(4, 8, 0)
+    gtk_picture_set_content_fit(
+        GTK_PICTURE(picture), GTK_CONTENT_FIT_COVER);
+#else
+    gtk_picture_set_keep_aspect_ratio(
+        GTK_PICTURE(picture), FALSE);
+#endif
+    gtk_widget_set_size_request(picture, width, height);
+    if (css_class != NULL) {
+        gtk_widget_add_css_class(picture, css_class);
+    }
+    return picture;
+}
+
 static void draw_scenic_panel(GtkDrawingArea *area,
                               cairo_t *cr,
                               int width,
@@ -1399,6 +1456,18 @@ static GtkWidget *make_scenic_panel(int width, int height, const char *css_class
         gtk_widget_add_css_class(area, css_class);
     }
     return area;
+}
+
+static GtkWidget *make_visual_panel(const char *filename,
+                                    int width,
+                                    int height,
+                                    const char *css_class)
+{
+    GtkWidget *picture = make_ui_asset_picture(
+        filename, width, height, css_class);
+    return picture != NULL
+        ? picture
+        : make_scenic_panel(width, height, css_class);
 }
 
 static void draw_australia_flag(GtkDrawingArea *area,
@@ -1524,15 +1593,22 @@ static GtkWidget *make_theme_preview(const char *label,
                                      gboolean selected)
 {
     GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
-    GtkWidget *preview = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    g_autofree gchar *asset_name =
+        g_strdup_printf("%s.svg", class_name);
+    GtkWidget *preview = make_ui_asset_picture(
+        asset_name, 112, 58, "theme-preview-window");
+
+    if (preview == NULL) {
+        preview = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+        gtk_widget_add_css_class(preview, "theme-preview-window");
+        gtk_widget_add_css_class(preview, class_name);
+        gtk_widget_set_size_request(preview, 112, 58);
+    }
 
     gtk_widget_add_css_class(box, "theme-preview");
-    gtk_widget_add_css_class(preview, "theme-preview-window");
-    gtk_widget_add_css_class(preview, class_name);
     if (selected) {
         gtk_widget_add_css_class(box, "theme-preview-selected");
     }
-    gtk_widget_set_size_request(preview, 96, 52);
     gtk_box_append(GTK_BOX(box), preview);
     gtk_widget_set_halign(box, GTK_ALIGN_CENTER);
     gtk_box_append(
@@ -1587,7 +1663,8 @@ static GtkWidget *build_home_page(GtkStack *stack)
 {
     GtkWidget *page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     GtkWidget *hero = gtk_overlay_new();
-    GtkWidget *hero_scene = make_scenic_panel(1060, 242, "hero-scene");
+    GtkWidget *hero_scene = make_visual_panel(
+        "hero-sunset.svg", 1060, 242, "hero-scene");
     GtkWidget *hero_foreground = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 20);
     GtkWidget *hero_copy = gtk_box_new(GTK_ORIENTATION_VERTICAL, 3);
     GtkWidget *hero_spacer = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
@@ -1603,7 +1680,8 @@ static GtkWidget *build_home_page(GtkStack *stack)
         "video-display-symbolic");
     GtkWidget *overview_data = gtk_grid_new();
     GtkWidget *overview_body = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 15);
-    GtkWidget *overview_scene = make_scenic_panel(190, 126, "overview-scene");
+    GtkWidget *overview_scene = make_visual_panel(
+        "overview-mountain.svg", 190, 126, "overview-scene");
     GtkWidget *quick = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
     GtkWidget *quick_heading = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 9);
     GtkWidget *quick_icon_wrap = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
@@ -1767,6 +1845,22 @@ static GtkWidget *build_home_page(GtkStack *stack)
     gtk_box_append(
         GTK_BOX(overview_heading),
         ss_linux_ui_make_label("System Overview", "home-card-title"));
+    GtkWidget *overview_spacer =
+        gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    GtkWidget *updates_button =
+        gtk_button_new_with_label("Check for updates →");
+    gtk_widget_set_hexpand(overview_spacer, TRUE);
+    gtk_box_append(GTK_BOX(overview_heading), overview_spacer);
+    gtk_widget_add_css_class(updates_button, "overview-link-button");
+    g_object_set_data_full(
+        G_OBJECT(updates_button),
+        "action-program",
+        g_strdup("infiltrator-software"),
+        g_free);
+    g_signal_connect(
+        updates_button, "clicked",
+        G_CALLBACK(launch_external_program), NULL);
+    gtk_box_append(GTK_BOX(overview_heading), updates_button);
     gtk_box_append(GTK_BOX(overview), overview_heading);
     gtk_grid_set_column_spacing(GTK_GRID(overview_data), 18);
     gtk_grid_set_row_spacing(GTK_GRID(overview_data), 8);
@@ -1943,6 +2037,13 @@ static GtkWidget *build_home_page(GtkStack *stack)
         GTK_BOX(region_copy),
         ss_linux_ui_make_label(region_detail, "status-card-detail"));
     gtk_box_append(GTK_BOX(region_body), region_copy);
+    GtkWidget *region_scene = make_ui_asset_picture(
+        "region-sydney.svg", 220, 96, "region-scene");
+    if (region_scene != NULL) {
+        gtk_widget_set_hexpand(region_scene, TRUE);
+        gtk_widget_set_halign(region_scene, GTK_ALIGN_END);
+        gtk_box_append(GTK_BOX(region_body), region_scene);
+    }
     gtk_box_append(GTK_BOX(region_card), region_body);
     gtk_grid_attach(GTK_GRID(status_grid), region_card, 1, 0, 1, 1);
 
@@ -1980,7 +2081,14 @@ static GtkWidget *build_home_page(GtkStack *stack)
             gtk_widget_get_first_child(network_card)),
         online ? "network-online" : "network-offline");
     network_body = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
-    gtk_box_append(GTK_BOX(network_body), make_network_visual(online));
+    GtkWidget *network_visual = make_ui_asset_picture(
+        "network-globe.svg", 300, 140, "network-visual");
+    if (network_visual == NULL) {
+        network_visual = make_network_visual(online);
+    }
+    gtk_widget_set_hexpand(network_visual, TRUE);
+    gtk_widget_set_halign(network_visual, GTK_ALIGN_END);
+    gtk_box_append(GTK_BOX(network_body), network_visual);
     gtk_box_append(GTK_BOX(network_card), network_body);
     gtk_grid_attach(GTK_GRID(status_grid), network_card, 1, 1, 1, 1);
 

@@ -2,6 +2,22 @@
 
 # Changelog
 
+## 0.4.20 — 2026-09-25 — runtime visual-asset finish pass
+
+- Add a packaged native SVG visual set derived from the approved north-star
+  composition instead of relying on the deliberately simple fallback Cairo
+  sketches for the primary Home dashboard.
+- Give the Home hero, System Overview, Date & Time, Region & Language and
+  Network cards dedicated high-detail visual artwork while preserving the Cairo
+  fallback when runtime assets are unavailable.
+- Replace flat theme swatches with miniature graphical desktop/window previews
+  for Light, Dark, Follow OS and Mercedes Grey.
+- Add the north-star-style Check for updates affordance to System Overview and
+  wire it to the real Infiltrator Software application.
+- Reduce the heavy hero text panel to a translucent gradient and add deeper
+  blue/grey card gradients and subtle glow without changing native controls.
+- Install the visual pack under /usr/share/infiltrator/system-settings/ui.
+
 ## 0.4.19 — 2026-09-25 — north-star composition pass
 
 - Recompose the Home hero as one full-width visual surface with the scenic
