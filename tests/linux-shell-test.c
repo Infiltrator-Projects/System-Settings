@@ -71,6 +71,7 @@ int main(void)
         g_assert_cmpuint(navigation_rows, >=, 13U);
         GtkWidget *home = gtk_stack_get_child_by_name(stack, "home");
         g_assert_nonnull(home);
+        g_assert_true(GTK_IS_SCROLLED_WINDOW(home));
         g_assert_cmpstr(
             gtk_stack_get_visible_child_name(stack), ==, "home");
         gtk_stack_set_visible_child_name(stack, "date-time");

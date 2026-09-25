@@ -2,6 +2,26 @@
 
 # Changelog
 
+## 0.4.19 — 2026-09-25 — north-star composition pass
+
+- Recompose the Home hero as one full-width visual surface with the scenic
+  artwork behind the welcome copy, feature chips and Infiltrator OS identity,
+  matching the north-star hierarchy instead of keeping text and art in separate
+  halves.
+- Strengthen the navigation rail with larger icon wells, cyan/gold glow,
+  tighter spacing and a vivid selected-state gradient.
+- Give all four Quick Actions larger icon wells, directional affordances and
+  cyan/gold visual identities instead of flat generic buttons.
+- Rebuild the Date & Time dashboard card around the real saved locality metadata
+  used by the Date & Time module: locality name, country, coordinates and the
+  local time are now shown directly on Home alongside a visual scene.
+- Present the System Overview OS line as Infiltrator OS over the underlying
+  Linux distribution and show a full human-readable system date/time.
+- Enrich Australian Region & Language presentation with currency and metric-unit
+  context while keeping the live locale as authority.
+- Preserve the repaired scrolling/window controls from 0.4.18 and keep all
+  visual changes inside the real native GTK program.
+
 ## 0.4.18 — 2026-09-25 — window controls and scrolling repair
 
 - Replace the unreliable implicit title-bar minimize/maximize controls with
