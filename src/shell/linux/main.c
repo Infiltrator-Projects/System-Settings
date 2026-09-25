@@ -290,15 +290,6 @@ static void install_common_theme(void)
         ".overview-value { color: %s; font-size: 13px; font-weight: %u; }\n"
         ".location-results row { border-radius: 9px; margin: 2px 4px; }\n"
         ".settings-card { border-top-width: 2px; }\n",
-        border,
-        surface, border,
-        warm, (unsigned int)type->ui_bold_weight,
-        card, border,
-        surface_hover,
-        surface, border,
-        accent,
-        muted,
-        title, (unsigned int)type->ui_bold_weight);
         panel, border,
         background, panel,
         panel, background,
@@ -319,7 +310,15 @@ static void install_common_theme(void)
         surface, border, accent,
         surface, status_border,
         surface, fault,
-        border);
+        border,
+        surface, border,
+        warm, (unsigned int)type->ui_bold_weight,
+        card, border,
+        surface_hover,
+        surface, border,
+        accent,
+        muted,
+        title, (unsigned int)type->ui_bold_weight);
 
     provider = gtk_css_provider_new();
 #if GTK_CHECK_VERSION(4, 12, 0)
