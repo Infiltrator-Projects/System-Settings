@@ -1130,9 +1130,8 @@ static GtkWidget *build_home_page(GtkWindow *parent,
         online ? "Connected" : "Offline",
         network_detail);
     gtk_widget_add_css_class(
-        gtk_widget_get_first_child(
-            gtk_widget_get_next_sibling(
-                gtk_widget_get_first_child(network_card))),
+        gtk_widget_get_next_sibling(
+            gtk_widget_get_first_child(network_card)),
         online ? "network-online" : "network-offline");
     gtk_grid_attach(GTK_GRID(status_grid), network_card, 1, 1, 1, 1);
 
