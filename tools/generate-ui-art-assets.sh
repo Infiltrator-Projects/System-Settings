@@ -2,8 +2,16 @@
 set -euo pipefail
 
 src="docs/design/system-settings-ui-north-star.webp"
+decoded="/tmp/system-settings-ui-north-star.png"
 out="assets/ui"
 mkdir -p "$out"
+
+if ! command -v dwebp >/dev/null 2>&1; then
+  echo "dwebp is required to decode the committed north-star WebP." >&2
+  exit 2
+fi
+dwebp "$src" -o "$decoded" >/dev/null
+src="$decoded"
 
 if command -v magick >/dev/null 2>&1; then
   IM=(magick)
