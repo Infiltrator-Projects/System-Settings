@@ -2,6 +2,21 @@
 
 # Changelog
 
+## 0.4.22 — 2026-09-25 — uploaded raster assets wired correctly
+
+- Replace the temporary/generated JPEG and SVG placeholder artwork with the nine
+  full-resolution PNG assets uploaded after the 0.4.21 tag.
+- Rename the uploaded ChatGPT-generated files to stable runtime names and map
+  them in generation order to hero, overview, date/time, region, network,
+  Light, Dark, Follow OS and Mercedes Grey presentation slots.
+- Point the native GTK shell and package install rules at the PNG artwork so the
+  actual raster assets are displayed instead of the old placeholders.
+- Remove the obsolete placeholder JPEG/SVG files and the generic upload names
+  from the runtime asset directory.
+- Keep Cairo/CSS rendering only as a missing-asset fallback rather than the
+  normal visual path.
+
+
 ## 0.4.21 — 2026-09-25 — dedicated north-star artwork
 
 - Replace the procedural SVG dashboard illustrations with nine independent

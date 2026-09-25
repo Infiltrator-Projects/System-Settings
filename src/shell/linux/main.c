@@ -1594,7 +1594,7 @@ static GtkWidget *make_theme_preview(const char *label,
 {
     GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
     g_autofree gchar *asset_name =
-        g_strdup_printf("%s.jpg", class_name);
+        g_strdup_printf("%s.png", class_name);
     GtkWidget *preview = make_ui_asset_picture(
         asset_name, 112, 58, "theme-preview-window");
 
@@ -1664,7 +1664,7 @@ static GtkWidget *build_home_page(GtkStack *stack)
     GtkWidget *page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     GtkWidget *hero = gtk_overlay_new();
     GtkWidget *hero_scene = make_visual_panel(
-        "hero-sunset.jpg", 1060, 242, "hero-scene");
+        "hero-asset.png", 1060, 242, "hero-scene");
     GtkWidget *hero_foreground = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 20);
     GtkWidget *hero_copy = gtk_box_new(GTK_ORIENTATION_VERTICAL, 3);
     GtkWidget *hero_spacer = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
@@ -1681,7 +1681,7 @@ static GtkWidget *build_home_page(GtkStack *stack)
     GtkWidget *overview_data = gtk_grid_new();
     GtkWidget *overview_body = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 15);
     GtkWidget *overview_scene = make_visual_panel(
-        "overview-mountain.jpg", 190, 126, "overview-scene");
+        "overview-asset.png", 190, 126, "overview-scene");
     GtkWidget *quick = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
     GtkWidget *quick_heading = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 9);
     GtkWidget *quick_icon_wrap = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
@@ -2008,7 +2008,7 @@ static GtkWidget *build_home_page(GtkStack *stack)
     gtk_box_append(GTK_BOX(date_body), date_meta);
 
     GtkWidget *date_scene = make_visual_panel(
-        "date-city.jpg", 190, 96, "date-scene");
+        "date-asset.png", 190, 96, "date-scene");
     gtk_widget_set_hexpand(date_scene, TRUE);
     gtk_widget_set_halign(date_scene, GTK_ALIGN_END);
     gtk_box_append(GTK_BOX(date_body), date_scene);
@@ -2039,7 +2039,7 @@ static GtkWidget *build_home_page(GtkStack *stack)
         ss_linux_ui_make_label(region_detail, "status-card-detail"));
     gtk_box_append(GTK_BOX(region_body), region_copy);
     GtkWidget *region_scene = make_ui_asset_picture(
-        "region-sydney.jpg", 220, 96, "region-scene");
+        "region-asset.png", 220, 96, "region-scene");
     if (region_scene != NULL) {
         gtk_widget_set_hexpand(region_scene, TRUE);
         gtk_widget_set_halign(region_scene, GTK_ALIGN_END);
@@ -2083,7 +2083,7 @@ static GtkWidget *build_home_page(GtkStack *stack)
         online ? "network-online" : "network-offline");
     network_body = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
     GtkWidget *network_visual = make_ui_asset_picture(
-        "network-globe.jpg", 300, 140, "network-visual");
+        "network-asset.png", 300, 140, "network-visual");
     if (network_visual == NULL) {
         network_visual = make_network_visual(online);
     }
