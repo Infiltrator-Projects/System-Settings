@@ -1,0 +1,44 @@
+name: Generate UI Art Assets
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/generate-ui-assets.yml"
+      - "tools/generate-ui-art-assets.sh"
+      - "docs/design/system-settings-ui-north-star.webp"
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install ImageMagick
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y imagemagick
+
+      - name: Generate dedicated UI artwork
+        run: |
+          chmod +x tools/generate-ui-art-assets.sh
+          ./tools/generate-ui-art-assets.sh
+
+      - name: Commit generated assets
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/ui/*.jpg
+          if git diff --cached --quiet; then
+            echo "No generated asset changes."
+            exit 0
+          fi
+          git commit -m "Generate dedicated north-star runtime art assets"
+          git push origin HEAD:main
