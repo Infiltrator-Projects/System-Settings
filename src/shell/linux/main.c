@@ -483,6 +483,40 @@ static void install_common_theme(void)
         accent,
         title);
 
+    g_string_append_printf(
+        css,
+        ".home-hero { padding: 18px 20px; overflow: hidden; }\n"
+        ".home-hero-mark { min-width: 390px; min-height: 182px; padding: 0; overflow: hidden; border-radius: 18px; }\n"
+        ".hero-scene { min-width: 390px; min-height: 182px; }\n"
+        ".hero-brand-overlay { background: rgba(4,12,19,0.76); border: 1px solid %s; border-radius: 13px; padding: 10px 14px; margin: 12px; }\n"
+        ".hero-brand-overlay image { color: %s; }\n"
+        ".overview-body { margin-top: 2px; }\n"
+        ".overview-scene { min-width: 190px; min-height: 126px; border-radius: 13px; }\n"
+        ".status-card { min-height: 0; padding: 16px 17px; }\n"
+        ".status-card-secondary { color: %s; font-size: 14px; font-weight: %u; }\n"
+        ".region-country { color: %s; font-size: 23px; font-weight: %u; }\n"
+        ".region-flag { border-radius: 11px; }\n",
+        border,
+        accent,
+        title, (unsigned int)type->ui_bold_weight,
+        title, (unsigned int)type->ui_bold_weight);
+
+    g_string_append_printf(
+        css,
+        ".theme-preview { padding: 5px; border: 1px solid transparent; border-radius: 10px; }\n"
+        ".theme-preview-selected { border-color: %s; background: %s; }\n"
+        ".theme-preview-window { border: 1px solid %s; border-radius: 8px; }\n"
+        ".theme-light { background-image: linear-gradient(to bottom, #f4f6f8 0 22%%, #dce2e8 22%% 100%%); }\n"
+        ".theme-dark { background-image: linear-gradient(to bottom, #24282d 0 22%%, #0f1216 22%% 100%%); }\n"
+        ".theme-follow { background-image: linear-gradient(135deg, #e9eef3 0 50%%, #171b20 50%% 100%%); }\n"
+        ".theme-mercedes { background-image: linear-gradient(to bottom, #53575b 0 22%%, #202326 22%% 100%%); }\n"
+        ".theme-preview-label { color: %s; font-size: 10px; }\n"
+        ".network-visual { min-height: 84px; border-radius: 12px; }\n"
+        ".date-status-card, .region-status-card, .appearance-status-card, .network-status-card { min-height: 186px; }\n",
+        accent, selected,
+        border,
+        muted);
+
     provider = gtk_css_provider_new();
 #if GTK_CHECK_VERSION(4, 12, 0)
     gtk_css_provider_load_from_string(provider, css->str);
@@ -1138,12 +1172,279 @@ static const char *network_connectivity_text(GNetworkConnectivity connectivity)
     }
 }
 
+static void draw_scenic_panel(GtkDrawingArea *area,
+                              cairo_t *cr,
+                              int width,
+                              int height,
+                              gpointer user_data)
+{
+    (void)area;
+    (void)user_data;
+    const double w = (double)width;
+    const double h = (double)height;
+
+    cairo_pattern_t *sky = cairo_pattern_create_linear(0.0, 0.0, 0.0, h);
+    cairo_pattern_add_color_stop_rgb(sky, 0.0, 0.01, 0.07, 0.13);
+    cairo_pattern_add_color_stop_rgb(sky, 0.45, 0.02, 0.18, 0.28);
+    cairo_pattern_add_color_stop_rgb(sky, 0.72, 0.78, 0.30, 0.08);
+    cairo_pattern_add_color_stop_rgb(sky, 1.0, 0.03, 0.08, 0.12);
+    cairo_set_source(cr, sky);
+    cairo_rectangle(cr, 0.0, 0.0, w, h);
+    cairo_fill(cr);
+    cairo_pattern_destroy(sky);
+
+    cairo_set_source_rgba(cr, 1.0, 0.63, 0.14, 0.92);
+    cairo_arc(cr, w * 0.72, h * 0.44, h * 0.075, 0.0, 6.283185307179586);
+    cairo_fill(cr);
+
+    cairo_set_source_rgb(cr, 0.03, 0.07, 0.10);
+    cairo_move_to(cr, 0.0, h * 0.60);
+    cairo_line_to(cr, w * 0.14, h * 0.42);
+    cairo_line_to(cr, w * 0.25, h * 0.56);
+    cairo_line_to(cr, w * 0.39, h * 0.34);
+    cairo_line_to(cr, w * 0.51, h * 0.57);
+    cairo_line_to(cr, w * 0.64, h * 0.40);
+    cairo_line_to(cr, w * 0.78, h * 0.58);
+    cairo_line_to(cr, w, h * 0.48);
+    cairo_line_to(cr, w, h);
+    cairo_line_to(cr, 0.0, h);
+    cairo_close_path(cr);
+    cairo_fill(cr);
+
+    cairo_pattern_t *water = cairo_pattern_create_linear(0.0, h * 0.60, 0.0, h);
+    cairo_pattern_add_color_stop_rgb(water, 0.0, 0.02, 0.18, 0.25);
+    cairo_pattern_add_color_stop_rgb(water, 1.0, 0.01, 0.05, 0.09);
+    cairo_set_source(cr, water);
+    cairo_rectangle(cr, 0.0, h * 0.60, w, h * 0.40);
+    cairo_fill(cr);
+    cairo_pattern_destroy(water);
+
+    cairo_set_source_rgba(cr, 1.0, 0.55, 0.08, 0.48);
+    cairo_set_line_width(cr, 2.0);
+    for (int i = 0; i < 6; ++i) {
+        const double y = h * (0.68 + 0.045 * (double)i);
+        const double spread = w * (0.025 + 0.018 * (double)i);
+        cairo_move_to(cr, w * 0.72 - spread, y);
+        cairo_line_to(cr, w * 0.72 + spread, y);
+        cairo_stroke(cr);
+    }
+
+    cairo_set_source_rgb(cr, 0.01, 0.03, 0.04);
+    cairo_set_line_width(cr, 7.0);
+    cairo_move_to(cr, w * 0.90, h);
+    cairo_curve_to(cr, w * 0.88, h * 0.78, w * 0.93, h * 0.58, w * 0.91, h * 0.30);
+    cairo_stroke(cr);
+    cairo_set_line_width(cr, 4.0);
+    cairo_move_to(cr, w * 0.91, h * 0.46);
+    cairo_line_to(cr, w * 0.83, h * 0.28);
+    cairo_move_to(cr, w * 0.91, h * 0.40);
+    cairo_line_to(cr, w * 0.97, h * 0.22);
+    cairo_stroke(cr);
+}
+
+static GtkWidget *make_scenic_panel(int width, int height, const char *css_class)
+{
+    GtkWidget *area = gtk_drawing_area_new();
+    gtk_drawing_area_set_content_width(GTK_DRAWING_AREA(area), width);
+    gtk_drawing_area_set_content_height(GTK_DRAWING_AREA(area), height);
+    gtk_drawing_area_set_draw_func(
+        GTK_DRAWING_AREA(area), draw_scenic_panel, NULL, NULL);
+    if (css_class != NULL) {
+        gtk_widget_add_css_class(area, css_class);
+    }
+    return area;
+}
+
+static void draw_australia_flag(GtkDrawingArea *area,
+                                cairo_t *cr,
+                                int width,
+                                int height,
+                                gpointer user_data)
+{
+    (void)area;
+    (void)user_data;
+    const double w = (double)width;
+    const double h = (double)height;
+
+    cairo_set_source_rgb(cr, 0.02, 0.14, 0.38);
+    cairo_paint(cr);
+
+    cairo_set_source_rgb(cr, 0.95, 0.95, 0.96);
+    cairo_rectangle(cr, 0.0, 0.0, w * 0.46, h * 0.52);
+    cairo_fill(cr);
+    cairo_set_source_rgb(cr, 0.03, 0.16, 0.42);
+    cairo_rectangle(cr, 0.0, 0.0, w * 0.46, h * 0.52);
+    cairo_fill(cr);
+
+    cairo_set_source_rgb(cr, 0.96, 0.96, 0.96);
+    cairo_set_line_width(cr, h * 0.08);
+    cairo_move_to(cr, 0.0, 0.0);
+    cairo_line_to(cr, w * 0.46, h * 0.52);
+    cairo_move_to(cr, w * 0.46, 0.0);
+    cairo_line_to(cr, 0.0, h * 0.52);
+    cairo_stroke(cr);
+
+    cairo_set_source_rgb(cr, 0.85, 0.05, 0.12);
+    cairo_set_line_width(cr, h * 0.035);
+    cairo_move_to(cr, 0.0, 0.0);
+    cairo_line_to(cr, w * 0.46, h * 0.52);
+    cairo_move_to(cr, w * 0.46, 0.0);
+    cairo_line_to(cr, 0.0, h * 0.52);
+    cairo_stroke(cr);
+
+    cairo_set_source_rgb(cr, 0.96, 0.96, 0.96);
+    cairo_rectangle(cr, w * 0.19, 0.0, w * 0.08, h * 0.52);
+    cairo_rectangle(cr, 0.0, h * 0.20, w * 0.46, h * 0.12);
+    cairo_fill(cr);
+    cairo_set_source_rgb(cr, 0.85, 0.05, 0.12);
+    cairo_rectangle(cr, w * 0.215, 0.0, w * 0.03, h * 0.52);
+    cairo_rectangle(cr, 0.0, h * 0.23, w * 0.46, h * 0.06);
+    cairo_fill(cr);
+
+    cairo_set_source_rgb(cr, 1.0, 1.0, 1.0);
+    const double stars[][2] = {
+        {0.68, 0.25}, {0.80, 0.48}, {0.64, 0.68},
+        {0.86, 0.76}, {0.75, 0.87}, {0.35, 0.72}
+    };
+    for (guint i = 0; i < G_N_ELEMENTS(stars); ++i) {
+        cairo_arc(cr, w * stars[i][0], h * stars[i][1], h * 0.035,
+                  0.0, 6.283185307179586);
+        cairo_fill(cr);
+    }
+}
+
+static GtkWidget *make_australia_flag(void)
+{
+    GtkWidget *area = gtk_drawing_area_new();
+    gtk_drawing_area_set_content_width(GTK_DRAWING_AREA(area), 104);
+    gtk_drawing_area_set_content_height(GTK_DRAWING_AREA(area), 66);
+    gtk_drawing_area_set_draw_func(
+        GTK_DRAWING_AREA(area), draw_australia_flag, NULL, NULL);
+    gtk_widget_add_css_class(area, "region-flag");
+    return area;
+}
+
+static void draw_network_visual(GtkDrawingArea *area,
+                                cairo_t *cr,
+                                int width,
+                                int height,
+                                gpointer user_data)
+{
+    (void)area;
+    const gboolean online = GPOINTER_TO_INT(user_data) != 0;
+    const double w = (double)width;
+    const double h = (double)height;
+    const double nodes[][2] = {
+        {0.14,0.62},{0.30,0.36},{0.46,0.58},{0.62,0.30},{0.78,0.52},{0.90,0.28}
+    };
+
+    cairo_set_source_rgb(cr, 0.01, 0.05, 0.09);
+    cairo_paint(cr);
+    cairo_set_line_width(cr, 1.5);
+    cairo_set_source_rgba(cr, 0.0, 0.68, 0.95, online ? 0.50 : 0.18);
+    for (guint i = 1; i < G_N_ELEMENTS(nodes); ++i) {
+        cairo_move_to(cr, w * nodes[i-1][0], h * nodes[i-1][1]);
+        cairo_line_to(cr, w * nodes[i][0], h * nodes[i][1]);
+        cairo_stroke(cr);
+    }
+    for (guint i = 0; i < G_N_ELEMENTS(nodes); ++i) {
+        cairo_set_source_rgb(
+            cr,
+            online ? 0.0 : 0.45,
+            online ? 0.75 : 0.45,
+            online ? 1.0 : 0.45);
+        cairo_arc(cr, w * nodes[i][0], h * nodes[i][1], 4.0,
+                  0.0, 6.283185307179586);
+        cairo_fill(cr);
+    }
+}
+
+static GtkWidget *make_network_visual(gboolean online)
+{
+    GtkWidget *area = gtk_drawing_area_new();
+    gtk_drawing_area_set_content_width(GTK_DRAWING_AREA(area), 280);
+    gtk_drawing_area_set_content_height(GTK_DRAWING_AREA(area), 84);
+    gtk_drawing_area_set_draw_func(
+        GTK_DRAWING_AREA(area),
+        draw_network_visual,
+        GINT_TO_POINTER(online ? 1 : 0),
+        NULL);
+    gtk_widget_add_css_class(area, "network-visual");
+    return area;
+}
+
+static GtkWidget *make_theme_preview(const char *label,
+                                     const char *class_name,
+                                     gboolean selected)
+{
+    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
+    GtkWidget *preview = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+
+    gtk_widget_add_css_class(box, "theme-preview");
+    gtk_widget_add_css_class(preview, "theme-preview-window");
+    gtk_widget_add_css_class(preview, class_name);
+    if (selected) {
+        gtk_widget_add_css_class(box, "theme-preview-selected");
+    }
+    gtk_widget_set_size_request(preview, 96, 52);
+    gtk_box_append(GTK_BOX(box), preview);
+    gtk_widget_set_halign(box, GTK_ALIGN_CENTER);
+    gtk_box_append(
+        GTK_BOX(box),
+        ss_linux_ui_make_label(label, "theme-preview-label"));
+    return box;
+}
+
+static gchar *format_uptime(void)
+{
+    g_autofree gchar *contents = NULL;
+    gsize length = 0U;
+    double seconds = 0.0;
+
+    if (!g_file_get_contents("/proc/uptime", &contents, &length, NULL) ||
+        contents == NULL ||
+        sscanf(contents, "%lf", &seconds) != 1 ||
+        seconds < 0.0) {
+        return g_strdup("Unknown");
+    }
+
+    const guint64 total = (guint64)seconds;
+    const guint64 days = total / 86400U;
+    const guint64 hours = (total % 86400U) / 3600U;
+    const guint64 minutes = (total % 3600U) / 60U;
+    if (days > 0U) {
+        return g_strdup_printf("%" G_GUINT64_FORMAT "d %" G_GUINT64_FORMAT "h", days, hours);
+    }
+    if (hours > 0U) {
+        return g_strdup_printf("%" G_GUINT64_FORMAT "h %" G_GUINT64_FORMAT "m", hours, minutes);
+    }
+    return g_strdup_printf("%" G_GUINT64_FORMAT "m", minutes);
+}
+
+static const char *locale_country_label(const char *locale_name)
+{
+    if (locale_name != NULL && strstr(locale_name, "_AU") != NULL) {
+        return "Australia";
+    }
+    return locale_name != NULL ? locale_name : "Unknown";
+}
+
+static const char *locale_language_label(const char *locale_name)
+{
+    if (locale_name != NULL && g_str_has_prefix(locale_name, "en_AU")) {
+        return "English (Australia)";
+    }
+    return locale_name != NULL ? locale_name : "Unknown";
+}
+
 static GtkWidget *build_home_page(GtkStack *stack)
 {
     GtkWidget *page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     GtkWidget *hero = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 22);
     GtkWidget *hero_copy = gtk_box_new(GTK_ORIENTATION_VERTICAL, 3);
-    GtkWidget *hero_mark = gtk_box_new(GTK_ORIENTATION_VERTICAL, 5);
+    GtkWidget *hero_mark = gtk_overlay_new();
+    GtkWidget *hero_scene = make_scenic_panel(360, 176, "hero-scene");
+    GtkWidget *hero_brand = gtk_box_new(GTK_ORIENTATION_VERTICAL, 3);
     GtkWidget *hero_icon = gtk_image_new_from_icon_name(
         "video-display-symbolic");
     GtkWidget *features = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 9);
@@ -1154,6 +1455,8 @@ static GtkWidget *build_home_page(GtkStack *stack)
     GtkWidget *overview_icon = gtk_image_new_from_icon_name(
         "video-display-symbolic");
     GtkWidget *overview_data = gtk_grid_new();
+    GtkWidget *overview_body = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 15);
+    GtkWidget *overview_scene = make_scenic_panel(190, 126, "overview-scene");
     GtkWidget *quick = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
     GtkWidget *quick_heading = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 9);
     GtkWidget *quick_icon_wrap = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
@@ -1166,7 +1469,12 @@ static GtkWidget *build_home_page(GtkStack *stack)
     GtkWidget *appearance_card;
     GtkWidget *network_card;
     GtkWidget *date_open;
-    GtkWidget *date_spacer;
+    GtkWidget *date_meta;
+    GtkWidget *date_location;
+    GtkWidget *region_body;
+    GtkWidget *region_copy;
+    GtkWidget *appearance_previews;
+    GtkWidget *network_body;
     GtkWidget *scroller = gtk_scrolled_window_new();
     struct utsname uts;
     g_autofree gchar *os_name = g_get_os_info(G_OS_INFO_KEY_PRETTY_NAME);
@@ -1194,6 +1502,10 @@ static GtkWidget *build_home_page(GtkStack *stack)
     g_autofree gchar *region_detail = NULL;
     g_autofree gchar *appearance_detail = NULL;
     g_autofree gchar *network_detail = NULL;
+    g_autofree gchar *uptime_text = format_uptime();
+    g_autoptr(GTimeZone) local_zone = g_time_zone_new_local();
+    const char *timezone_name =
+        local_zone != NULL ? g_time_zone_get_identifier(local_zone) : "Unknown";
 
     if (gtk_settings != NULL) {
         g_object_get(
@@ -1208,7 +1520,10 @@ static GtkWidget *build_home_page(GtkStack *stack)
         connectivity = g_network_monitor_get_connectivity(network);
     }
 
-    region_detail = g_strdup_printf("Locale %s", locale_name);
+    region_detail = g_strdup_printf(
+        "%s  •  Locale %s",
+        locale_language_label(locale_name),
+        locale_name);
     appearance_detail = g_strdup_printf(
         "%s presentation",
         prefer_dark ? "Dark" : "Light");
@@ -1250,18 +1565,21 @@ static GtkWidget *build_home_page(GtkStack *stack)
     gtk_box_append(GTK_BOX(hero), hero_copy);
 
     gtk_widget_add_css_class(hero_mark, "home-hero-mark");
-    gtk_widget_set_valign(hero_mark, GTK_ALIGN_CENTER);
-    gtk_widget_set_halign(hero_mark, GTK_ALIGN_CENTER);
-    gtk_image_set_pixel_size(GTK_IMAGE(hero_icon), 78);
-    gtk_box_append(GTK_BOX(hero_mark), hero_icon);
+    gtk_overlay_set_child(GTK_OVERLAY(hero_mark), hero_scene);
+    gtk_widget_set_halign(hero_brand, GTK_ALIGN_END);
+    gtk_widget_set_valign(hero_brand, GTK_ALIGN_END);
+    gtk_widget_add_css_class(hero_brand, "hero-brand-overlay");
+    gtk_image_set_pixel_size(GTK_IMAGE(hero_icon), 42);
+    gtk_box_append(GTK_BOX(hero_brand), hero_icon);
     gtk_box_append(
-        GTK_BOX(hero_mark),
+        GTK_BOX(hero_brand),
         ss_linux_ui_make_label("INFILTRATOR OS", "home-hero-mark-title"));
     gtk_box_append(
-        GTK_BOX(hero_mark),
+        GTK_BOX(hero_brand),
         ss_linux_ui_make_label(
             "GRAPHICAL SYSTEM CONTROL",
             "home-hero-mark-copy"));
+    gtk_overlay_add_overlay(GTK_OVERLAY(hero_mark), hero_brand);
     gtk_box_append(GTK_BOX(hero), hero_mark);
     gtk_box_append(GTK_BOX(page), hero);
 
@@ -1291,7 +1609,14 @@ static GtkWidget *build_home_page(GtkStack *stack)
         GTK_GRID(overview_data), 3, "Desktop", desktop);
     append_overview_row(
         GTK_GRID(overview_data), 4, "Hostname", host);
-    gtk_box_append(GTK_BOX(overview), overview_data);
+    append_overview_row(
+        GTK_GRID(overview_data), 5, "Uptime", uptime_text);
+    append_overview_row(
+        GTK_GRID(overview_data), 6, "System time", time_text);
+    gtk_box_append(GTK_BOX(overview_body), overview_scene);
+    gtk_widget_set_hexpand(overview_data, TRUE);
+    gtk_box_append(GTK_BOX(overview_body), overview_data);
+    gtk_box_append(GTK_BOX(overview), overview_body);
     gtk_grid_attach(GTK_GRID(grid), overview, 0, 0, 1, 1);
 
     gtk_widget_add_css_class(quick, "home-card");
@@ -1357,9 +1682,17 @@ static GtkWidget *build_home_page(GtkStack *stack)
         "Date & Time",
         time_text,
         date_text);
-    date_spacer = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
-    gtk_widget_set_vexpand(date_spacer, TRUE);
-    gtk_box_append(GTK_BOX(date_card), date_spacer);
+    date_meta = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
+    date_location = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
+    gtk_box_append(
+        GTK_BOX(date_location),
+        ss_linux_ui_make_label("Current time zone", "status-card-detail"));
+    gtk_box_append(
+        GTK_BOX(date_location),
+        ss_linux_ui_make_label(timezone_name, "status-card-secondary"));
+    gtk_box_append(GTK_BOX(date_meta), date_location);
+    gtk_widget_set_hexpand(date_meta, TRUE);
+    gtk_box_append(GTK_BOX(date_card), date_meta);
     date_open = gtk_button_new_with_label("Open Date & Time");
     gtk_widget_add_css_class(date_open, "primary-button");
     gtk_widget_set_halign(date_open, GTK_ALIGN_START);
@@ -1369,12 +1702,30 @@ static GtkWidget *build_home_page(GtkStack *stack)
     gtk_box_append(GTK_BOX(date_card), date_open);
     gtk_grid_attach(GTK_GRID(status_grid), date_card, 0, 0, 1, 1);
 
-    region_card = make_status_card(
-        "region-status-card",
-        "preferences-desktop-locale-symbolic",
-        "Region & Language",
-        locale_name,
-        region_detail);
+    region_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+    gtk_widget_add_css_class(region_card, "status-card");
+    gtk_widget_add_css_class(region_card, "region-status-card");
+    GtkWidget *region_heading = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 9);
+    GtkWidget *region_icon = gtk_image_new_from_icon_name(
+        "preferences-desktop-locale-symbolic");
+    gtk_image_set_pixel_size(GTK_IMAGE(region_icon), 23);
+    gtk_box_append(GTK_BOX(region_heading), region_icon);
+    gtk_box_append(
+        GTK_BOX(region_heading),
+        ss_linux_ui_make_label("Region & Language", "home-card-title"));
+    gtk_box_append(GTK_BOX(region_card), region_heading);
+    region_body = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 13);
+    gtk_box_append(GTK_BOX(region_body), make_australia_flag());
+    region_copy = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
+    gtk_box_append(
+        GTK_BOX(region_copy),
+        ss_linux_ui_make_label(
+            locale_country_label(locale_name), "region-country"));
+    gtk_box_append(
+        GTK_BOX(region_copy),
+        ss_linux_ui_make_label(region_detail, "status-card-detail"));
+    gtk_box_append(GTK_BOX(region_body), region_copy);
+    gtk_box_append(GTK_BOX(region_card), region_body);
     gtk_grid_attach(GTK_GRID(status_grid), region_card, 1, 0, 1, 1);
 
     appearance_card = make_status_card(
@@ -1383,6 +1734,21 @@ static GtkWidget *build_home_page(GtkStack *stack)
         "Display & Appearance",
         theme_name != NULL ? theme_name : "System theme",
         appearance_detail);
+    appearance_previews = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 9);
+    gtk_box_set_homogeneous(GTK_BOX(appearance_previews), TRUE);
+    gtk_box_append(
+        GTK_BOX(appearance_previews),
+        make_theme_preview("Light", "theme-light", !prefer_dark));
+    gtk_box_append(
+        GTK_BOX(appearance_previews),
+        make_theme_preview("Dark", "theme-dark", prefer_dark));
+    gtk_box_append(
+        GTK_BOX(appearance_previews),
+        make_theme_preview("Follow OS", "theme-follow", FALSE));
+    gtk_box_append(
+        GTK_BOX(appearance_previews),
+        make_theme_preview("Mercedes Grey", "theme-mercedes", FALSE));
+    gtk_box_append(GTK_BOX(appearance_card), appearance_previews);
     gtk_grid_attach(GTK_GRID(status_grid), appearance_card, 0, 1, 1, 1);
 
     network_card = make_status_card(
@@ -1395,8 +1761,13 @@ static GtkWidget *build_home_page(GtkStack *stack)
         gtk_widget_get_next_sibling(
             gtk_widget_get_first_child(network_card)),
         online ? "network-online" : "network-offline");
+    network_body = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
+    gtk_box_append(GTK_BOX(network_body), make_network_visual(online));
+    gtk_box_append(GTK_BOX(network_card), network_body);
     gtk_grid_attach(GTK_GRID(status_grid), network_card, 1, 1, 1, 1);
 
+    gtk_widget_set_valign(status_grid, GTK_ALIGN_START);
+    gtk_widget_set_vexpand(status_grid, FALSE);
     gtk_box_append(GTK_BOX(page), status_grid);
 
     gtk_scrolled_window_set_policy(

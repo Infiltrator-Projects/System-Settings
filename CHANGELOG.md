@@ -2,6 +2,24 @@
 
 # Changelog
 
+## 0.4.17 — 2026-09-25 — graphical dashboard content pass
+
+- Replace the generic hero monitor block with a real programmatic scenic
+  dashboard illustration: sunset sky, mountains, water reflection and tree
+  silhouette, rendered natively with Cairo rather than a static mockup image.
+- Enrich System Overview with its own visual thumbnail plus live uptime and
+  system time, removing more of the spreadsheet-like feel.
+- Recompose Date & Time around a large clock plus the real local time-zone
+  identifier instead of leaving a large empty card.
+- Give Region & Language a graphical Australian flag treatment on en_AU systems,
+  with human-readable Australia / English (Australia) presentation.
+- Add four visual theme-preview tiles to Display & Appearance while retaining
+  the real current GTK theme and light/dark state.
+- Add a live network visualization driven by GIO connectivity state.
+- Remove the accidental vertical expansion that made the lower dashboard cards
+  look mostly empty, so the Home page becomes denser and closer to the committed
+  north-star composition.
+
 ## 0.4.16 — 2026-09-25 — full graphical navigation rail
 
 - Expand the left rail to the full north-star category density instead of
