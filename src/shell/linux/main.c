@@ -365,6 +365,7 @@ static void install_common_theme(void)
         ".header-brand-subtitle { color: %s; font-size: 11px; }\n"
         ".settings-search { min-width: 290px; background: %s; color: %s; border: 1px solid %s; border-radius: 14px; padding: 8px 12px; }\n"
         ".settings-search:focus { border-color: %s; }\n"
+        ".header-end { margin-left: 10px; }\n"
         ".home-page { padding: 22px 26px 28px 26px; }\n"
         ".home-hero { background-image: linear-gradient(115deg, %s, %s); border: 1px solid %s; border-radius: 20px; padding: 26px 28px; }\n"
         ".home-hero-eyebrow { color: %s; font-size: 10px; font-weight: %u; letter-spacing: 0.12em; }\n"
@@ -903,6 +904,7 @@ static GtkWidget *build_header(GtkWindow *parent, GtkSearchEntry **search_out)
     GtkWidget *icon = gtk_image_new_from_icon_name(info->icon_name);
     GtkWidget *copy = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     GtkWidget *search = gtk_search_entry_new();
+    GtkWidget *header_end = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
     GtkWidget *minimize = make_window_control(
         "window-minimize-symbolic", "Minimize", NULL);
     GtkWidget *maximize = make_window_control(
@@ -934,7 +936,7 @@ static GtkWidget *build_header(GtkWindow *parent, GtkSearchEntry **search_out)
         GTK_SEARCH_ENTRY(search), "Search settings…");
     gtk_widget_add_css_class(search, "settings-search");
     gtk_widget_set_size_request(search, 320, -1);
-    gtk_header_bar_pack_end(GTK_HEADER_BAR(header), search);
+    gtk_widget_add_css_class(header_end, "header-end");
 
     g_signal_connect(
         minimize, "clicked", G_CALLBACK(minimize_window), parent);
@@ -942,10 +944,22 @@ static GtkWidget *build_header(GtkWindow *parent, GtkSearchEntry **search_out)
         maximize, "clicked", G_CALLBACK(toggle_maximize_window), parent);
     g_signal_connect(
         close, "clicked", G_CALLBACK(close_window), parent);
-    gtk_header_bar_pack_end(GTK_HEADER_BAR(header), minimize);
-    gtk_header_bar_pack_end(GTK_HEADER_BAR(header), maximize);
-    gtk_header_bar_pack_end(GTK_HEADER_BAR(header), close);
+    /*
+     * Keep the search field to the left of the conventional window controls.
+     * Packing each item independently with GtkHeaderBar::pack_end reverses the
+     * apparent order at the trailing edge. One explicit box makes the visual
+     * contract deterministic: Search | Minimize | Maximize | Close.
+     */
+    gtk_box_append(GTK_BOX(header_end), search);
+    gtk_box_append(GTK_BOX(header_end), minimize);
+    gtk_box_append(GTK_BOX(header_end), maximize);
+    gtk_box_append(GTK_BOX(header_end), close);
+    gtk_header_bar_pack_end(GTK_HEADER_BAR(header), header_end);
 
+    g_object_set_data(
+        G_OBJECT(parent), "system-settings-header-end", header_end);
+    g_object_set_data(
+        G_OBJECT(parent), "system-settings-search-entry", search);
     g_object_set_data(
         G_OBJECT(parent), "system-settings-minimize-button", minimize);
     g_object_set_data(

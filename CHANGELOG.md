@@ -2,6 +2,15 @@
 
 # Changelog
 
+## 0.4.25 — 2026-09-25 — correct header control order
+
+- Correct the title-bar trailing controls to the conventional visual order:
+  Search, Minimize, Maximize/Restore, Close.
+- Replace independent GtkHeaderBar trailing packing with one explicit ordered
+  container so GTK cannot reverse the apparent control sequence.
+- Add a Linux shell regression that verifies the exact child order of the
+  search field and three window controls.
+
 ## 0.4.24 — 2026-09-25 — live Home clock
 
 - Make the Home Date & Time clock a genuinely live display instead of a

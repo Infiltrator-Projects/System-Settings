@@ -41,15 +41,26 @@ int main(void)
         GtkListBox *navigation = g_object_get_data(
             G_OBJECT(window), "system-settings-navigation-list");
         g_assert_true(GTK_IS_LIST_BOX(navigation));
+        GtkWidget *header_end = g_object_get_data(
+            G_OBJECT(window), "system-settings-header-end");
+        GtkWidget *search = g_object_get_data(
+            G_OBJECT(window), "system-settings-search-entry");
         GtkWidget *minimize = g_object_get_data(
             G_OBJECT(window), "system-settings-minimize-button");
         GtkWidget *maximize = g_object_get_data(
             G_OBJECT(window), "system-settings-maximize-button");
         GtkWidget *close = g_object_get_data(
             G_OBJECT(window), "system-settings-close-button");
+        g_assert_true(GTK_IS_BOX(header_end));
+        g_assert_true(GTK_IS_SEARCH_ENTRY(search));
         g_assert_true(GTK_IS_BUTTON(minimize));
         g_assert_true(GTK_IS_BUTTON(maximize));
         g_assert_true(GTK_IS_BUTTON(close));
+        g_assert_true(gtk_widget_get_first_child(header_end) == search);
+        g_assert_true(gtk_widget_get_next_sibling(search) == minimize);
+        g_assert_true(gtk_widget_get_next_sibling(minimize) == maximize);
+        g_assert_true(gtk_widget_get_next_sibling(maximize) == close);
+        g_assert_null(gtk_widget_get_next_sibling(close));
         GtkScrolledWindow *nav_scroller = g_object_get_data(
             G_OBJECT(window), "system-settings-navigation-scroller");
         GtkScrolledWindow *date_scroller = g_object_get_data(
