@@ -261,16 +261,18 @@ A release commit must:
 ## Implemented audit regressions (2026-09-25)
 
 CTest contains eleven project tests on Linux with Xvfb available. Added checks
-exercise private-bus service lifetime after caller release, actual shell
-activation/dropdown ownership/close with pending construction, and CLI
-transaction rollback on malformed arguments. Existing tests cover non-finite
-coordinates, malformed locality records, truncated zone rows, bounded time
-parsing, save/reload failure, synchronous model re-entry and Windows embedded
-NUL input. Tests use isolated files and a memory settings backend.
+exercise private-bus service lifetime after caller release, timedated owner
+loss/reacquisition, actual shell activation/dropdown ownership/close with
+pending construction, and CLI transaction rollback on malformed arguments.
+Existing tests cover non-finite coordinates, malformed locality records,
+private-directory permission repair, truncated zone rows, bounded time parsing,
+save/reload failure, synchronous model re-entry, Windows embedded-NUL input and
+cross-process Windows publication races. Tests use isolated files and a memory
+settings backend.
 
 Manual acceptance still includes real Mint polkit cancellation/denial, network
-geocoding, desktop theme changes, screen-reader interaction, DST fold choice
-and Windows concurrent writers. A passing fixture is not proof of those cases.
+geocoding, desktop theme changes, screen-reader interaction and DST fold choice.
+A passing fixture is not proof of those cases.
 Manual Gregorian time rejects GLib's normalisation of nonexistent DST wall
 times; repeated wall times use GLib's documented standard-time occurrence.
 

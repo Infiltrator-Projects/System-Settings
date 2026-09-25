@@ -2,6 +2,18 @@
 
 # Changelog
 
+## 0.4.9 — 2026-09-25 — forensic follow-up hardening
+
+- Add a private-D-Bus regression for timedated owner loss and reacquisition,
+  proving unavailable state is surfaced and authoritative state returns.
+- Add a native Windows cross-process persistence race test; competing writers
+  must leave one complete parseable policy and no stale sibling temporary file.
+- Enforce mode 0700 on the Linux locality-metadata directory even when the
+  directory already existed with broader permissions, with regression coverage.
+- Make normal Linux and Windows CI builds use total logical processors minus one,
+  matching the project's build-parallelism rule used by sanitizer/release jobs.
+- Preserve the complete 0.4.7/0.4.8 forensic implementation and documentation.
+
 ## 0.4.8 — 2026-09-25 — forensic audit closure
 
 - Preserve the complete 0.4.7 forensic implementation unchanged.

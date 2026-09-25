@@ -145,6 +145,15 @@ bool ss_location_metadata_save(const SsLocationMetadata *metadata)
     if (g_mkdir_with_parents(directory, 0700) != 0 && errno != EEXIST) {
         return false;
     }
+    /*
+     * g_mkdir_with_parents() does not tighten an already existing directory.
+     * Locality metadata is private user state, so repair the leaf directory
+     * mode before publishing the file as well as creating new directories
+     * with 0700.
+     */
+    if (g_chmod(directory, 0700) != 0) {
+        return false;
+    }
 
     /*
      * CONSISTENT requests replacement through a temporary file and DURABLE

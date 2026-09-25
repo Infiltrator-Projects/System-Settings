@@ -35,8 +35,16 @@ jobs:
           pkg-config --exists geocode-glib-2.0
       - name: Configure
         run: cmake -S . -B build -DBUILD_TESTING=ON -DSYSTEM_SETTINGS_WARNINGS_AS_ERRORS=ON
-      - name: Build
-        run: cmake --build build --config Release --parallel 2
+      - name: Build (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: cmake --build build --config Release --parallel "$(($(nproc)>1?$(nproc)-1:1))"
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $jobs = [Math]::Max([Environment]::ProcessorCount - 1, 1)
+          cmake --build build --config Release --parallel $jobs
       - name: Test
         run: ctest --test-dir build -C Release --output-on-failure
       - name: Build Debian package

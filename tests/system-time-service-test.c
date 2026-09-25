@@ -6,6 +6,8 @@ static SsSystemTimeService *service;
 static bool ready;
 static bool completed;
 static GDBusMethodInvocation *pending;
+static SsSystemTimeState observed_state;
+static guint observed_changes;
 
 static GVariant *get_property(GDBusConnection *connection, const gchar *sender,
     const gchar *path, const gchar *interface, const gchar *property,
@@ -38,6 +40,17 @@ static void on_ready(SsSystemTimeService *value, const char *error, gpointer dat
     ready = true;
 }
 
+static void on_changed(SsSystemTimeService *value,
+                       const SsSystemTimeState *state,
+                       gpointer data)
+{
+    (void)value;
+    (void)data;
+    g_assert_nonnull(state);
+    observed_state = *state;
+    observed_changes++;
+}
+
 static void on_complete(SsSystemTimeService *value, bool success,
                         const char *error, gpointer data)
 {
@@ -49,6 +62,25 @@ static void on_complete(SsSystemTimeService *value, bool success,
     g_assert_true(ss_system_time_service_read(value, &state));
     g_assert_cmpstr(state.timezone, ==, "Australia/Melbourne");
     completed = true;
+}
+
+static void change_bus_name(GDBusConnection *connection, const char *method)
+{
+    g_autoptr(GVariant) reply = NULL;
+    GVariant *parameters;
+
+    if (g_str_equal(method, "RequestName")) {
+        parameters = g_variant_new("(su)", "org.freedesktop.timedate1", 0U);
+    } else {
+        g_assert_cmpstr(method, ==, "ReleaseName");
+        parameters = g_variant_new("(s)", "org.freedesktop.timedate1");
+    }
+
+    reply = g_dbus_connection_call_sync(connection,
+        "org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus",
+        method, parameters, G_VARIANT_TYPE("(u)"),
+        G_DBUS_CALL_FLAGS_NONE, 1000, NULL, NULL);
+    g_assert_nonnull(reply);
 }
 
 static gboolean deadline(gpointer data)
@@ -73,18 +105,39 @@ int main(void)
     g_setenv("DBUS_SYSTEM_BUS_ADDRESS", g_test_dbus_get_bus_address(bus), TRUE);
     g_autoptr(GDBusConnection) connection = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, NULL);
     g_assert_nonnull(connection);
-    g_autoptr(GVariant) reply = g_dbus_connection_call_sync(connection,
-        "org.freedesktop.DBus", "/org/freedesktop/DBus", "org.freedesktop.DBus",
-        "RequestName", g_variant_new("(su)", "org.freedesktop.timedate1", 0U),
-        G_VARIANT_TYPE("(u)"), G_DBUS_CALL_FLAGS_NONE, 1000, NULL, NULL);
-    g_assert_nonnull(reply);
+    change_bus_name(connection, "RequestName");
     g_autoptr(GDBusNodeInfo) info = g_dbus_node_info_new_for_xml(xml, NULL);
     guint registration = g_dbus_connection_register_object(connection,
         "/org/freedesktop/timedate1", info->interfaces[0], &vtable, NULL, NULL, NULL);
     g_assert_cmpuint(registration, !=, 0U);
-    guint timeout = g_timeout_add_seconds(5U, deadline, NULL);
+    guint timeout = g_timeout_add_seconds(10U, deadline, NULL);
+
     ss_system_time_service_new_async(NULL, on_ready, NULL);
     while (!ready) g_main_context_iteration(NULL, TRUE);
+
+    SsSystemTimeState initial;
+    g_assert_true(ss_system_time_service_read(service, &initial));
+    g_assert_true(initial.available);
+    g_assert_cmpstr(initial.timezone, ==, "Australia/Melbourne");
+    ss_system_time_service_set_changed_callback(service, on_changed, NULL);
+
+    /* Losing the well-known name must surface unavailable state even if the
+     * proxy still holds old cached property values. */
+    guint before = observed_changes;
+    change_bus_name(connection, "ReleaseName");
+    while (observed_changes == before || observed_state.available) {
+        g_main_context_iteration(NULL, TRUE);
+    }
+    g_assert_false(observed_state.available);
+
+    /* Reacquiring the name must restore an authoritative readable snapshot. */
+    before = observed_changes;
+    change_bus_name(connection, "RequestName");
+    while (observed_changes == before || !observed_state.available) {
+        g_main_context_iteration(NULL, TRUE);
+    }
+    g_assert_cmpstr(observed_state.timezone, ==, "Australia/Melbourne");
+
     ss_system_time_service_set_ntp_async(service, false, NULL, on_complete, NULL);
     while (pending == NULL) g_main_context_iteration(NULL, TRUE);
     ss_system_time_service_free(service);
@@ -92,6 +145,7 @@ int main(void)
     g_dbus_method_invocation_return_value(pending, g_variant_new("()"));
     g_clear_object(&pending);
     while (!completed) g_main_context_iteration(NULL, TRUE);
+
     g_source_remove(timeout);
     g_dbus_connection_unregister_object(connection, registration);
     g_dbus_connection_close_sync(connection, NULL, NULL);

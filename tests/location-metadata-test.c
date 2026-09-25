@@ -28,7 +28,9 @@ int main(void)
 {
     g_autofree gchar *temporary_root = NULL;
     g_autofree gchar *expected_file = NULL;
+    g_autofree gchar *settings_dir = NULL;
     SsLocationMetadata saved = {0};
+    GStatBuf settings_stat;
     SsLocationMetadata loaded = {0};
     g_autoptr(GError) error = NULL;
 
@@ -65,6 +67,13 @@ int main(void)
         NULL);
     CHECK(g_file_test(expected_file, G_FILE_TEST_IS_REGULAR));
 
+    settings_dir = g_path_get_dirname(expected_file);
+    CHECK(settings_dir != NULL);
+    CHECK(g_chmod(settings_dir, 0755) == 0);
+    CHECK(ss_location_metadata_save(&saved));
+    CHECK(g_stat(settings_dir, &settings_stat) == 0);
+    CHECK((settings_stat.st_mode & 0777) == 0700);
+
     saved.latitude = NAN;
     CHECK(!ss_location_metadata_save(&saved));
     saved.latitude = -36.3949;
@@ -85,7 +94,6 @@ int main(void)
     }
     CHECK(g_remove(expected_file) == 0);
     {
-        g_autofree gchar *settings_dir = g_path_get_dirname(expected_file);
         g_autofree gchar *infiltrator_dir = g_path_get_dirname(settings_dir);
         CHECK(g_rmdir(settings_dir) == 0);
         CHECK(g_rmdir(infiltrator_dir) == 0);
