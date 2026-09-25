@@ -1016,14 +1016,6 @@ static void open_date_time(GtkButton *button, gpointer user_data)
     gtk_stack_set_visible_child_name(GTK_STACK(user_data), "date-time");
 }
 
-static void focus_settings_search(GtkButton *button, gpointer user_data)
-{
-    (void)button;
-    if (user_data != NULL) {
-        gtk_widget_grab_focus(GTK_WIDGET(user_data));
-    }
-}
-
 static void launch_external_program(GtkButton *button, gpointer user_data)
 {
     (void)user_data;
@@ -1146,9 +1138,7 @@ static const char *network_connectivity_text(GNetworkConnectivity connectivity)
     }
 }
 
-static GtkWidget *build_home_page(GtkWindow *parent,
-                                  GtkStack *stack,
-                                  GtkSearchEntry *search_entry)
+static GtkWidget *build_home_page(GtkStack *stack)
 {
     GtkWidget *page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     GtkWidget *hero = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 22);
@@ -1602,7 +1592,7 @@ static void on_activate(GtkApplication *application, gpointer user_data)
         panel_widget);
     gtk_stack_add_named(
         stack,
-        build_home_page(window, stack, search_entry),
+        build_home_page(stack),
         "home");
     gtk_stack_add_named(
         stack,
