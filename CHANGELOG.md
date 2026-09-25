@@ -2,6 +2,13 @@
 
 # Changelog
 
+## 0.4.8 — 2026-09-25 — forensic audit closure
+
+- Preserve the complete 0.4.7 forensic implementation unchanged.
+- Reconcile the audit record with the final successful Linux, Windows and
+  sanitizer CI run and the successful immutable release publication.
+- Record that the audited implementation commit is the direct parent of the
+  published release commit, making the preservation chain explicit.
 ## 0.4.7 — forensic correctness and documentation audit
 
 - Publish a Debian package, hardware-native source installer and complete source
