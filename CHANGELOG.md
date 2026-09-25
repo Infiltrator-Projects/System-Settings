@@ -2,6 +2,25 @@
 
 # Changelog
 
+## 0.4.21 — 2026-09-25 — dedicated north-star artwork
+
+- Replace the procedural SVG dashboard illustrations with nine independent
+  raster artwork assets taken from the approved north-star visual language.
+  The application does not ship or display a screenshot of the complete
+  prototype: hero, overview, date/time, region, network and each appearance
+  preview are separate runtime files.
+- Wire the native GTK shell directly to the new JPEG artwork while retaining
+  the existing live widgets, system data, navigation, window controls and
+  scrolling behaviour.
+- Make Date & Time use its own dedicated city/night artwork instead of falling
+  through to the generic Cairo scene.
+- Keep the Cairo/vector renderers only as an emergency missing-asset fallback;
+  packaged Linux builds now install the photographic artwork as the normal
+  presentation path.
+- Remove the temporary asset-generation workflow and script. They depended on
+  the old committed WebP north-star file, which is not a reliable decodable
+  source and must not be part of the release path.
+
 ## 0.4.20 — 2026-09-25 — runtime visual-asset finish pass
 
 - Add a packaged native SVG visual set derived from the approved north-star
