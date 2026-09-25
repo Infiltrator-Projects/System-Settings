@@ -2,6 +2,18 @@
 
 # Changelog
 
+## 0.4.12 — 2026-09-25 — graphical system snapshot polish
+
+- Make the Date & Time hero substantially more graphical by adding a live
+  system snapshot beside the clock preview.
+- Surface the real active clock system, calendar, operating-system time zone and
+  automatic/manual time-sync state in four icon-led summary tiles.
+- Keep snapshot values live as policy or timedated state changes, including
+  graceful unavailable-state presentation.
+- Strengthen the hero/card hierarchy and compact the visual language further
+  toward the committed UI north star without adding placeholder modules.
+- Preserve all existing settings behaviour and backend ownership.
+
 ## 0.4.11 — 2026-09-25 — second UI north-star polish
 
 - Replace the text-only page heading with a graphical Date & Time identity block.

@@ -326,6 +326,36 @@ static void fill_manual_time_entries(SsLinuxDateTimePanel *state)
     }
 }
 
+static void update_overview_policy(SsLinuxDateTimePanel *state)
+{
+    const InfiltratrTemporalPolicyV3 *policy;
+    const InfiltratrTemporalClockModeInfo *clock;
+    const InfiltratrTemporalCalendarInfo *calendar;
+
+    if (state == NULL) {
+        return;
+    }
+
+    policy = ss_date_time_model_policy(&state->model);
+    if (policy == NULL) {
+        return;
+    }
+
+    clock = infiltratr_temporal_clock_mode_find(policy->clock_mode);
+    if (state->overview_clock != NULL) {
+        gtk_label_set_text(
+            GTK_LABEL(state->overview_clock),
+            clock != NULL ? clock->name : policy->clock_mode);
+    }
+
+    calendar = infiltratr_temporal_calendar_find(policy->calendar);
+    if (state->overview_calendar != NULL) {
+        gtk_label_set_text(
+            GTK_LABEL(state->overview_calendar),
+            calendar != NULL ? calendar->name : policy->calendar);
+    }
+}
+
 static void sync_system_time_controls(SsLinuxDateTimePanel *state)
 {
     SsSystemTimeState system_state;
@@ -355,10 +385,29 @@ static void sync_system_time_controls(SsLinuxDateTimePanel *state)
             gtk_widget_set_visible(
                 state->manual_unavailable, FALSE);
         }
+        if (state->overview_timezone != NULL) {
+            gtk_label_set_text(GTK_LABEL(state->overview_timezone), "Unavailable");
+        }
+        if (state->overview_sync != NULL) {
+            gtk_label_set_text(GTK_LABEL(state->overview_sync), "Unavailable");
+        }
         return;
     }
 
     state->updating_system_controls = true;
+
+    if (state->overview_timezone != NULL) {
+        gtk_label_set_text(
+            GTK_LABEL(state->overview_timezone),
+            system_state.timezone[0] != '\0'
+                ? system_state.timezone
+                : "Unknown");
+    }
+    if (state->overview_sync != NULL) {
+        gtk_label_set_text(
+            GTK_LABEL(state->overview_sync),
+            system_state.ntp_enabled ? "Automatic" : "Manual");
+    }
 
     if (state->timezone != NULL) {
         zone_index = timezone_index_for_id(
@@ -504,6 +553,7 @@ static void update_control_capabilities(SsLinuxDateTimePanel *state)
     gtk_widget_set_sensitive(GTK_WIDGET(state->longitude), TRUE);
 
     update_location_summary(state);
+    update_overview_policy(state);
     sync_native_format_controls(state);
     sync_system_time_controls(state);
 
@@ -629,6 +679,7 @@ static gboolean refresh_preview(gpointer user_data)
     if (format_preview(state, clock_text, sizeof(clock_text))) {
         gtk_label_set_text(GTK_LABEL(state->clock_preview), clock_text);
     }
+    update_overview_policy(state);
 
     calendar = infiltratr_temporal_calendar_find(policy->calendar);
     {

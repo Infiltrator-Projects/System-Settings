@@ -124,6 +124,35 @@ static GtkWidget *make_section_heading(const char *icon_name,
     return heading;
 }
 
+static GtkWidget *make_overview_item(const char *icon_name,
+                                     const char *title,
+                                     GtkWidget **value_out)
+{
+    GtkWidget *item = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+    GtkWidget *icon_wrap = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    GtkWidget *icon = gtk_image_new_from_icon_name(icon_name);
+    GtkWidget *copy = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
+    GtkWidget *value = ss_linux_ui_make_label("—", "overview-value");
+
+    gtk_widget_add_css_class(item, "overview-item");
+    gtk_widget_add_css_class(icon_wrap, "overview-icon");
+    gtk_image_set_pixel_size(GTK_IMAGE(icon), 18);
+    gtk_box_append(GTK_BOX(icon_wrap), icon);
+    gtk_box_append(GTK_BOX(item), icon_wrap);
+    gtk_widget_set_hexpand(copy, TRUE);
+    gtk_box_append(
+        GTK_BOX(copy),
+        ss_linux_ui_make_label(title, "overview-label"));
+    gtk_label_set_ellipsize(GTK_LABEL(value), PANGO_ELLIPSIZE_END);
+    gtk_box_append(GTK_BOX(copy), value);
+    gtk_box_append(GTK_BOX(item), copy);
+
+    if (value_out != NULL) {
+        *value_out = value;
+    }
+    return item;
+}
+
 static GtkWidget *make_coordinate_field(const char *caption,
                                         GtkSpinButton *spin)
 {
@@ -168,8 +197,10 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         "Clock, calendar, location and system time — live, visual and immediate.",
         "page-summary");
     GtkWidget *hero_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
-    GtkWidget *hero_top = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 16);
+    GtkWidget *hero_top = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 20);
     GtkWidget *hero_copy = gtk_box_new(GTK_ORIENTATION_VERTICAL, 3);
+    GtkWidget *overview_panel = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+    GtkWidget *overview_grid = gtk_grid_new();
     GtkWidget *hero_badge = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 7);
     GtkWidget *hero_badge_icon = gtk_image_new_from_icon_name(
         "media-playback-start-symbolic");
@@ -224,7 +255,48 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     gtk_label_set_wrap(GTK_LABEL(state->date_preview), TRUE);
     gtk_box_append(GTK_BOX(hero_copy), state->clock_preview);
     gtk_box_append(GTK_BOX(hero_copy), state->date_preview);
+    gtk_widget_add_css_class(hero_copy, "hero-live-column");
     gtk_box_append(GTK_BOX(hero_top), hero_copy);
+
+    gtk_widget_add_css_class(overview_panel, "overview-panel");
+    gtk_box_append(
+        GTK_BOX(overview_panel),
+        ss_linux_ui_make_label("CURRENT SYSTEM", "overview-heading"));
+    gtk_widget_add_css_class(overview_grid, "overview-grid");
+    gtk_grid_set_row_spacing(GTK_GRID(overview_grid), 8);
+    gtk_grid_set_column_spacing(GTK_GRID(overview_grid), 8);
+    gtk_grid_set_column_homogeneous(GTK_GRID(overview_grid), TRUE);
+    gtk_grid_attach(
+        GTK_GRID(overview_grid),
+        make_overview_item(
+            "preferences-system-time-symbolic",
+            "Clock",
+            &state->overview_clock),
+        0, 0, 1, 1);
+    gtk_grid_attach(
+        GTK_GRID(overview_grid),
+        make_overview_item(
+            "x-office-calendar-symbolic",
+            "Calendar",
+            &state->overview_calendar),
+        1, 0, 1, 1);
+    gtk_grid_attach(
+        GTK_GRID(overview_grid),
+        make_overview_item(
+            "mark-location-symbolic",
+            "Time zone",
+            &state->overview_timezone),
+        0, 1, 1, 1);
+    gtk_grid_attach(
+        GTK_GRID(overview_grid),
+        make_overview_item(
+            "network-transmit-receive-symbolic",
+            "Time sync",
+            &state->overview_sync),
+        1, 1, 1, 1);
+    gtk_box_append(GTK_BOX(overview_panel), overview_grid);
+    gtk_widget_set_size_request(overview_panel, 390, -1);
+    gtk_box_append(GTK_BOX(hero_top), overview_panel);
 
     gtk_widget_add_css_class(hero_badge, "hero-badge");
     gtk_image_set_pixel_size(GTK_IMAGE(hero_badge_icon), 13);
@@ -233,7 +305,8 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         GTK_BOX(hero_badge),
         ss_linux_ui_make_label("LIVE", "hero-badge-label"));
     gtk_widget_set_valign(hero_badge, GTK_ALIGN_START);
-    gtk_box_append(GTK_BOX(hero_top), hero_badge);
+    gtk_widget_set_halign(hero_badge, GTK_ALIGN_START);
+    gtk_box_append(GTK_BOX(hero_copy), hero_badge);
     gtk_box_append(GTK_BOX(hero_card), hero_top);
 
     gtk_box_append(

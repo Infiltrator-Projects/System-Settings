@@ -277,7 +277,28 @@ static void install_common_theme(void)
         ".info-strip image { color: %s; }\n"
         ".status-ok { background: %s; border: 1px solid %s; border-radius: 9px; padding: 8px 10px; }\n"
         ".error { background: %s; border: 1px solid %s; border-radius: 9px; padding: 8px 10px; }\n"
-        ".settings-card > .section-heading { padding-bottom: 6px; border-bottom: 1px solid %s; }\n",
+        ".settings-card > .section-heading { padding-bottom: 6px; border-bottom: 1px solid %s; }\n"
+        ".hero-card { padding: 26px 28px; }\n"
+        ".hero-live-column { min-width: 340px; padding: 4px 10px 4px 0; }\n"
+        ".overview-panel { background: %s; border: 1px solid %s; border-radius: 16px; padding: 14px; }\n"
+        ".overview-heading { color: %s; font-size: 10px; font-weight: %u; letter-spacing: 0.11em; margin-bottom: 3px; }\n"
+        ".overview-item { background: %s; border: 1px solid %s; border-radius: 12px; padding: 10px 11px; min-height: 56px; }\n"
+        ".overview-item:hover { background: %s; }\n"
+        ".overview-icon { background: %s; border: 1px solid %s; border-radius: 10px; padding: 7px; }\n"
+        ".overview-icon image { color: %s; }\n"
+        ".overview-label { color: %s; font-size: 9px; letter-spacing: 0.06em; }\n"
+        ".overview-value { color: %s; font-size: 13px; font-weight: %u; }\n"
+        ".location-results row { border-radius: 9px; margin: 2px 4px; }\n"
+        ".settings-card { border-top-width: 2px; }\n",
+        border,
+        surface, border,
+        warm, (unsigned int)type->ui_bold_weight,
+        card, border,
+        surface_hover,
+        surface, border,
+        accent,
+        muted,
+        title, (unsigned int)type->ui_bold_weight);
         panel, border,
         background, panel,
         panel, background,

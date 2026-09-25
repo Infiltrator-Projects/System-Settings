@@ -18,6 +18,10 @@ struct SsLinuxDateTimePanel {
     GtkWidget *root;
     GtkWidget *clock_preview;
     GtkWidget *date_preview;
+    GtkWidget *overview_clock;
+    GtkWidget *overview_calendar;
+    GtkWidget *overview_timezone;
+    GtkWidget *overview_sync;
     GtkDropDown *clock_mode;
     GtkDropDown *calendar;
     GtkSwitch *show_seconds;
