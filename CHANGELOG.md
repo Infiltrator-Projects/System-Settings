@@ -2,8 +2,10 @@
 
 # Changelog
 
-## Unreleased — forensic correctness and documentation audit
+## 0.4.7 — forensic correctness and documentation audit
 
+- Publish a Debian package, hardware-native source installer and complete source
+  ZIP containing the exact pinned Common source.
 - Fix GTK dropdown model ownership, repeated activation and close-time cleanup.
 - Keep timedated services alive through pending completions and report missing
   service/property state without enabling manual writes on an unknown NTP state.

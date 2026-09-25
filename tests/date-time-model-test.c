@@ -74,7 +74,7 @@ int main(void)
     CHECK(model.policy.latitude == -36.39);
     CHECK(model.policy.longitude == 145.36);
 
-    strcpy(model.policy.clock_mode, "standard");
+    memcpy(model.policy.clock_mode, "standard", sizeof("standard"));
     CHECK(ss_date_time_model_reload(&model));
     CHECK(strcmp(model.policy.clock_mode, "roman-temporal") == 0);
     CHECK(strcmp(model.policy.calendar, "egyptian-nabonassar") == 0);

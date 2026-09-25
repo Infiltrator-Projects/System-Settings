@@ -53,6 +53,9 @@ jobs:
           cd build
           cpack -G DEB
 
+      - name: Build native installer and complete source archive
+        run: bash packaging/build-source-assets.sh build
+
       - name: Publish immutable release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -65,6 +68,11 @@ jobs:
           deb="$(find build -maxdepth 1 -type f -name 'infiltrator-system-settings_*.deb' -print -quit)"
           test -n "$deb"
           test -s "$deb"
+          native="build/System-Settings-$version-native.run"
+          source="build/System-Settings-$version-source.zip"
+          test -s "$native"
+          test -s "$source"
+          (cd build && sha256sum "$(basename "$deb")" "$(basename "$native")" "$(basename "$source")" > SHA256SUMS)
 
           existing="$(git ls-remote origin "refs/tags/$tag" | awk '{print $1}')"
           if [[ -n "$existing" && "$existing" != "$sha" ]]; then
@@ -80,7 +88,7 @@ jobs:
             echo "Release $tag already exists; verifying asset name."
             gh release view "$tag" --json assets --jq '.assets[].name' |               grep -qx "$(basename "$deb")"
           else
-            gh release create "$tag" "$deb" \
+            gh release create "$tag" "$deb" "$native" "$source" build/SHA256SUMS \
               --verify-tag \
               --target "$sha" \
               --title "System Settings $version" \

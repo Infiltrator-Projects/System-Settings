@@ -327,3 +327,12 @@ The maintained documents are indexed in [docs/README.md](docs/README.md).
 Copyright © 2000-2026 Shannon Smith.
 
 Shannon Smith-owned source, documentation and project artwork are licensed under GPL-3.0-or-later.
+
+## Release assets
+
+Each release publishes the Debian package, a `System-Settings-VERSION-native.run`
+source installer, a complete source ZIP (including pinned Common), and SHA256SUMS.
+The native installer builds and tests as the ordinary user with CPU-specific
+optimisation, then asks sudo only to install the generated Debian package through
+APT. Its `--help` and `--extract DIRECTORY` modes need no elevation. Build
+prerequisites are the same as above; it does not install dependencies silently.

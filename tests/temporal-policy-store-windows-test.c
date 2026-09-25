@@ -99,7 +99,7 @@ int main(void)
     CHECK(!found);
 
     CHECK(infiltratr_temporal_policy_v3_default(&policy));
-    strcpy(policy.clock_mode, "standard-12");
+    memcpy(policy.clock_mode, "standard-12", sizeof("standard-12"));
     CHECK(ss_windows_temporal_policy_save_file(policy_path, &policy));
     found = false;
     CHECK(ss_windows_temporal_policy_load_file(
