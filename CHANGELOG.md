@@ -2,6 +2,13 @@
 
 # Changelog
 
+## 0.4.29 — 2026-09-26 — separate historical clock systems
+
+- Pin System Settings to Infiltratr Common 1.19.31 at `fd51905f3cea1f051e1163fbdeea8b62b7069833`.
+- Add an explicit Modern Italian civil-time choice, leaving historical Italian hours clearly labelled as the sunset-origin 24-hour system.
+- Separate Renaissance European “Babylonian hours” from ancient Babylonian bēru/UŠ timekeeping.
+- Split the historical Nürnberg Great Clock with its fixed Wendetage from the location-aware Nuremberg-style solar reconstruction.
+
 ## 0.4.28 — 2026-09-26 — clarify and correct historical clocks
 
 - Pin the Date & Time clock catalogue to released Infiltratr Common 1.19.30 at `9a9fae5b3f0d133d400310cdd316b21129631429`.
