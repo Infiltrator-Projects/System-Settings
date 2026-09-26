@@ -2,6 +2,12 @@
 
 # Changelog
 
+## 0.4.31 — 2026-09-26 — audited temporal models
+
+- Pin System Settings to released Infiltratr Common 1.19.34 at `1467755d088d740b873660a8f0c9a515e9a39046`.
+- Present historically distinct early-Edo sunrise/sunset and late-Edo 1797 twilight clocks as separate choices rather than one ambiguous Edo mode.
+- Use clearer clock/calendar labels that expose approximations, continuation rules, computational models and bounded data ranges where they materially affect interpretation.
+
 ## 0.4.30 — 2026-09-26 — remove redundant modern Italian mode
 
 - Pin System Settings to released Infiltratr Common 1.19.32 at `ba9386fad1944d3e575a28346a46f85108326051`.
