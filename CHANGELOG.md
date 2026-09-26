@@ -2,6 +2,14 @@
 
 # Changelog
 
+## 0.4.28 — 2026-09-26 — clarify and correct historical clocks
+
+- Pin the Date & Time clock catalogue to released Infiltratr Common 1.19.30 at `9a9fae5b3f0d133d400310cdd316b21129631429`.
+- Rename the old Italian option to make clear that it is the historical 24-equal-hour sunset-origin system, not modern Italian civil time.
+- Rename the sunrise-origin European "Babylonian hours" option as the Renaissance convention and add a separate Ancient Babylonian seasonal-hours option with twelve daylight and twelve night simānu.
+- Correct Nuremberg time to the discrete Wendetag day/night allocation instead of resetting its equal-hour count at every actual sunrise and sunset.
+- Modern Italian time remains ordinary standard civil time under the Europe/Rome time zone rather than a duplicate clock system.
+
 ## 0.4.27 — 2026-09-26 — historical time hierarchy correction
 
 - Pin the System Settings Common submodule to released Infiltratr Common 1.19.29 at `13b824e4c4e266426590d86597249a89d18ec2f0`.
