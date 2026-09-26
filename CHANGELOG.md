@@ -2,6 +2,12 @@
 
 # Changelog
 
+## 0.4.33 — 2026-09-26 — finish temporal selector clarity audit
+
+- Pin System Settings to released Infiltratr Common 1.19.36 at `5e129851bbd7ac0b94bd8c2f48f32924016bdbda`.
+- Replace specialist shorthand in ancient/historical clock and calendar selectors with plain-language descriptions of the actual model, epoch or day boundary.
+- Keep all persisted temporal IDs and chronology behaviour unchanged; this is a clarity/accuracy-of-description release.
+
 ## 0.4.32 — 2026-09-26 — complete temporal clarity audit
 
 - Pin System Settings to released Infiltratr Common 1.19.35 at `7cc5de3de0e94ed2cfcff0840bbb5346eb5c9c9f`.
