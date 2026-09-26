@@ -2,6 +2,13 @@
 
 # Changelog
 
+## 0.4.27 — 2026-09-26 — historical time hierarchy correction
+
+- Pin the System Settings Common submodule to released Infiltratr Common 1.19.29 at `13b824e4c4e266426590d86597249a89d18ec2f0`.
+- Present Chinese hundred-kè time as native `NN刻` rather than redundant `刻 NN/100` notation.
+- Supply the corrected shared Roman elapsed-duration hierarchy to Common-aware consumers, where complete seasonal day/night cycles collapse into `dies` before residual horae, vigiliae and unciae.
+- Keep the generic hundred-kè mode at kè precision rather than fabricating a dynasty-specific finer subdivision.
+
 ## 0.4.26 — 2026-09-25 — remove hero logo halo
 
 - Remove the cyan outer glow from the top-right Infiltrator OS hero-brand panel.
