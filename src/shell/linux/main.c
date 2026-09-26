@@ -545,7 +545,7 @@ static void install_common_theme(void)
         ".nav-row:selected { background-image: linear-gradient(to right, rgba(0,174,255,0.88), rgba(0,112,194,0.72)); box-shadow: inset 0 0 0 1px #47d4ff, 0 0 18px rgba(0,183,255,0.18); }\n"
         ".nav-row:selected .nav-primary, .nav-row:selected .nav-secondary { color: #ffffff; }\n"
         ".nav-row:selected .nav-icon-well { background: rgba(3,18,28,0.46); border-color: rgba(255,255,255,0.28); }\n"
-        ".home-hero { min-height: 238px; padding: 0; border-color: #0b8fc4; }\n"
+        ".home-hero { min-height: 238px; padding: 0; border: 0; box-shadow: none; }\n"
         ".hero-scene { min-height: 238px; }\n"
         ".hero-copy-overlay { min-width: 560px; padding: 16px 24px; margin: 14px; border-radius: 17px; background: rgba(3,11,18,0.66); }\n"
         ".hero-brand-overlay { margin: 18px; padding: 14px 18px; background: rgba(3,11,18,0.68); box-shadow: none; }\n",

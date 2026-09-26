@@ -2,6 +2,11 @@
 
 # Changelog
 
+## 0.4.35 — 2026-09-26 — remove mountain hero cyan edge
+
+- Remove the explicit cyan border from the full-width mountain hero panel.
+- Keep the raster mountain artwork and internal overlays unchanged; the hero now has no outer cyan edge and no outer glow.
+
 ## 0.4.34 — 2026-09-26 — remove mountain hero halo
 
 - Remove the cyan outer box-shadow from the full-width mountain hero image on
