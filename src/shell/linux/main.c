@@ -582,7 +582,7 @@ static void install_common_theme(void)
 
     g_string_append_printf(
         css,
-        ".home-hero { box-shadow: 0 0 28px rgba(0,160,220,0.13); }\n"
+        ".home-hero { box-shadow: none; }\n"
         ".hero-copy-overlay { background: linear-gradient(to right, rgba(2,8,14,0.78), rgba(2,8,14,0.34), rgba(2,8,14,0.06)); border: 0; min-width: 610px; }\n"
         ".hero-brand-overlay { background: rgba(2,9,15,0.42); border-color: rgba(70,210,255,0.38); }\n"
         ".home-card, .status-card { background-image: linear-gradient(145deg, %s, %s); box-shadow: 0 6px 18px rgba(0,0,0,0.18); }\n"

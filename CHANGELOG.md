@@ -2,6 +2,13 @@
 
 # Changelog
 
+## 0.4.34 — 2026-09-26 — remove mountain hero halo
+
+- Remove the cyan outer box-shadow from the full-width mountain hero image on
+  the Home dashboard.
+- Preserve the hero border, raster artwork, overlays and internal styling; only
+  the unwanted glow outside the mountain image is removed.
+
 ## 0.4.33 — 2026-09-26 — finish temporal selector clarity audit
 
 - Pin System Settings to released Infiltratr Common 1.19.36 at `5e129851bbd7ac0b94bd8c2f48f32924016bdbda`.
