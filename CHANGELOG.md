@@ -2,6 +2,12 @@
 
 # Changelog
 
+## 0.4.32 — 2026-09-26 — complete temporal clarity audit
+
+- Pin System Settings to released Infiltratr Common 1.19.35 at `7cc5de3de0e94ed2cfcff0840bbb5346eb5c9c9f`.
+- Expose clearer model/epoch labels for the full clock and calendar catalogue, especially ancient and historical systems.
+- Consume native elapsed hierarchies for Chinese shíchén, Edo unequal hours and ancient Babylonian ūmu/bēru/UŠ.
+
 ## 0.4.31 — 2026-09-26 — audited temporal models
 
 - Pin System Settings to released Infiltratr Common 1.19.34 at `1467755d088d740b873660a8f0c9a515e9a39046`.
