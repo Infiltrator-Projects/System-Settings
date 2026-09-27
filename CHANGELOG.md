@@ -2,6 +2,25 @@
 
 # Changelog
 
+## 0.4.36 — 2026-09-28 — forensic shell and Date & Time repair
+
+- Remove the remaining Cairo-generated mountain, Australian flag and network artwork fallbacks; missing packaged art now degrades to a neutral surface instead of inventing substitute imagery.
+- Resolve UI artwork from the configured installation data directory rather than assuming /usr/share, and verify all nine runtime PNG assets inside the Debian package.
+- Remove the late hard-coded cyan/glow styling overrides and return those surfaces to Common semantic palette roles.
+- Reduce fixed widths and large minimums across Home and Date & Time so the native window can fit substantially smaller desktops without inheriting the former 1420×900 assumption.
+- Replace Home's repeated policy/GSettings/Calendar reconstruction with one long-lived temporal presenter that watches the policy directory and native clock preference; retain the fast display tick without rereading policy or rediscovering Calendar four times per second.
+- Add live Home refresh for uptime, local time-zone identity, locale, theme and network state instead of freezing those cards at application construction.
+- Give SsHomeTemporalPresentation an explicit initialisation contract and regression coverage rather than freeing unspecified caller memory.
+- Separate timedated timezone, NTP and manual-clock cancellables/generations so independent user operations cannot cancel one another.
+- Protect dirty manual date/time entry from unrelated timedated property refreshes until the manual write succeeds.
+- Make locality/custom-coordinate persistence rollback the temporal policy when metadata persistence fails, and keep locality metadata aligned to the authoritative current system zone until a requested zone change is actually observed.
+- Remove Australia-only Home presentation assumptions and display the active locale truthfully.
+- Keep Home quick navigation and the selected sidebar row in sync, disable the updates affordance when Infiltrator Software is absent, and avoid duplicate uname calls.
+- Reassert the shell/module boundary by removing locality-metadata ownership from main.c and extending the configure-time ownership guard.
+- Expand shell regression coverage for navigation synchronisation, search filtering, live Home sources and neutral missing-asset behaviour.
+- Prefer BigBedroom for non-release Linux CI, with REST/pinned-Common checkout support for runners without Git; immutable release validation remains hosted.
+- Correct the architecture documentation's stale Common 1.19.25 reference to the actual 1.19.35 pin.
+
 ## 0.4.35 — 2026-09-26 — remove mountain hero cyan edge
 
 - Remove the explicit cyan border from the full-width mountain hero panel.
