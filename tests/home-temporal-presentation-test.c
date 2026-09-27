@@ -15,6 +15,26 @@ int main(void)
     g_assert_nonnull(noon);
     ss_home_temporal_presentation_init(&presentation);
     g_assert_true(infiltratr_temporal_policy_v3_default(&policy));
+
+    /*
+     * The presentation result is an output object, not an in/out object.
+     * Deliberately poison the stack to prove the formatter never frees or
+     * otherwise inspects incoming pointer values.
+     */
+    {
+        SsHomeTemporalPresentation raw_output;
+        memset(&raw_output, 0xA5, sizeof(raw_output));
+        infiltratr_copy_string(
+            policy.clock_mode, sizeof(policy.clock_mode), "standard-24");
+        infiltratr_copy_string(
+            policy.calendar, sizeof(policy.calendar), "gregorian");
+        policy.show_seconds = false;
+        g_assert_true(ss_home_temporal_presentation_format(
+            &policy, noon, true, &raw_output));
+        g_assert_cmpstr(raw_output.clock_text, ==, "12:00");
+        ss_home_temporal_presentation_clear(&raw_output);
+    }
+
     infiltratr_copy_string(
         policy.clock_mode, sizeof(policy.clock_mode), "decimal");
     infiltratr_copy_string(
