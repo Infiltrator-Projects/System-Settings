@@ -8,57 +8,52 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os == 'windows-latest' && 'windows-latest' || (startsWith(github.event.head_commit.message, 'Release ') && 'ubuntu-24.04' || 'bigbedroom') }}
+  linux:
+    name: Linux build, test and package
+    runs-on: ${{ startsWith(github.event.head_commit.message, 'Release ') && 'ubuntu-24.04' || 'bigbedroom' }}
+    timeout-minutes: 30
+    env:
+      PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     steps:
-      - name: Provide Git on self-hosted Linux
-        if: runner.os == 'Linux' && runner.environment == 'self-hosted'
-        shell: /bin/bash --noprofile --norc -e -o pipefail {0}
-        run: echo "/usr/bin" >> "$GITHUB_PATH"
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+
       - name: Install Linux UI dependencies
-        if: runner.os == 'Linux' && runner.environment == 'github-hosted'
+        if: runner.environment == 'github-hosted'
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-4-dev libgeocode-glib-dev pkg-config xvfb dbus-x11
+
       - name: Verify self-hosted Linux UI dependencies
-        if: runner.os == 'Linux' && runner.environment == 'self-hosted'
+        if: runner.environment == 'self-hosted'
         shell: bash
         run: |
           set -euo pipefail
-          for command_name in cmake ctest pkg-config dpkg-deb; do
+          for command_name in git cmake ctest pkg-config dpkg-deb; do
             command -v "$command_name" >/dev/null 2>&1 || exit 1
           done
           pkg-config --exists gtk4
           pkg-config --exists geocode-glib-2.0
+
       - name: Configure
         run: cmake -S . -B build -DBUILD_TESTING=ON -DSYSTEM_SETTINGS_WARNINGS_AS_ERRORS=ON
-      - name: Build (Linux)
-        if: runner.os == 'Linux'
+
+      - name: Build
         shell: bash
         run: cmake --build build --config Release --parallel "$(($(nproc)>1?$(nproc)-1:1))"
-      - name: Build (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $jobs = [Math]::Max([Environment]::ProcessorCount - 1, 1)
-          cmake --build build --config Release --parallel $jobs
+
       - name: Test
         run: ctest --test-dir build -C Release --output-on-failure
+
       - name: Build Debian package
-        if: runner.os == 'Linux'
         run: |
           cd build
           cpack -G DEB
+
       - name: Validate Debian integration assets
-        if: runner.os == 'Linux'
         run: |
+          set -euo pipefail
           deb="$(find build -maxdepth 1 -type f -name '*.deb' -print -quit)"
           test -n "$deb"
           root="$(mktemp -d)"
@@ -81,53 +76,72 @@ jobs:
           depends="$(dpkg-deb --field "$deb" Depends)"
           grep -Eq 'libgeocode-glib-2-0|libgeocode-glib0' <<<"$depends"
           rm -rf "$root"
+
       - name: Upload Debian package
-        if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
         with:
           name: infiltrator-system-settings-deb
           path: build/*.deb
           if-no-files-found: error
 
-
-  sanitizers:
-    runs-on: ${{ startsWith(github.event.head_commit.message, 'Release ') && 'ubuntu-24.04' || 'bigbedroom' }}
+  windows:
+    name: Windows build and test
+    runs-on: windows-latest
+    timeout-minutes: 30
     steps:
-      - name: Provide Git on self-hosted Linux
-        if: runner.os == 'Linux' && runner.environment == 'self-hosted'
-        shell: /bin/bash --noprofile --norc -e -o pipefail {0}
-        run: echo "/usr/bin" >> "$GITHUB_PATH"
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - name: Configure
+        run: cmake -S . -B build -DBUILD_TESTING=ON -DSYSTEM_SETTINGS_WARNINGS_AS_ERRORS=ON
+
+      - name: Build
+        shell: pwsh
+        run: |
+          $jobs = [Math]::Max([Environment]::ProcessorCount - 1, 1)
+          cmake --build build --config Release --parallel $jobs
+
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+
+  sanitizers:
+    name: Linux ASan and UBSan
+    runs-on: ${{ startsWith(github.event.head_commit.message, 'Release ') && 'ubuntu-24.04' || 'bigbedroom' }}
+    timeout-minutes: 30
+    env:
+      PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
       - name: Install Linux UI dependencies
         if: runner.environment == 'github-hosted'
         run: |
           sudo apt-get update
           sudo apt-get install -y libgtk-4-dev libgeocode-glib-dev pkg-config xvfb dbus-x11
+
       - name: Verify self-hosted sanitizer dependencies
         if: runner.environment == 'self-hosted'
         shell: bash
         run: |
           set -euo pipefail
-          for command_name in cmake ctest cc pkg-config; do
+          for command_name in git cmake ctest cc pkg-config; do
             command -v "$command_name" >/dev/null 2>&1 || exit 1
           done
           pkg-config --exists gtk4
           pkg-config --exists geocode-glib-2.0
+
       - name: Configure ASan and UBSan
         run: |
-          cmake -S . -B build-sanitized \
-            -DCMAKE_BUILD_TYPE=Debug \
-            -DBUILD_TESTING=ON \
-            -DSYSTEM_SETTINGS_WARNINGS_AS_ERRORS=ON \
-            -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
-            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
-            -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address,undefined"
+          cmake -S . -B build-sanitized             -DCMAKE_BUILD_TYPE=Debug             -DBUILD_TESTING=ON             -DSYSTEM_SETTINGS_WARNINGS_AS_ERRORS=ON             -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"             -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"             -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address,undefined"
+
       - name: Build sanitized targets
         run: cmake --build build-sanitized --parallel "$(($(nproc)>1?$(nproc)-1:1))"
+
       - name: Test with sanitizers
         env:
-          ASAN_OPTIONS: detect_leaks=0:halt_on_error=1
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
         run: ctest --test-dir build-sanitized --output-on-failure
