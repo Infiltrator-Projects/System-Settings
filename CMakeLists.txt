@@ -101,6 +101,7 @@ foreach(SS_FORBIDDEN_SHELL_TOKEN
         "date-time-model.h"
         "system-time-service.h"
         "location-search.h"
+        "location-metadata.h"
         "regional-context.h"
         "temporal-policy-store.h"
         "SsDateTimeModel"
@@ -174,6 +175,8 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_include_directories(system-settings PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/modules/date-time"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux")
+    target_compile_definitions(system-settings PRIVATE
+        SYSTEM_SETTINGS_UI_ASSET_DIR="${CMAKE_INSTALL_FULL_DATADIR}/infiltrator/system-settings/ui")
     target_link_libraries(system-settings PRIVATE
         system-settings-date-time-linux
         system-settings-linux-ui

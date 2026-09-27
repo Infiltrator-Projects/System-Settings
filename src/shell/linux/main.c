@@ -12,7 +12,6 @@
 #include "home-temporal-presentation.h"
 
 #include "system-settings/project-info.h"
-#include "system-settings/location-metadata.h"
 
 #include <gtk/gtk.h>
 #include <infiltratr/core.h>
@@ -535,72 +534,42 @@ static void install_common_theme(void)
 
     g_string_append_printf(
         css,
-        ".shell-header { background-image: linear-gradient(to right, #06131f, #08263a); min-height: 58px; }\n"
-        ".header-brand-icon { box-shadow: 0 0 18px rgba(0,183,255,0.18); }\n"
-        ".settings-sidebar { padding: 14px 10px 12px 10px; }\n"
-        ".nav-row { min-height: 58px; padding: 7px 9px; margin: 2px 4px; }\n"
-        ".nav-icon-well { min-width: 43px; min-height: 43px; border-radius: 12px; padding: 5px; background: %s; border: 1px solid %s; }\n"
-        ".nav-gold .nav-icon-well { box-shadow: 0 0 16px rgba(218,164,58,0.10); }\n"
-        ".nav-cyan .nav-icon-well { box-shadow: 0 0 16px rgba(0,183,255,0.12); }\n"
-        ".nav-row:selected { background-image: linear-gradient(to right, rgba(0,174,255,0.88), rgba(0,112,194,0.72)); box-shadow: inset 0 0 0 1px #47d4ff, 0 0 18px rgba(0,183,255,0.18); }\n"
-        ".nav-row:selected .nav-primary, .nav-row:selected .nav-secondary { color: #ffffff; }\n"
-        ".nav-row:selected .nav-icon-well { background: rgba(3,18,28,0.46); border-color: rgba(255,255,255,0.28); }\n"
-        ".home-hero { min-height: 238px; padding: 0; border: 0; box-shadow: none; }\n"
-        ".hero-scene { min-height: 238px; }\n"
-        ".hero-copy-overlay { min-width: 560px; padding: 16px 24px; margin: 14px; border-radius: 17px; background: rgba(3,11,18,0.66); }\n"
-        ".hero-brand-overlay { margin: 18px; padding: 14px 18px; background: rgba(3,11,18,0.68); box-shadow: none; }\n",
-        surface, border);
-
-    g_string_append_printf(
-        css,
-        ".home-hero-title, .home-hero-accent { font-size: 38px; }\n"
-        ".home-feature { background: rgba(4,15,24,0.64); border-color: rgba(86,176,219,0.36); }\n"
-        ".quick-action { min-height: 76px; padding: 9px 11px; }\n"
-        ".quick-action-icon { min-width: 48px; min-height: 48px; border-radius: 13px; padding: 7px; background: rgba(4,17,27,0.74); border: 1px solid rgba(85,189,235,0.30); }\n"
-        ".quick-action-arrow { opacity: 0.70; }\n"
-        ".quick-action-cyan { background-image: linear-gradient(135deg, %s, %s); border-color: %s; }\n"
-        ".quick-action-gold { background-image: linear-gradient(135deg, %s, #3a2507); border-color: %s; }\n"
-        ".quick-action:hover { box-shadow: 0 0 18px rgba(0,183,255,0.14); }\n"
-        ".home-clock-value { color: %s; font-size: 32px; font-weight: %u; }\n"
-        ".home-clock-date { color: %s; font-size: 13px; }\n"
-        ".location-pin-well { background: %s; border: 1px solid %s; border-radius: 12px; padding: 8px; }\n"
-        ".location-pin-well image { color: %s; }\n"
-        ".location-primary { color: %s; font-size: 18px; font-weight: %u; }\n"
-        ".location-coordinates { color: %s; font-size: 11px; }\n"
-        ".date-scene { min-width: 190px; min-height: 96px; border-radius: 13px; }\n"
-        ".card-arrow { background: transparent; border: 0; min-width: 32px; min-height: 32px; }\n"
-        ".card-arrow image { color: %s; }\n",
-        surface, panel, accent,
-        panel, warm,
-        title, (unsigned int)type->ui_bold_weight,
-        muted,
-        surface, border,
-        warm,
-        title, (unsigned int)type->ui_bold_weight,
-        muted,
-        accent);
-
-    g_string_append_printf(
-        css,
-        ".home-hero { box-shadow: none; }\n"
-        ".hero-copy-overlay { background: linear-gradient(to right, rgba(2,8,14,0.78), rgba(2,8,14,0.34), rgba(2,8,14,0.06)); border: 0; min-width: 610px; }\n"
-        ".hero-brand-overlay { background: rgba(2,9,15,0.42); border-color: rgba(70,210,255,0.38); }\n"
-        ".home-card, .status-card { background-image: linear-gradient(145deg, %s, %s); box-shadow: 0 6px 18px rgba(0,0,0,0.18); }\n"
+        ".shell-header { background: %s; border-bottom: 1px solid %s; min-height: 58px; }\n"
+        ".header-brand-icon { box-shadow: none; }\n"
+        ".settings-sidebar { padding: 12px 9px; min-width: 220px; }\n"
+        ".nav-row { min-height: 50px; padding: 7px 9px; margin: 2px 4px; }\n"
+        ".nav-icon-well { min-width: 38px; min-height: 38px; border-radius: 11px; padding: 5px; background: %s; border: 1px solid %s; }\n"
+        ".nav-gold .nav-icon-well, .nav-cyan .nav-icon-well { box-shadow: none; }\n"
+        ".nav-row:selected { background: %s; border-color: %s; box-shadow: none; }\n"
+        ".nav-row:selected .nav-primary, .nav-row:selected .nav-secondary { color: %s; }\n"
+        ".home-hero { min-height: 210px; padding: 0; border: 0; box-shadow: none; }\n"
+        ".hero-scene { min-height: 210px; }\n"
+        ".hero-copy-overlay { min-width: 0; padding: 14px 18px; margin: 12px; border-radius: 15px; background: rgba(0,0,0,0.56); }\n"
+        ".hero-brand-overlay { margin: 14px; padding: 12px 14px; background: rgba(0,0,0,0.46); border-color: %s; box-shadow: none; }\n"
+        ".home-hero-title, .home-hero-accent { font-size: 34px; }\n"
+        ".home-feature { background: %s; border-color: %s; }\n"
+        ".quick-action { min-height: 68px; padding: 8px 10px; }\n"
+        ".quick-action-icon { min-width: 42px; min-height: 42px; border-radius: 12px; padding: 6px; background: %s; border: 1px solid %s; box-shadow: none; }\n"
+        ".quick-action-cyan, .quick-action-gold { background: %s; border-color: %s; }\n"
+        ".quick-action:hover { box-shadow: none; }\n"
+        ".hero-live-column { min-width: 220px; }\n"
+        ".overview-panel { min-width: 260px; }\n"
+        ".home-card, .status-card { background: %s; box-shadow: none; }\n"
         ".home-card:hover, .status-card:hover { border-color: %s; }\n"
-        ".overview-scene, .date-scene, .region-scene, .network-visual { border: 1px solid %s; border-radius: 13px; }\n"
-        ".overview-link-button { background: transparent; border: 0; color: %s; font-size: 11px; padding: 4px 8px; }\n"
-        ".overview-link-button:hover { color: %s; text-decoration-line: underline; }\n"
-        ".quick-action-icon { box-shadow: 0 0 18px rgba(0,183,255,0.12); }\n"
-        ".region-status-card { background-image: linear-gradient(135deg, %s, #071725); }\n"
-        ".network-status-card { background-image: linear-gradient(135deg, %s, #04131f); }\n"
-        ".appearance-status-card { background-image: linear-gradient(135deg, %s, #141719); }\n"
-        ".date-status-card { background-image: linear-gradient(135deg, %s, #11161b); }\n",
-        card, panel,
-        accent,
+        ".region-status-card, .network-status-card, .appearance-status-card, .date-status-card { background: %s; }\n"
+        ".settings-content { padding: 18px 20px 22px 20px; }\n"
+        ".hero-copy-overlay, .hero-live-column { min-width: 0; }\n"
+        ".home-hero-mark { min-width: 190px; }\n"
+        ".asset-missing { background: transparent; border: 1px solid transparent; box-shadow: none; }\n",
+        panel, border,
+        surface, border,
+        selected, accent, accent_foreground,
         border,
-        accent,
-        warm,
-        card, card, card, card);
+        surface, border,
+        surface, border,
+        card, border,
+        card, accent,
+        card);
 
     provider = gtk_css_provider_new();
 #if GTK_CHECK_VERSION(4, 12, 0)
@@ -999,7 +968,7 @@ static GtkWidget *build_sidebar(GtkWindow *parent,
     g_autofree gchar *version =
         g_strdup_printf("Version %s", info->version);
 
-    gtk_widget_set_size_request(sidebar, 312, -1);
+    gtk_widget_set_size_request(sidebar, 230, -1);
     gtk_widget_add_css_class(sidebar, "settings-sidebar");
 
     gtk_box_append(
@@ -1228,12 +1197,24 @@ typedef struct {
     GtkLabel *clock;
     GtkLabel *date;
     GtkLabel *system_time;
+    SsHomeTemporalPresenter *presenter;
 } HomeTemporalTicker;
+
+typedef struct {
+    GtkLabel *uptime;
+    GtkLabel *date_timezone;
+    GtkLabel *region_value;
+    GtkLabel *region_detail;
+    GtkLabel *appearance_value;
+    GtkLabel *appearance_detail;
+    GtkLabel *network_value;
+    GtkLabel *network_detail;
+} HomeStatusTicker;
 
 static gboolean refresh_home_temporal(gpointer user_data)
 {
     HomeTemporalTicker *ticker = user_data;
-    SsHomeTemporalPresentation temporal = {0};
+    SsHomeTemporalPresentation temporal;
 
     if (ticker == NULL ||
         ticker->clock == NULL ||
@@ -1242,7 +1223,10 @@ static gboolean refresh_home_temporal(gpointer user_data)
         return G_SOURCE_REMOVE;
     }
 
-    if (ss_home_temporal_presentation_now(&temporal)) {
+    ss_home_temporal_presentation_init(&temporal);
+    if (ticker->presenter != NULL &&
+        ss_home_temporal_presenter_format_now(
+            ticker->presenter, &temporal)) {
         gtk_label_set_text(ticker->clock, temporal.clock_text);
         gtk_label_set_text(ticker->date, temporal.date_text);
         gtk_label_set_text(ticker->system_time, temporal.system_time_text);
@@ -1251,19 +1235,29 @@ static gboolean refresh_home_temporal(gpointer user_data)
     return G_SOURCE_CONTINUE;
 }
 
-static void remove_home_temporal_source(gpointer data)
+static void home_temporal_ticker_free(gpointer data)
+{
+    HomeTemporalTicker *ticker = data;
+    if (ticker == NULL) return;
+    ss_home_temporal_presenter_free(ticker->presenter);
+    g_free(ticker);
+}
+
+static void remove_source(gpointer data)
 {
     const guint source_id = GPOINTER_TO_UINT(data);
-
-    if (source_id != 0U) {
-        g_source_remove(source_id);
-    }
+    if (source_id != 0U) g_source_remove(source_id);
 }
 
 static void open_date_time(GtkButton *button, gpointer user_data)
 {
+    ShellSearchState *state = user_data;
     (void)button;
-    gtk_stack_set_visible_child_name(GTK_STACK(user_data), "date-time");
+    if (state == NULL || state->stack == NULL) return;
+    gtk_stack_set_visible_child_name(state->stack, "date-time");
+    if (state->list != NULL && state->date_row != NULL) {
+        gtk_list_box_select_row(state->list, state->date_row);
+    }
 }
 
 static void launch_external_program(GtkButton *button, gpointer user_data)
@@ -1377,6 +1371,8 @@ static GtkWidget *make_status_card(const char *css_class,
     gtk_label_set_wrap(GTK_LABEL(detail_label), TRUE);
     gtk_box_append(GTK_BOX(card), value_label);
     gtk_box_append(GTK_BOX(card), detail_label);
+    g_object_set_data(G_OBJECT(card), "status-value-label", value_label);
+    g_object_set_data(G_OBJECT(card), "status-detail-label", detail_label);
     return card;
 }
 
@@ -1396,7 +1392,9 @@ static const char *network_connectivity_text(GNetworkConnectivity connectivity)
     }
 }
 
+#ifndef SYSTEM_SETTINGS_UI_ASSET_DIR
 #define SYSTEM_SETTINGS_UI_ASSET_DIR "/usr/share/infiltrator/system-settings/ui"
+#endif
 
 static GtkWidget *make_ui_asset_picture(const char *filename,
                                         int width,
@@ -1409,8 +1407,12 @@ static GtkWidget *make_ui_asset_picture(const char *filename,
     if (filename == NULL || filename[0] == '\0') {
         return NULL;
     }
-    path = g_build_filename(
-        SYSTEM_SETTINGS_UI_ASSET_DIR, filename, NULL);
+    const char *asset_dir =
+        g_getenv("SYSTEM_SETTINGS_UI_ASSET_DIR_OVERRIDE");
+    if (asset_dir == NULL || asset_dir[0] == '\0') {
+        asset_dir = SYSTEM_SETTINGS_UI_ASSET_DIR;
+    }
+    path = g_build_filename(asset_dir, filename, NULL);
     if (!g_file_test(path, G_FILE_TEST_IS_REGULAR)) {
         return NULL;
     }
@@ -1431,89 +1433,6 @@ static GtkWidget *make_ui_asset_picture(const char *filename,
     return picture;
 }
 
-static void draw_scenic_panel(GtkDrawingArea *area,
-                              cairo_t *cr,
-                              int width,
-                              int height,
-                              gpointer user_data)
-{
-    (void)area;
-    (void)user_data;
-    const double w = (double)width;
-    const double h = (double)height;
-
-    cairo_pattern_t *sky = cairo_pattern_create_linear(0.0, 0.0, 0.0, h);
-    cairo_pattern_add_color_stop_rgb(sky, 0.0, 0.01, 0.07, 0.13);
-    cairo_pattern_add_color_stop_rgb(sky, 0.45, 0.02, 0.18, 0.28);
-    cairo_pattern_add_color_stop_rgb(sky, 0.72, 0.78, 0.30, 0.08);
-    cairo_pattern_add_color_stop_rgb(sky, 1.0, 0.03, 0.08, 0.12);
-    cairo_set_source(cr, sky);
-    cairo_rectangle(cr, 0.0, 0.0, w, h);
-    cairo_fill(cr);
-    cairo_pattern_destroy(sky);
-
-    cairo_set_source_rgba(cr, 1.0, 0.63, 0.14, 0.92);
-    cairo_arc(cr, w * 0.72, h * 0.44, h * 0.075, 0.0, 6.283185307179586);
-    cairo_fill(cr);
-
-    cairo_set_source_rgb(cr, 0.03, 0.07, 0.10);
-    cairo_move_to(cr, 0.0, h * 0.60);
-    cairo_line_to(cr, w * 0.14, h * 0.42);
-    cairo_line_to(cr, w * 0.25, h * 0.56);
-    cairo_line_to(cr, w * 0.39, h * 0.34);
-    cairo_line_to(cr, w * 0.51, h * 0.57);
-    cairo_line_to(cr, w * 0.64, h * 0.40);
-    cairo_line_to(cr, w * 0.78, h * 0.58);
-    cairo_line_to(cr, w, h * 0.48);
-    cairo_line_to(cr, w, h);
-    cairo_line_to(cr, 0.0, h);
-    cairo_close_path(cr);
-    cairo_fill(cr);
-
-    cairo_pattern_t *water = cairo_pattern_create_linear(0.0, h * 0.60, 0.0, h);
-    cairo_pattern_add_color_stop_rgb(water, 0.0, 0.02, 0.18, 0.25);
-    cairo_pattern_add_color_stop_rgb(water, 1.0, 0.01, 0.05, 0.09);
-    cairo_set_source(cr, water);
-    cairo_rectangle(cr, 0.0, h * 0.60, w, h * 0.40);
-    cairo_fill(cr);
-    cairo_pattern_destroy(water);
-
-    cairo_set_source_rgba(cr, 1.0, 0.55, 0.08, 0.48);
-    cairo_set_line_width(cr, 2.0);
-    for (int i = 0; i < 6; ++i) {
-        const double y = h * (0.68 + 0.045 * (double)i);
-        const double spread = w * (0.025 + 0.018 * (double)i);
-        cairo_move_to(cr, w * 0.72 - spread, y);
-        cairo_line_to(cr, w * 0.72 + spread, y);
-        cairo_stroke(cr);
-    }
-
-    cairo_set_source_rgb(cr, 0.01, 0.03, 0.04);
-    cairo_set_line_width(cr, 7.0);
-    cairo_move_to(cr, w * 0.90, h);
-    cairo_curve_to(cr, w * 0.88, h * 0.78, w * 0.93, h * 0.58, w * 0.91, h * 0.30);
-    cairo_stroke(cr);
-    cairo_set_line_width(cr, 4.0);
-    cairo_move_to(cr, w * 0.91, h * 0.46);
-    cairo_line_to(cr, w * 0.83, h * 0.28);
-    cairo_move_to(cr, w * 0.91, h * 0.40);
-    cairo_line_to(cr, w * 0.97, h * 0.22);
-    cairo_stroke(cr);
-}
-
-static GtkWidget *make_scenic_panel(int width, int height, const char *css_class)
-{
-    GtkWidget *area = gtk_drawing_area_new();
-    gtk_drawing_area_set_content_width(GTK_DRAWING_AREA(area), width);
-    gtk_drawing_area_set_content_height(GTK_DRAWING_AREA(area), height);
-    gtk_drawing_area_set_draw_func(
-        GTK_DRAWING_AREA(area), draw_scenic_panel, NULL, NULL);
-    if (css_class != NULL) {
-        gtk_widget_add_css_class(area, css_class);
-    }
-    return area;
-}
-
 static GtkWidget *make_visual_panel(const char *filename,
                                     int width,
                                     int height,
@@ -1521,127 +1440,21 @@ static GtkWidget *make_visual_panel(const char *filename,
 {
     GtkWidget *picture = make_ui_asset_picture(
         filename, width, height, css_class);
-    return picture != NULL
-        ? picture
-        : make_scenic_panel(width, height, css_class);
-}
+    GtkWidget *fallback;
 
-static void draw_australia_flag(GtkDrawingArea *area,
-                                cairo_t *cr,
-                                int width,
-                                int height,
-                                gpointer user_data)
-{
-    (void)area;
-    (void)user_data;
-    const double w = (double)width;
-    const double h = (double)height;
-
-    cairo_set_source_rgb(cr, 0.02, 0.14, 0.38);
-    cairo_paint(cr);
-
-    cairo_set_source_rgb(cr, 0.95, 0.95, 0.96);
-    cairo_rectangle(cr, 0.0, 0.0, w * 0.46, h * 0.52);
-    cairo_fill(cr);
-    cairo_set_source_rgb(cr, 0.03, 0.16, 0.42);
-    cairo_rectangle(cr, 0.0, 0.0, w * 0.46, h * 0.52);
-    cairo_fill(cr);
-
-    cairo_set_source_rgb(cr, 0.96, 0.96, 0.96);
-    cairo_set_line_width(cr, h * 0.08);
-    cairo_move_to(cr, 0.0, 0.0);
-    cairo_line_to(cr, w * 0.46, h * 0.52);
-    cairo_move_to(cr, w * 0.46, 0.0);
-    cairo_line_to(cr, 0.0, h * 0.52);
-    cairo_stroke(cr);
-
-    cairo_set_source_rgb(cr, 0.85, 0.05, 0.12);
-    cairo_set_line_width(cr, h * 0.035);
-    cairo_move_to(cr, 0.0, 0.0);
-    cairo_line_to(cr, w * 0.46, h * 0.52);
-    cairo_move_to(cr, w * 0.46, 0.0);
-    cairo_line_to(cr, 0.0, h * 0.52);
-    cairo_stroke(cr);
-
-    cairo_set_source_rgb(cr, 0.96, 0.96, 0.96);
-    cairo_rectangle(cr, w * 0.19, 0.0, w * 0.08, h * 0.52);
-    cairo_rectangle(cr, 0.0, h * 0.20, w * 0.46, h * 0.12);
-    cairo_fill(cr);
-    cairo_set_source_rgb(cr, 0.85, 0.05, 0.12);
-    cairo_rectangle(cr, w * 0.215, 0.0, w * 0.03, h * 0.52);
-    cairo_rectangle(cr, 0.0, h * 0.23, w * 0.46, h * 0.06);
-    cairo_fill(cr);
-
-    cairo_set_source_rgb(cr, 1.0, 1.0, 1.0);
-    const double stars[][2] = {
-        {0.68, 0.25}, {0.80, 0.48}, {0.64, 0.68},
-        {0.86, 0.76}, {0.75, 0.87}, {0.35, 0.72}
-    };
-    for (guint i = 0; i < G_N_ELEMENTS(stars); ++i) {
-        cairo_arc(cr, w * stars[i][0], h * stars[i][1], h * 0.035,
-                  0.0, 6.283185307179586);
-        cairo_fill(cr);
+    if (picture != NULL) {
+        return picture;
     }
-}
 
-static GtkWidget *make_australia_flag(void)
-{
-    GtkWidget *area = gtk_drawing_area_new();
-    gtk_drawing_area_set_content_width(GTK_DRAWING_AREA(area), 104);
-    gtk_drawing_area_set_content_height(GTK_DRAWING_AREA(area), 66);
-    gtk_drawing_area_set_draw_func(
-        GTK_DRAWING_AREA(area), draw_australia_flag, NULL, NULL);
-    gtk_widget_add_css_class(area, "region-flag");
-    return area;
-}
-
-static void draw_network_visual(GtkDrawingArea *area,
-                                cairo_t *cr,
-                                int width,
-                                int height,
-                                gpointer user_data)
-{
-    (void)area;
-    const gboolean online = GPOINTER_TO_INT(user_data) != 0;
-    const double w = (double)width;
-    const double h = (double)height;
-    const double nodes[][2] = {
-        {0.14,0.62},{0.30,0.36},{0.46,0.58},{0.62,0.30},{0.78,0.52},{0.90,0.28}
-    };
-
-    cairo_set_source_rgb(cr, 0.01, 0.05, 0.09);
-    cairo_paint(cr);
-    cairo_set_line_width(cr, 1.5);
-    cairo_set_source_rgba(cr, 0.0, 0.68, 0.95, online ? 0.50 : 0.18);
-    for (guint i = 1; i < G_N_ELEMENTS(nodes); ++i) {
-        cairo_move_to(cr, w * nodes[i-1][0], h * nodes[i-1][1]);
-        cairo_line_to(cr, w * nodes[i][0], h * nodes[i][1]);
-        cairo_stroke(cr);
+    fallback = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
+    gtk_widget_add_css_class(fallback, "asset-missing");
+    if (css_class != NULL) {
+        gtk_widget_add_css_class(fallback, css_class);
     }
-    for (guint i = 0; i < G_N_ELEMENTS(nodes); ++i) {
-        cairo_set_source_rgb(
-            cr,
-            online ? 0.0 : 0.45,
-            online ? 0.75 : 0.45,
-            online ? 1.0 : 0.45);
-        cairo_arc(cr, w * nodes[i][0], h * nodes[i][1], 4.0,
-                  0.0, 6.283185307179586);
-        cairo_fill(cr);
-    }
-}
-
-static GtkWidget *make_network_visual(gboolean online)
-{
-    GtkWidget *area = gtk_drawing_area_new();
-    gtk_drawing_area_set_content_width(GTK_DRAWING_AREA(area), 280);
-    gtk_drawing_area_set_content_height(GTK_DRAWING_AREA(area), 84);
-    gtk_drawing_area_set_draw_func(
-        GTK_DRAWING_AREA(area),
-        draw_network_visual,
-        GINT_TO_POINTER(online ? 1 : 0),
-        NULL);
-    gtk_widget_add_css_class(area, "network-visual");
-    return area;
+    gtk_widget_set_size_request(fallback, width, height);
+    gtk_widget_set_tooltip_text(
+        fallback, "Installed visual asset is unavailable.");
+    return fallback;
 }
 
 static GtkWidget *make_theme_preview(const char *label,
@@ -1652,13 +1465,13 @@ static GtkWidget *make_theme_preview(const char *label,
     g_autofree gchar *asset_name =
         g_strdup_printf("%s.png", class_name);
     GtkWidget *preview = make_ui_asset_picture(
-        asset_name, 112, 58, "theme-preview-window");
+        asset_name, 76, 44, "theme-preview-window");
 
     if (preview == NULL) {
         preview = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
         gtk_widget_add_css_class(preview, "theme-preview-window");
-        gtk_widget_add_css_class(preview, class_name);
-        gtk_widget_set_size_request(preview, 112, 58);
+        gtk_widget_add_css_class(preview, "asset-missing");
+        gtk_widget_set_size_request(preview, 76, 44);
     }
 
     gtk_widget_add_css_class(box, "theme-preview");
@@ -1699,28 +1512,90 @@ static gchar *format_uptime(void)
     return g_strdup_printf("%" G_GUINT64_FORMAT "m", minutes);
 }
 
-static const char *locale_country_label(const char *locale_name)
+static const char *current_locale_label(void)
 {
-    if (locale_name != NULL && strstr(locale_name, "_AU") != NULL) {
-        return "Australia";
-    }
-    return locale_name != NULL ? locale_name : "Unknown";
+    const gchar *const *languages = g_get_language_names();
+    return languages != NULL && languages[0] != NULL
+        ? languages[0]
+        : "Unknown";
 }
 
-static const char *locale_language_label(const char *locale_name)
+static gboolean refresh_home_status(gpointer user_data)
 {
-    if (locale_name != NULL && g_str_has_prefix(locale_name, "en_AU")) {
-        return "English (Australia)";
+    HomeStatusTicker *ticker = user_data;
+    g_autofree gchar *uptime = NULL;
+    GtkSettings *settings = gtk_settings_get_default();
+    gchar *theme_name = NULL;
+    gboolean prefer_dark = FALSE;
+    GNetworkMonitor *network = g_network_monitor_get_default();
+    gboolean online = FALSE;
+    gboolean metered = FALSE;
+    GNetworkConnectivity connectivity = G_NETWORK_CONNECTIVITY_LOCAL;
+    const char *locale_name = current_locale_label();
+    g_autofree gchar *region_detail = NULL;
+    g_autofree gchar *appearance_detail = NULL;
+    g_autofree gchar *network_detail = NULL;
+    g_autoptr(GTimeZone) local_zone = g_time_zone_new_local();
+
+    if (ticker == NULL) return G_SOURCE_REMOVE;
+    uptime = format_uptime();
+    if (ticker->uptime != NULL) gtk_label_set_text(ticker->uptime, uptime);
+    if (ticker->date_timezone != NULL && local_zone != NULL) {
+        gtk_label_set_text(
+            ticker->date_timezone,
+            g_time_zone_get_identifier(local_zone));
     }
-    return locale_name != NULL ? locale_name : "Unknown";
+    if (ticker->region_value != NULL) {
+        gtk_label_set_text(ticker->region_value, locale_name);
+    }
+    region_detail = g_strdup_printf(
+        "Current language/format locale • %s", locale_name);
+    if (ticker->region_detail != NULL) {
+        gtk_label_set_text(ticker->region_detail, region_detail);
+    }
+    if (settings != NULL) {
+        g_object_get(settings,
+            "gtk-theme-name", &theme_name,
+            "gtk-application-prefer-dark-theme", &prefer_dark,
+            NULL);
+    }
+    if (ticker->appearance_value != NULL) {
+        gtk_label_set_text(
+            ticker->appearance_value,
+            theme_name != NULL ? theme_name : "System theme");
+    }
+    appearance_detail = g_strdup_printf(
+        "%s presentation", prefer_dark ? "Dark" : "Light");
+    if (ticker->appearance_detail != NULL) {
+        gtk_label_set_text(ticker->appearance_detail, appearance_detail);
+    }
+    if (network != NULL) {
+        online = g_network_monitor_get_network_available(network);
+        metered = g_network_monitor_get_network_metered(network);
+        connectivity = g_network_monitor_get_connectivity(network);
+    }
+    if (ticker->network_value != NULL) {
+        gtk_label_set_text(
+            ticker->network_value, online ? "Connected" : "Offline");
+    }
+    network_detail = g_strdup_printf(
+        "%s%s", network_connectivity_text(connectivity),
+        metered ? " • Metered" : "");
+    if (ticker->network_detail != NULL) {
+        gtk_label_set_text(ticker->network_detail, network_detail);
+    }
+    g_free(theme_name);
+    return G_SOURCE_CONTINUE;
 }
 
-static GtkWidget *build_home_page(GtkStack *stack)
+static GtkWidget *build_home_page(
+    GtkStack *stack,
+    ShellSearchState *search_state)
 {
     GtkWidget *page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     GtkWidget *hero = gtk_overlay_new();
     GtkWidget *hero_scene = make_visual_panel(
-        "hero-asset.png", 1060, 242, "hero-scene");
+        "hero-asset.png", -1, 212, "hero-scene");
     GtkWidget *hero_foreground = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 20);
     GtkWidget *hero_copy = gtk_box_new(GTK_ORIENTATION_VERTICAL, 3);
     GtkWidget *hero_spacer = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
@@ -1738,7 +1613,7 @@ static GtkWidget *build_home_page(GtkStack *stack)
     GtkWidget *overview_body = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 15);
     GtkWidget *system_time_label;
     GtkWidget *overview_scene = make_visual_panel(
-        "overview-asset.png", 190, 126, "overview-scene");
+        "overview-asset.png", 120, 96, "overview-scene");
     GtkWidget *quick = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
     GtkWidget *quick_heading = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 9);
     GtkWidget *quick_icon_wrap = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
@@ -1762,13 +1637,10 @@ static GtkWidget *build_home_page(GtkStack *stack)
     g_autofree gchar *os_name = g_get_os_info(G_OS_INFO_KEY_PRETTY_NAME);
     const char *desktop = g_getenv("XDG_CURRENT_DESKTOP");
     const char *host = g_get_host_name();
-    const char *kernel = uname(&uts) == 0 ? uts.release : "Unknown";
-    const char *architecture = uname(&uts) == 0 ? uts.machine : "Unknown";
-    const gchar *const *languages = g_get_language_names();
-    const char *locale_name =
-        languages != NULL && languages[0] != NULL
-            ? languages[0]
-            : "Unknown";
+    const int uname_result = uname(&uts);
+    const char *kernel = uname_result == 0 ? uts.release : "Unknown";
+    const char *architecture = uname_result == 0 ? uts.machine : "Unknown";
+    const char *locale_name = current_locale_label();
     GtkSettings *gtk_settings = gtk_settings_get_default();
     gchar *theme_name = NULL;
     gboolean prefer_dark = FALSE;
@@ -1776,7 +1648,7 @@ static GtkWidget *build_home_page(GtkStack *stack)
     gboolean online = FALSE;
     gboolean metered = FALSE;
     GNetworkConnectivity connectivity = G_NETWORK_CONNECTIVITY_LOCAL;
-    SsHomeTemporalPresentation temporal = {0};
+    SsHomeTemporalPresentation temporal;
     g_autofree gchar *region_detail = NULL;
     g_autofree gchar *appearance_detail = NULL;
     g_autofree gchar *network_detail = NULL;
@@ -1784,20 +1656,15 @@ static GtkWidget *build_home_page(GtkStack *stack)
     g_autoptr(GTimeZone) local_zone = g_time_zone_new_local();
     const char *timezone_name =
         local_zone != NULL ? g_time_zone_get_identifier(local_zone) : "Unknown";
-    SsLocationMetadata location = {0};
-    const gboolean have_location =
-        ss_location_metadata_load(&location) ? TRUE : FALSE;
-    g_autofree gchar *coordinate_text = have_location
-        ? g_strdup_printf("%.4f° %c, %.4f° %c",
-                          fabs(location.latitude),
-                          location.latitude < 0.0 ? 'S' : 'N',
-                          fabs(location.longitude),
-                          location.longitude < 0.0 ? 'W' : 'E')
-        : NULL;
     g_autofree gchar *os_display = g_strdup_printf(
         "Infiltrator OS (%s)",
         os_name != NULL ? os_name : "Linux");
-    if (!ss_home_temporal_presentation_now(&temporal)) {
+    ss_home_temporal_presentation_init(&temporal);
+    SsHomeTemporalPresenter *home_presenter =
+        ss_home_temporal_presenter_new();
+    if (home_presenter == NULL ||
+        !ss_home_temporal_presenter_format_now(
+            home_presenter, &temporal)) {
         temporal.clock_text = g_strdup("Unknown");
         temporal.date_text = g_strdup("");
         temporal.system_time_text = g_strdup("Unknown");
@@ -1817,12 +1684,8 @@ static GtkWidget *build_home_page(GtkStack *stack)
     }
 
     region_detail = g_strdup_printf(
-        "%s  •  Locale %s%s",
-        locale_language_label(locale_name),
-        locale_name,
-        strstr(locale_name, "_AU") != NULL
-            ? "  •  Currency AUD  •  Units Metric"
-            : "");
+        "Current language/format locale • %s",
+        locale_name);
     appearance_detail = g_strdup_printf(
         "%s presentation",
         prefer_dark ? "Dark" : "Light");
@@ -1913,9 +1776,17 @@ static GtkWidget *build_home_page(GtkStack *stack)
         "action-program",
         g_strdup("infiltrator-software"),
         g_free);
-    g_signal_connect(
-        updates_button, "clicked",
-        G_CALLBACK(launch_external_program), NULL);
+    g_autofree gchar *software_path =
+        g_find_program_in_path("infiltrator-software");
+    if (software_path == NULL) {
+        gtk_widget_set_sensitive(updates_button, FALSE);
+        gtk_widget_set_tooltip_text(
+            updates_button, "Infiltrator Software is not installed.");
+    } else {
+        g_signal_connect(
+            updates_button, "clicked",
+            G_CALLBACK(launch_external_program), NULL);
+    }
     gtk_box_append(GTK_BOX(overview_heading), updates_button);
     gtk_box_append(GTK_BOX(overview), overview_heading);
     gtk_grid_set_column_spacing(GTK_GRID(overview_data), 18);
@@ -1930,7 +1801,7 @@ static GtkWidget *build_home_page(GtkStack *stack)
         GTK_GRID(overview_data), 3, "Desktop", desktop);
     append_overview_row(
         GTK_GRID(overview_data), 4, "Hostname", host);
-    append_overview_row(
+    GtkWidget *uptime_label = append_overview_row(
         GTK_GRID(overview_data), 5, "Uptime", uptime_text);
     system_time_label = append_overview_row(
         GTK_GRID(overview_data), 6, "System time", temporal.system_time_text);
@@ -1962,7 +1833,7 @@ static GtkWidget *build_home_page(GtkStack *stack)
     gtk_widget_add_css_class(date_action, "quick-action-cyan");
     g_signal_connect(
         date_action, "clicked",
-        G_CALLBACK(open_date_time), stack);
+        G_CALLBACK(open_date_time), search_state);
     gtk_grid_attach(GTK_GRID(quick_grid), date_action, 0, 0, 1, 1);
 
     GtkWidget *region_action = make_program_action(
@@ -2021,7 +1892,7 @@ static GtkWidget *build_home_page(GtkStack *stack)
     gtk_widget_set_hexpand(date_open, TRUE);
     g_signal_connect(
         date_open, "clicked",
-        G_CALLBACK(open_date_time), stack);
+        G_CALLBACK(open_date_time), search_state);
     gtk_box_append(GTK_BOX(date_heading), date_open);
     gtk_box_append(GTK_BOX(date_card), date_heading);
 
@@ -2043,28 +1914,19 @@ static GtkWidget *build_home_page(GtkStack *stack)
     gtk_box_append(GTK_BOX(pin_wrap), pin);
     gtk_box_append(GTK_BOX(date_meta), pin_wrap);
     date_location = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
+    GtkWidget *date_timezone_label =
+        ss_linux_ui_make_label(timezone_name, "location-primary");
+    gtk_box_append(GTK_BOX(date_location), date_timezone_label);
     gtk_box_append(
         GTK_BOX(date_location),
         ss_linux_ui_make_label(
-            have_location ? location.display_name : timezone_name,
-            "location-primary"));
-    gtk_box_append(
-        GTK_BOX(date_location),
-        ss_linux_ui_make_label(
-            have_location && location.country_code[0] != '\0'
-                ? (g_strcmp0(location.country_code, "AU") == 0 ? "Australia" : location.country_code)
-                : timezone_name,
+            "Authoritative local time zone",
             "status-card-detail"));
-    if (coordinate_text != NULL) {
-        gtk_box_append(
-            GTK_BOX(date_location),
-            ss_linux_ui_make_label(coordinate_text, "location-coordinates"));
-    }
     gtk_box_append(GTK_BOX(date_meta), date_location);
     gtk_box_append(GTK_BOX(date_body), date_meta);
 
     GtkWidget *date_scene = make_visual_panel(
-        "date-asset.png", 190, 96, "date-scene");
+        "date-asset.png", 120, 78, "date-scene");
     gtk_widget_set_hexpand(date_scene, TRUE);
     gtk_widget_set_halign(date_scene, GTK_ALIGN_END);
     gtk_box_append(GTK_BOX(date_body), date_scene);
@@ -2084,15 +1946,13 @@ static GtkWidget *build_home_page(GtkStack *stack)
         ss_linux_ui_make_label("Region & Language", "home-card-title"));
     gtk_box_append(GTK_BOX(region_card), region_heading);
     region_body = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 13);
-    gtk_box_append(GTK_BOX(region_body), make_australia_flag());
     region_copy = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
-    gtk_box_append(
-        GTK_BOX(region_copy),
-        ss_linux_ui_make_label(
-            locale_country_label(locale_name), "region-country"));
-    gtk_box_append(
-        GTK_BOX(region_copy),
-        ss_linux_ui_make_label(region_detail, "status-card-detail"));
+    GtkWidget *region_value_label =
+        ss_linux_ui_make_label(locale_name, "region-country");
+    GtkWidget *region_detail_label =
+        ss_linux_ui_make_label(region_detail, "status-card-detail");
+    gtk_box_append(GTK_BOX(region_copy), region_value_label);
+    gtk_box_append(GTK_BOX(region_copy), region_detail_label);
     gtk_box_append(GTK_BOX(region_body), region_copy);
     GtkWidget *region_scene = make_ui_asset_picture(
         "region-asset.png", 220, 96, "region-scene");
@@ -2110,7 +1970,11 @@ static GtkWidget *build_home_page(GtkStack *stack)
         "Display & Appearance",
         theme_name != NULL ? theme_name : "System theme",
         appearance_detail);
-    appearance_previews = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 9);
+    GtkWidget *appearance_value_label = g_object_get_data(
+        G_OBJECT(appearance_card), "status-value-label");
+    GtkWidget *appearance_detail_label = g_object_get_data(
+        G_OBJECT(appearance_card), "status-detail-label");
+    appearance_previews = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
     gtk_box_set_homogeneous(GTK_BOX(appearance_previews), TRUE);
     gtk_box_append(
         GTK_BOX(appearance_previews),
@@ -2133,15 +1997,16 @@ static GtkWidget *build_home_page(GtkStack *stack)
         "Network",
         online ? "Connected" : "Offline",
         network_detail);
-    gtk_widget_add_css_class(
-        gtk_widget_get_next_sibling(
-            gtk_widget_get_first_child(network_card)),
-        online ? "network-online" : "network-offline");
+    GtkWidget *network_value_label = g_object_get_data(
+        G_OBJECT(network_card), "status-value-label");
+    GtkWidget *network_detail_label = g_object_get_data(
+        G_OBJECT(network_card), "status-detail-label");
     network_body = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
     GtkWidget *network_visual = make_ui_asset_picture(
-        "network-asset.png", 300, 140, "network-visual");
+        "network-asset.png", 220, 100, "network-visual");
     if (network_visual == NULL) {
-        network_visual = make_network_visual(online);
+        network_visual = make_visual_panel(
+            "network-asset.png", 220, 100, "network-visual");
     }
     gtk_widget_set_hexpand(network_visual, TRUE);
     gtk_widget_set_halign(network_visual, GTK_ALIGN_END);
@@ -2183,12 +2048,14 @@ static GtkWidget *build_home_page(GtkStack *stack)
     ticker->clock = GTK_LABEL(date_clock_label);
     ticker->date = GTK_LABEL(date_calendar_label);
     ticker->system_time = GTK_LABEL(system_time_label);
+    ticker->presenter = home_presenter;
+    home_presenter = NULL;
     const guint temporal_source_id = g_timeout_add_full(
         G_PRIORITY_DEFAULT,
         250U,
         refresh_home_temporal,
         ticker,
-        g_free);
+        home_temporal_ticker_free);
     g_source_set_name_by_id(
         temporal_source_id,
         "[system-settings] live Home temporal presentation");
@@ -2196,8 +2063,31 @@ static GtkWidget *build_home_page(GtkStack *stack)
         G_OBJECT(scroller),
         "system-settings-home-temporal-source",
         GUINT_TO_POINTER(temporal_source_id),
-        remove_home_temporal_source);
+        remove_source);
 
+    HomeStatusTicker *status_ticker = g_new0(HomeStatusTicker, 1);
+    status_ticker->uptime = GTK_LABEL(uptime_label);
+    status_ticker->date_timezone = GTK_LABEL(date_timezone_label);
+    status_ticker->region_value = GTK_LABEL(region_value_label);
+    status_ticker->region_detail = GTK_LABEL(region_detail_label);
+    status_ticker->appearance_value = GTK_LABEL(appearance_value_label);
+    status_ticker->appearance_detail = GTK_LABEL(appearance_detail_label);
+    status_ticker->network_value = GTK_LABEL(network_value_label);
+    status_ticker->network_detail = GTK_LABEL(network_detail_label);
+    (void)refresh_home_status(status_ticker);
+    const guint status_source_id = g_timeout_add_seconds_full(
+        G_PRIORITY_DEFAULT, 5U,
+        refresh_home_status, status_ticker, g_free);
+    g_source_set_name_by_id(
+        status_source_id,
+        "[system-settings] live Home system status");
+    g_object_set_data_full(
+        G_OBJECT(scroller),
+        "system-settings-home-status-source",
+        GUINT_TO_POINTER(status_source_id),
+        remove_source);
+
+    ss_home_temporal_presenter_free(home_presenter);
     g_free(theme_name);
     ss_home_temporal_presentation_clear(&temporal);
     return scroller;
@@ -2317,7 +2207,7 @@ static void on_activate(GtkApplication *application, gpointer user_data)
     window = GTK_WINDOW(
         gtk_application_window_new(application));
     gtk_window_set_title(window, info->program_name);
-    gtk_window_set_default_size(window, 1420, 900);
+    gtk_window_set_default_size(window, 1180, 760);
     gtk_window_set_resizable(window, TRUE);
     g_signal_connect(
         window, "close-request",
@@ -2395,7 +2285,7 @@ static void on_activate(GtkApplication *application, gpointer user_data)
         date_scroller);
     gtk_stack_add_named(
         stack,
-        build_home_page(stack),
+        build_home_page(stack, search_state),
         "home");
     gtk_stack_add_named(
         stack,

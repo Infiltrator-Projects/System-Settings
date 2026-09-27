@@ -36,9 +36,16 @@ typedef struct LocationSearchUiRequest {
     guint generation;
 } LocationSearchUiRequest;
 
+typedef enum SsSystemTimeOperation {
+    SS_SYSTEM_TIME_OPERATION_TIMEZONE,
+    SS_SYSTEM_TIME_OPERATION_NTP,
+    SS_SYSTEM_TIME_OPERATION_MANUAL
+} SsSystemTimeOperation;
+
 typedef struct SystemTimeUiRequest {
     GtkWindow *window;
     guint generation;
+    SsSystemTimeOperation operation;
 } SystemTimeUiRequest;
 
 static void set_status(SsLinuxDateTimePanel *state,
@@ -453,7 +460,9 @@ static void sync_system_time_controls(SsLinuxDateTimePanel *state)
             GTK_WIDGET(state->manual_time), TRUE);
         gtk_widget_set_sensitive(
             GTK_WIDGET(state->manual_set_time), TRUE);
-        fill_manual_time_entries(state);
+        if (!state->manual_dirty) {
+            fill_manual_time_entries(state);
+        }
     }
 
     state->updating_system_controls = false;
@@ -985,25 +994,67 @@ static void system_time_ui_request_free(SystemTimeUiRequest *request)
     g_free(request);
 }
 
-static SystemTimeUiRequest *begin_system_time_operation(
-    SsLinuxDateTimePanel *state)
+static guint *operation_generation(
+    SsLinuxDateTimePanel *state,
+    SsSystemTimeOperation operation)
 {
-    SystemTimeUiRequest *request;
-
     if (state == NULL) {
         return NULL;
     }
-
-    if (state->system_time_cancellable != NULL) {
-        g_cancellable_cancel(state->system_time_cancellable);
-        g_clear_object(&state->system_time_cancellable);
+    switch (operation) {
+    case SS_SYSTEM_TIME_OPERATION_TIMEZONE:
+        return &state->timezone_generation;
+    case SS_SYSTEM_TIME_OPERATION_NTP:
+        return &state->ntp_generation;
+    case SS_SYSTEM_TIME_OPERATION_MANUAL:
+        return &state->manual_time_generation;
+    default:
+        return NULL;
     }
-    state->system_time_cancellable = g_cancellable_new();
-    state->system_time_generation++;
+}
+
+static GCancellable **operation_cancellable(
+    SsLinuxDateTimePanel *state,
+    SsSystemTimeOperation operation)
+{
+    if (state == NULL) {
+        return NULL;
+    }
+    switch (operation) {
+    case SS_SYSTEM_TIME_OPERATION_TIMEZONE:
+        return &state->timezone_cancellable;
+    case SS_SYSTEM_TIME_OPERATION_NTP:
+        return &state->ntp_cancellable;
+    case SS_SYSTEM_TIME_OPERATION_MANUAL:
+        return &state->manual_time_cancellable;
+    default:
+        return NULL;
+    }
+}
+
+static SystemTimeUiRequest *begin_system_time_operation(
+    SsLinuxDateTimePanel *state,
+    SsSystemTimeOperation operation)
+{
+    SystemTimeUiRequest *request;
+    GCancellable **cancellable = operation_cancellable(state, operation);
+    guint *generation = operation_generation(state, operation);
+
+    if (state == NULL || cancellable == NULL || generation == NULL) {
+        return NULL;
+    }
+
+    if (*cancellable != NULL) {
+        g_cancellable_cancel(*cancellable);
+        g_clear_object(cancellable);
+    }
+    *cancellable = g_cancellable_new();
+    ++(*generation);
 
     request = g_new0(SystemTimeUiRequest, 1);
     request->window = g_object_ref(state->window);
-    request->generation = state->system_time_generation;
+    request->generation = *generation;
+    request->operation = operation;
     return request;
 }
 
@@ -1027,9 +1078,16 @@ static void system_time_operation_complete(
      * completion. Cancellation alone is insufficient because D-Bus replies
      * can race with the cancellation notification.
      */
-    if (state != NULL &&
-        request->generation == state->system_time_generation) {
+    guint *generation = state != NULL
+        ? operation_generation(state, request->operation)
+        : NULL;
+
+    if (state != NULL && generation != NULL &&
+        request->generation == *generation) {
         if (success) {
+            if (request->operation == SS_SYSTEM_TIME_OPERATION_MANUAL) {
+                state->manual_dirty = false;
+            }
             (void)ss_regional_context_detect(&state->regional_context);
             sync_system_time_controls(state);
             update_location_summary(state);
@@ -1061,7 +1119,8 @@ static void request_system_timezone(
     }
 
     SystemTimeUiRequest *request =
-        begin_system_time_operation(state);
+        begin_system_time_operation(
+            state, SS_SYSTEM_TIME_OPERATION_TIMEZONE);
 
     if (request == NULL) {
         return;
@@ -1070,7 +1129,7 @@ static void request_system_timezone(
     ss_system_time_service_set_timezone_async(
         state->system_time_service,
         timezone_id,
-        state->system_time_cancellable,
+        state->timezone_cancellable,
         system_time_operation_complete,
         request);
 }
@@ -1111,7 +1170,8 @@ void on_network_time_changed(GObject *object,
     SystemTimeUiRequest *request;
 
     enabled = gtk_switch_get_active(GTK_SWITCH(object)) != FALSE;
-    request = begin_system_time_operation(state);
+    request = begin_system_time_operation(
+        state, SS_SYSTEM_TIME_OPERATION_NTP);
     if (request == NULL) {
         return;
     }
@@ -1122,7 +1182,7 @@ void on_network_time_changed(GObject *object,
     ss_system_time_service_set_ntp_async(
         state->system_time_service,
         enabled,
-        state->system_time_cancellable,
+        state->ntp_cancellable,
         system_time_operation_complete,
         request);
 }
@@ -1197,6 +1257,17 @@ static bool parse_manual_datetime(
     return true;
 }
 
+void on_manual_entry_changed(
+    GtkEditable *editable G_GNUC_UNUSED,
+    gpointer user_data)
+{
+    SsLinuxDateTimePanel *state = user_data;
+
+    if (state != NULL && !state->updating_system_controls) {
+        state->manual_dirty = true;
+    }
+}
+
 void on_manual_set_time_clicked(
     GtkButton *button G_GNUC_UNUSED,
     gpointer user_data)
@@ -1223,7 +1294,8 @@ void on_manual_set_time_clicked(
 
     {
         SystemTimeUiRequest *request =
-            begin_system_time_operation(state);
+            begin_system_time_operation(
+                state, SS_SYSTEM_TIME_OPERATION_MANUAL);
 
         if (request == NULL) {
             return;
@@ -1235,7 +1307,7 @@ void on_manual_set_time_clicked(
         ss_system_time_service_set_time_async(
             state->system_time_service,
             unix_time_usec,
-            state->system_time_cancellable,
+            state->manual_time_cancellable,
             system_time_operation_complete,
             request);
     }
@@ -1315,6 +1387,8 @@ void on_location_result_activated(
     const SsLocationSearchResult *result;
     char timezone_id[SS_TIMEZONE_ID_CAPACITY] = {0};
     const InfiltratrTemporalPolicyV3 *policy;
+    InfiltratrTemporalPolicyV3 previous_policy;
+    SsSystemTimeState current_system;
 
     if (state == NULL || row == NULL) {
         return;
@@ -1325,6 +1399,12 @@ void on_location_result_activated(
     if (result == NULL) {
         return;
     }
+
+    policy = ss_date_time_model_policy(&state->model);
+    if (policy == NULL) {
+        return;
+    }
+    previous_policy = *policy;
 
     if (!ss_date_time_model_set_location(
             &state->model,
@@ -1347,6 +1427,15 @@ void on_location_result_activated(
         sizeof(state->location_metadata.country_code));
     state->location_metadata.latitude = result->latitude;
     state->location_metadata.longitude = result->longitude;
+    if (state->system_time_service != NULL &&
+        ss_system_time_service_read(
+            state->system_time_service, &current_system) &&
+        current_system.timezone[0] != '\0') {
+        (void)g_strlcpy(
+            state->location_metadata.timezone_id,
+            current_system.timezone,
+            sizeof(state->location_metadata.timezone_id));
+    }
 
     if (result->country_code[0] != '\0' &&
         ss_regional_context_nearest_timezone(
@@ -1363,6 +1452,19 @@ void on_location_result_activated(
 
     state->location_metadata_present =
         ss_location_metadata_save(&state->location_metadata);
+    if (!state->location_metadata_present) {
+        (void)ss_date_time_model_set_location(
+            &state->model,
+            previous_policy.location_configured,
+            previous_policy.latitude,
+            previous_policy.longitude);
+        set_status(
+            state,
+            "The selected location could not be saved; the previous location was restored.",
+            true);
+        sync_controls(state);
+        return;
+    }
     state->location_follows_timezone_reference = false;
 
     state->updating_controls = true;
@@ -1542,6 +1644,8 @@ void on_location_coordinate_changed(
     SsLinuxDateTimePanel *state = user_data;
     double latitude;
     double longitude;
+    const InfiltratrTemporalPolicyV3 *policy;
+    InfiltratrTemporalPolicyV3 previous_policy;
 
     if (state == NULL || state->updating_controls) {
         return;
@@ -1549,6 +1653,11 @@ void on_location_coordinate_changed(
 
     latitude = gtk_spin_button_get_value(state->latitude);
     longitude = gtk_spin_button_get_value(state->longitude);
+    policy = ss_date_time_model_policy(&state->model);
+    if (policy == NULL) {
+        return;
+    }
+    previous_policy = *policy;
 
     if (!ss_date_time_model_set_location(
             &state->model, true, latitude, longitude)) {
@@ -1567,6 +1676,19 @@ void on_location_coordinate_changed(
     state->location_metadata.longitude = longitude;
     state->location_metadata_present =
         ss_location_metadata_save(&state->location_metadata);
+    if (!state->location_metadata_present) {
+        (void)ss_date_time_model_set_location(
+            &state->model,
+            previous_policy.location_configured,
+            previous_policy.latitude,
+            previous_policy.longitude);
+        set_status(
+            state,
+            "Custom coordinates could not be saved; the previous location was restored.",
+            true);
+        sync_controls(state);
+        return;
+    }
     state->location_follows_timezone_reference = false;
     gtk_editable_set_text(
         GTK_EDITABLE(state->location_search),
@@ -1690,7 +1812,7 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
         (!ss_date_time_model_policy(&state->model)->location_configured ||
          location_policy_matches_reference(state));
 
-    state->system_time_cancellable = g_cancellable_new();
+    state->service_cancellable = g_cancellable_new();
 
     state->cinnamon_interface_settings =
         ss_cinnamon_interface_settings_new();
@@ -1730,7 +1852,7 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
      * window before either external-service work path runs.
      */
     ss_system_time_service_new_async(
-        state->system_time_cancellable,
+        state->service_cancellable,
         system_time_service_ready,
         g_object_ref(state->window));
     state->preview_idle_id =
@@ -1776,9 +1898,21 @@ void ss_linux_date_time_panel_free(gpointer data)
         g_cancellable_cancel(state->location_search_cancellable);
         g_clear_object(&state->location_search_cancellable);
     }
-    if (state->system_time_cancellable != NULL) {
-        g_cancellable_cancel(state->system_time_cancellable);
-        g_clear_object(&state->system_time_cancellable);
+    if (state->service_cancellable != NULL) {
+        g_cancellable_cancel(state->service_cancellable);
+        g_clear_object(&state->service_cancellable);
+    }
+    if (state->timezone_cancellable != NULL) {
+        g_cancellable_cancel(state->timezone_cancellable);
+        g_clear_object(&state->timezone_cancellable);
+    }
+    if (state->ntp_cancellable != NULL) {
+        g_cancellable_cancel(state->ntp_cancellable);
+        g_clear_object(&state->ntp_cancellable);
+    }
+    if (state->manual_time_cancellable != NULL) {
+        g_cancellable_cancel(state->manual_time_cancellable);
+        g_clear_object(&state->manual_time_cancellable);
     }
 
     g_clear_pointer(&state->clock_mode_ids, g_ptr_array_unref);

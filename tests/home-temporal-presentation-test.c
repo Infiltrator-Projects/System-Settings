@@ -8,11 +8,12 @@
 int main(void)
 {
     InfiltratrTemporalPolicyV3 policy;
-    SsHomeTemporalPresentation presentation = {0};
+    SsHomeTemporalPresentation presentation;
     g_autoptr(GDateTime) noon =
         g_date_time_new_from_unix_utc(INT64_C(43200));
 
     g_assert_nonnull(noon);
+    ss_home_temporal_presentation_init(&presentation);
     g_assert_true(infiltratr_temporal_policy_v3_default(&policy));
     infiltratr_copy_string(
         policy.clock_mode, sizeof(policy.clock_mode), "decimal");

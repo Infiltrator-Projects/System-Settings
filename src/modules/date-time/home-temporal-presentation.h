@@ -19,28 +19,27 @@ typedef struct SsHomeTemporalPresentation {
     gchar *system_time_text;
 } SsHomeTemporalPresentation;
 
-/**
- * Format a supplied instant under a supplied temporal policy.
- *
- * desktop_use_24h is consulted only for the legacy "standard" clock mode.
- * Strings are owned by @out and released with
- * ss_home_temporal_presentation_clear().
- */
+typedef struct SsHomeTemporalPresenter SsHomeTemporalPresenter;
+
+void ss_home_temporal_presentation_init(
+    SsHomeTemporalPresentation *presentation);
+
 bool ss_home_temporal_presentation_format(
     const InfiltratrTemporalPolicyV3 *policy,
     GDateTime *now,
     bool desktop_use_24h,
     SsHomeTemporalPresentation *out);
 
-/**
- * Read the system-wide policy and format the current local instant.
- *
- * Failure leaves @out cleared.
- */
 bool ss_home_temporal_presentation_now(
     SsHomeTemporalPresentation *out);
 
-/** Release all strings held by one presentation value. */
+SsHomeTemporalPresenter *ss_home_temporal_presenter_new(void);
+void ss_home_temporal_presenter_free(
+    SsHomeTemporalPresenter *presenter);
+bool ss_home_temporal_presenter_format_now(
+    SsHomeTemporalPresenter *presenter,
+    SsHomeTemporalPresentation *out);
+
 void ss_home_temporal_presentation_clear(
     SsHomeTemporalPresentation *presentation);
 

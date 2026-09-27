@@ -13,7 +13,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.os == 'windows-latest' && 'windows-latest' || (startsWith(github.event.head_commit.message, 'Release ') && 'ubuntu-24.04' || 'bigbedroom') }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -70,6 +70,10 @@ jobs:
           test -f "$icon"
           grep -qx 'Icon=org.infiltrator.SystemSettings' "$desktop"
           grep -q '#00ADEF' "$icon"
+          ui="$root/usr/share/infiltrator/system-settings/ui"
+          for asset in hero-asset.png overview-asset.png date-asset.png region-asset.png network-asset.png theme-light.png theme-dark.png theme-follow.png theme-mercedes.png; do
+            test -s "$ui/$asset"
+          done
           depends="$(dpkg-deb --field "$deb" Depends)"
           grep -Eq 'libgeocode-glib-2-0|libgeocode-glib0' <<<"$depends"
           rm -rf "$root"
@@ -83,7 +87,7 @@ jobs:
 
 
   sanitizers:
-    runs-on: ubuntu-latest
+    runs-on: ${{ startsWith(github.event.head_commit.message, 'Release ') && 'ubuntu-24.04' || 'bigbedroom' }}
     steps:
       - uses: actions/checkout@v4
         with:

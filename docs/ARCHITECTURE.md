@@ -136,7 +136,7 @@ prematurely freezing an ABI around GTK widgets.
 
 ### Specialised temporal preview provider
 
-System Settings owns the temporal selection. Common 1.19.25 renders every
+System Settings owns the temporal selection. Common 1.19.35 renders every
 clock mode through `infiltratr_temporal_format_clock_mode()`. Gregorian dates
 use GLib's local date formatter. Non-Gregorian chronology previews use the
 optional `libcalendar-plus.so.0` runtime ABI.

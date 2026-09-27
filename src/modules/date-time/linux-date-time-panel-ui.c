@@ -305,7 +305,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
             &state->overview_sync),
         1, 1, 1, 1);
     gtk_box_append(GTK_BOX(overview_panel), overview_grid);
-    gtk_widget_set_size_request(overview_panel, 390, -1);
+    gtk_widget_set_size_request(overview_panel, 300, -1);
     gtk_box_append(GTK_BOX(hero_top), overview_panel);
 
     gtk_widget_add_css_class(hero_badge, "hero-badge");
@@ -442,7 +442,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
 
     gtk_widget_add_css_class(presentation_card, "settings-card");
     gtk_widget_add_css_class(presentation_card, "presentation-card");
-    gtk_widget_set_size_request(presentation_card, 390, -1);
+    gtk_widget_set_size_request(presentation_card, 320, -1);
     gtk_box_append(
         GTK_BOX(presentation_card),
         make_section_heading(
@@ -519,7 +519,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
 
     gtk_widget_add_css_class(system_card, "settings-card");
     gtk_widget_add_css_class(system_card, "system-card");
-    gtk_widget_set_size_request(system_card, 390, -1);
+    gtk_widget_set_size_request(system_card, 320, -1);
     gtk_box_append(
         GTK_BOX(system_card),
         make_section_heading(
@@ -595,6 +595,12 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     g_signal_connect(
         state->manual_set_time, "clicked",
         G_CALLBACK(on_manual_set_time_clicked), state);
+    g_signal_connect(
+        state->manual_date, "changed",
+        G_CALLBACK(on_manual_entry_changed), state);
+    g_signal_connect(
+        state->manual_time, "changed",
+        G_CALLBACK(on_manual_entry_changed), state);
     g_signal_connect(
         state->location_search_button, "clicked",
         G_CALLBACK(on_location_search_clicked), state);

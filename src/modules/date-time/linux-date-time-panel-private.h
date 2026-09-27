@@ -50,15 +50,21 @@ struct SsLinuxDateTimePanel {
     GPtrArray *clock_mode_ids;
     GPtrArray *timezone_ids;
     GCancellable *location_search_cancellable;
-    GCancellable *system_time_cancellable;
+    GCancellable *service_cancellable;
+    GCancellable *timezone_cancellable;
+    GCancellable *ntp_cancellable;
+    GCancellable *manual_time_cancellable;
     guint timer_id;
     guint preview_idle_id;
     guint location_search_generation;
-    guint system_time_generation;
+    guint timezone_generation;
+    guint ntp_generation;
+    guint manual_time_generation;
     bool location_metadata_present;
     bool location_follows_timezone_reference;
     bool updating_controls;
     bool updating_system_controls;
+    bool manual_dirty;
 };
 
 GtkWidget *ss_linux_date_time_panel_build_ui(
@@ -70,6 +76,7 @@ void on_seconds_changed(GObject *object, GParamSpec *pspec, gpointer user_data);
 void on_timezone_changed(GObject *object, GParamSpec *pspec, gpointer user_data);
 void on_network_time_changed(GObject *object, GParamSpec *pspec, gpointer user_data);
 void on_manual_set_time_clicked(GtkButton *button, gpointer user_data);
+void on_manual_entry_changed(GtkEditable *editable, gpointer user_data);
 void on_show_date_changed(GObject *object, GParamSpec *pspec, gpointer user_data);
 void on_first_day_changed(GObject *object, GParamSpec *pspec, gpointer user_data);
 void on_location_result_activated(

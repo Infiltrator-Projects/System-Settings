@@ -76,6 +76,9 @@ int main(void)
         g_assert_nonnull(g_object_get_data(
             G_OBJECT(home_scroller),
             "system-settings-home-temporal-source"));
+        g_assert_nonnull(g_object_get_data(
+            G_OBJECT(home_scroller),
+            "system-settings-home-status-source"));
         guint navigation_rows = 0U;
         for (GtkWidget *row = gtk_widget_get_first_child(GTK_WIDGET(navigation));
              row != NULL;
@@ -88,10 +91,36 @@ int main(void)
         g_assert_true(GTK_IS_SCROLLED_WINDOW(home));
         g_assert_cmpstr(
             gtk_stack_get_visible_child_name(stack), ==, "home");
-        gtk_stack_set_visible_child_name(stack, "date-time");
+        ShellSearchState *search_state = g_object_get_data(
+            G_OBJECT(window), "system-settings-search-state");
+        g_assert_nonnull(search_state);
+        open_date_time(NULL, search_state);
         g_assert_cmpstr(
             gtk_stack_get_visible_child_name(stack), ==, "date-time");
+        g_assert_true(
+            gtk_list_box_get_selected_row(navigation) ==
+            search_state->date_row);
         gtk_stack_set_visible_child_name(stack, "home");
+        gtk_editable_set_text(GTK_EDITABLE(search), "theme");
+        on_search_changed(GTK_SEARCH_ENTRY(search), search_state);
+        g_assert_cmpstr(search_state->query, ==, "theme");
+        g_assert_false(navigation_filter(search_state->home_row, search_state));
+        GtkListBoxRow *appearance_row = GTK_LIST_BOX_ROW(
+            gtk_widget_get_next_sibling(
+                gtk_widget_get_next_sibling(
+                    gtk_widget_get_next_sibling(
+                        GTK_WIDGET(search_state->home_row)))));
+        g_assert_true(navigation_filter(appearance_row, search_state));
+        gtk_editable_set_text(GTK_EDITABLE(search), "");
+        on_search_changed(GTK_SEARCH_ENTRY(search), search_state);
+
+        GtkWidget *missing_visual = make_visual_panel(
+            "definitely-missing.png", 80, 40, "test-visual");
+        g_assert_true(GTK_IS_BOX(missing_visual));
+        g_assert_false(GTK_IS_DRAWING_AREA(missing_visual));
+        g_object_ref_sink(missing_visual);
+        g_object_unref(missing_visual);
+
         GtkDropDown *dropdowns[] = {panel->timezone, panel->clock_mode,
                                     panel->calendar, panel->first_day};
         for (size_t j = 0; j < G_N_ELEMENTS(dropdowns); ++j) {
