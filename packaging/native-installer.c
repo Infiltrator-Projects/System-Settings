@@ -155,17 +155,11 @@ static bool executable_path(const char *argv0, char *out, size_t capacity)
     if (argv0 == NULL || argv0[0] == '\0') {
         return false;
     }
-    char *resolved = realpath(argv0, NULL);
-    if (resolved == NULL) {
+    const size_t fallback_length = strlen(argv0);
+    if (fallback_length >= capacity) {
         return false;
     }
-    const size_t resolved_length = strlen(resolved);
-    if (resolved_length >= capacity) {
-        free(resolved);
-        return false;
-    }
-    memcpy(out, resolved, resolved_length + 1U);
-    free(resolved);
+    memcpy(out, argv0, fallback_length + 1U);
     return true;
 }
 
