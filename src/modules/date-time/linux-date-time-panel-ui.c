@@ -305,7 +305,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
             &state->overview_sync),
         1, 1, 1, 1);
     gtk_box_append(GTK_BOX(overview_panel), overview_grid);
-    gtk_widget_set_size_request(overview_panel, 300, -1);
+    gtk_widget_set_hexpand(overview_panel, TRUE);
     gtk_box_append(GTK_BOX(hero_top), overview_panel);
 
     gtk_widget_add_css_class(hero_badge, "hero-badge");
@@ -390,7 +390,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     gtk_drop_down_set_enable_search(state->timezone, TRUE);
     gtk_widget_add_css_class(
         GTK_WIDGET(state->timezone), "setting-dropdown");
-    gtk_widget_set_size_request(GTK_WIDGET(state->timezone), 250, -1);
+    gtk_widget_set_hexpand(GTK_WIDGET(state->timezone), TRUE);
     gtk_box_append(
         GTK_BOX(location_card),
         ss_linux_ui_make_setting_tile(
@@ -410,13 +410,21 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     gtk_widget_set_size_request(GTK_WIDGET(state->latitude), 130, -1);
     gtk_widget_set_size_request(GTK_WIDGET(state->longitude), 130, -1);
 
-    coordinate_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
-    gtk_box_append(
-        GTK_BOX(coordinate_box),
-        make_coordinate_field("LATITUDE", state->latitude));
-    gtk_box_append(
-        GTK_BOX(coordinate_box),
-        make_coordinate_field("LONGITUDE", state->longitude));
+    coordinate_box = gtk_flow_box_new();
+    gtk_flow_box_set_selection_mode(
+        GTK_FLOW_BOX(coordinate_box), GTK_SELECTION_NONE);
+    gtk_flow_box_set_min_children_per_line(
+        GTK_FLOW_BOX(coordinate_box), 1U);
+    gtk_flow_box_set_max_children_per_line(
+        GTK_FLOW_BOX(coordinate_box), 2U);
+    gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(coordinate_box), 10U);
+    gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(coordinate_box), 8U);
+    gtk_flow_box_insert(
+        GTK_FLOW_BOX(coordinate_box),
+        make_coordinate_field("LATITUDE", state->latitude), -1);
+    gtk_flow_box_insert(
+        GTK_FLOW_BOX(coordinate_box),
+        make_coordinate_field("LONGITUDE", state->longitude), -1);
     gtk_box_append(
         GTK_BOX(location_card),
         ss_linux_ui_make_setting_tile(
@@ -442,7 +450,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
 
     gtk_widget_add_css_class(presentation_card, "settings-card");
     gtk_widget_add_css_class(presentation_card, "presentation-card");
-    gtk_widget_set_size_request(presentation_card, 320, -1);
+    gtk_widget_set_hexpand(presentation_card, TRUE);
     gtk_box_append(
         GTK_BOX(presentation_card),
         make_section_heading(
@@ -519,7 +527,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
 
     gtk_widget_add_css_class(system_card, "settings-card");
     gtk_widget_add_css_class(system_card, "system-card");
-    gtk_widget_set_size_request(system_card, 320, -1);
+    gtk_widget_set_hexpand(system_card, TRUE);
     gtk_box_append(
         GTK_BOX(system_card),
         make_section_heading(
@@ -538,7 +546,15 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
             "Synchronise automatically with the system service.",
             GTK_WIDGET(state->network_time)));
 
-    manual_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 7);
+    manual_box = gtk_flow_box_new();
+    gtk_flow_box_set_selection_mode(
+        GTK_FLOW_BOX(manual_box), GTK_SELECTION_NONE);
+    gtk_flow_box_set_min_children_per_line(
+        GTK_FLOW_BOX(manual_box), 1U);
+    gtk_flow_box_set_max_children_per_line(
+        GTK_FLOW_BOX(manual_box), 3U);
+    gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(manual_box), 7U);
+    gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(manual_box), 7U);
     state->manual_date = GTK_ENTRY(gtk_entry_new());
     state->manual_time = GTK_ENTRY(gtk_entry_new());
     state->manual_set_time =
@@ -555,9 +571,12 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         GTK_WIDGET(state->manual_set_time), "setting-button");
     gtk_widget_add_css_class(
         GTK_WIDGET(state->manual_set_time), "primary-button");
-    gtk_box_append(GTK_BOX(manual_box), GTK_WIDGET(state->manual_date));
-    gtk_box_append(GTK_BOX(manual_box), GTK_WIDGET(state->manual_time));
-    gtk_box_append(GTK_BOX(manual_box), GTK_WIDGET(state->manual_set_time));
+    gtk_flow_box_insert(
+        GTK_FLOW_BOX(manual_box), GTK_WIDGET(state->manual_date), -1);
+    gtk_flow_box_insert(
+        GTK_FLOW_BOX(manual_box), GTK_WIDGET(state->manual_time), -1);
+    gtk_flow_box_insert(
+        GTK_FLOW_BOX(manual_box), GTK_WIDGET(state->manual_set_time), -1);
     gtk_box_append(
         GTK_BOX(system_card),
         make_manual_setting_block(state, manual_box));
