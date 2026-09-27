@@ -2,6 +2,15 @@
 
 # Changelog
 
+## 0.4.37 — 2026-09-28 — native C installer
+
+- Replace the distributed Bash self-extracting .run with a compiled C executable.
+- Preserve the existing native install contract: extract the exact release source, configure with -march=native/-mtune=native, build, run the full test suite, create the Debian package and install it through APT.
+- Store the source archive as an authenticated-by-structure trailing payload with a fixed-size length footer; the native executable extracts only that bounded payload.
+- Keep the release-only source-asset builder as packaging infrastructure, while removing the Bash runtime installer from the published source tree.
+- Compile the native installer under the project's strict warning policy during ordinary Linux test builds and exercise its --help path in CTest.
+- Make the release asset builder prove that the generated .run is an ELF executable and that its embedded source payload round-trips correctly before publication.
+
 ## 0.4.36 — 2026-09-28 — forensic shell and Date & Time repair
 
 - Remove the remaining Cairo-generated mountain, Australian flag and network artwork fallbacks; missing packaged art now degrades to a neutral surface instead of inventing substitute imagery.
