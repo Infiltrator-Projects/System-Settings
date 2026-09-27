@@ -24,18 +24,25 @@ typedef struct SsHomeTemporalPresenter SsHomeTemporalPresenter;
 void ss_home_temporal_presentation_init(
     SsHomeTemporalPresentation *presentation);
 
+/**
+ * Format one supplied instant. @out is a pure output parameter: its previous
+ * contents are never inspected or released. A caller reusing a populated
+ * presentation must clear it first.
+ */
 bool ss_home_temporal_presentation_format(
     const InfiltratrTemporalPolicyV3 *policy,
     GDateTime *now,
     bool desktop_use_24h,
     SsHomeTemporalPresentation *out);
 
+/** Same pure-output ownership contract as ss_home_temporal_presentation_format(). */
 bool ss_home_temporal_presentation_now(
     SsHomeTemporalPresentation *out);
 
 SsHomeTemporalPresenter *ss_home_temporal_presenter_new(void);
 void ss_home_temporal_presenter_free(
     SsHomeTemporalPresenter *presenter);
+/** Same pure-output ownership contract as ss_home_temporal_presentation_format(). */
 bool ss_home_temporal_presenter_format_now(
     SsHomeTemporalPresenter *presenter,
     SsHomeTemporalPresentation *out);
