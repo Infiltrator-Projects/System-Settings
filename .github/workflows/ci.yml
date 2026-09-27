@@ -15,6 +15,10 @@ jobs:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os == 'windows-latest' && 'windows-latest' || (startsWith(github.event.head_commit.message, 'Release ') && 'ubuntu-24.04' || 'bigbedroom') }}
     steps:
+      - name: Provide Git on self-hosted Linux
+        if: runner.os == 'Linux' && runner.environment == 'self-hosted'
+        shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+        run: echo "/usr/bin" >> "$GITHUB_PATH"
       - uses: actions/checkout@v4
         with:
           submodules: recursive
@@ -89,6 +93,10 @@ jobs:
   sanitizers:
     runs-on: ${{ startsWith(github.event.head_commit.message, 'Release ') && 'ubuntu-24.04' || 'bigbedroom' }}
     steps:
+      - name: Provide Git on self-hosted Linux
+        if: runner.os == 'Linux' && runner.environment == 'self-hosted'
+        shell: /bin/bash --noprofile --norc -e -o pipefail {0}
+        run: echo "/usr/bin" >> "$GITHUB_PATH"
       - uses: actions/checkout@v4
         with:
           submodules: recursive
