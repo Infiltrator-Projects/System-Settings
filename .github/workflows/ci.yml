@@ -15,7 +15,23 @@ jobs:
     env:
       PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out source on BigBedroom
+        if: runner.environment == 'self-hosted'
+        uses: actions/checkout@v4
+
+      - name: Fetch pinned Common on BigBedroom
+        if: runner.environment == 'self-hosted'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf src/vendor/infiltratr-common
+          mkdir -p src/vendor/infiltratr-common
+          curl -fsSL https://github.com/Infiltrator-Projects/Infiltrator-Libraries/archive/7cc5de3de0e94ed2cfcff0840bbb5346eb5c9c9f.tar.gz |
+            tar -xz --strip-components=1 -C src/vendor/infiltratr-common
+
+      - name: Check out source and Common on hosted Linux
+        if: runner.environment == 'github-hosted'
+        uses: actions/checkout@v4
         with:
           submodules: recursive
 
@@ -30,7 +46,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for command_name in git cmake ctest pkg-config dpkg-deb; do
+          for command_name in curl tar cmake ctest pkg-config dpkg-deb; do
             command -v "$command_name" >/dev/null 2>&1 || exit 1
           done
           pkg-config --exists gtk4
@@ -112,7 +128,23 @@ jobs:
     env:
       PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out source on BigBedroom
+        if: runner.environment == 'self-hosted'
+        uses: actions/checkout@v4
+
+      - name: Fetch pinned Common on BigBedroom
+        if: runner.environment == 'self-hosted'
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf src/vendor/infiltratr-common
+          mkdir -p src/vendor/infiltratr-common
+          curl -fsSL https://github.com/Infiltrator-Projects/Infiltrator-Libraries/archive/7cc5de3de0e94ed2cfcff0840bbb5346eb5c9c9f.tar.gz |
+            tar -xz --strip-components=1 -C src/vendor/infiltratr-common
+
+      - name: Check out source and Common on hosted Linux
+        if: runner.environment == 'github-hosted'
+        uses: actions/checkout@v4
         with:
           submodules: recursive
 
@@ -127,7 +159,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for command_name in git cmake ctest cc pkg-config; do
+          for command_name in curl tar cmake ctest cc pkg-config; do
             command -v "$command_name" >/dev/null 2>&1 || exit 1
           done
           pkg-config --exists gtk4
