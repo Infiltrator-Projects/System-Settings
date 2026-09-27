@@ -20,6 +20,7 @@
 - Expand shell regression coverage for navigation synchronisation, search filtering, live Home sources and neutral missing-asset behaviour.
 - Prefer BigBedroom for non-release Linux CI, with REST/pinned-Common checkout support for runners without Git; immutable release validation remains hosted.
 - Correct the architecture documentation's stale Common 1.19.25 reference to the actual 1.19.35 pin.
+- Run leak detection across the non-GTK sanitizer suite while keeping ASan/UBSan active for the GTK shell without treating GTK/Pango/fontconfig process-global caches as application leaks.
 
 ## 0.4.35 — 2026-09-26 — remove mountain hero cyan edge
 
