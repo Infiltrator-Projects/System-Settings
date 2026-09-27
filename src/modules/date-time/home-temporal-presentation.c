@@ -24,6 +24,8 @@ struct SsHomeTemporalPresenter {
     GSettings *settings;
     gulong settings_changed_id;
     GFileMonitor *policy_monitor;
+    guint policy_monitor_retry_id;
+    gchar *policy_directory;
     SsCalendarPreviewProvider *calendar_provider;
 };
 
@@ -121,7 +123,11 @@ static bool format_into(
         ss_home_temporal_presentation_clear(&candidate);
         return false;
     }
-    ss_home_temporal_presentation_clear(out);
+    /*
+     * @out is a pure output parameter. Do not inspect or free its previous
+     * contents: callers may pass an ordinary uninitialised stack value.
+     * Reusers clear their prior presentation before requesting a replacement.
+     */
     *out = candidate;
     return true;
 }
@@ -210,13 +216,61 @@ static void on_policy_directory_changed(
     }
 }
 
+static bool ensure_policy_monitor(SsHomeTemporalPresenter *presenter)
+{
+    g_autoptr(GFile) directory = NULL;
+
+    if (presenter == NULL) {
+        return false;
+    }
+    if (presenter->policy_monitor != NULL) {
+        return true;
+    }
+    if (presenter->policy_directory == NULL ||
+        presenter->policy_directory[0] == '\0') {
+        return false;
+    }
+
+    directory = g_file_new_for_path(presenter->policy_directory);
+    presenter->policy_monitor =
+        g_file_monitor_directory(
+            directory, G_FILE_MONITOR_NONE, NULL, NULL);
+    if (presenter->policy_monitor == NULL) {
+        return false;
+    }
+    g_signal_connect(
+        presenter->policy_monitor, "changed",
+        G_CALLBACK(on_policy_directory_changed), presenter);
+    return true;
+}
+
+static gboolean retry_policy_monitor(gpointer user_data)
+{
+    SsHomeTemporalPresenter *presenter = user_data;
+
+    if (presenter == NULL) {
+        return G_SOURCE_REMOVE;
+    }
+
+    /*
+     * The policy directory may not exist on first run. Retry without creating
+     * configuration state merely by opening Settings. Reloading here also
+     * closes the small first-save window before the monitor can attach.
+     */
+    (void)presenter_reload_policy(presenter);
+    if (ensure_policy_monitor(presenter)) {
+        presenter->policy_monitor_retry_id = 0U;
+        return G_SOURCE_REMOVE;
+    }
+    return G_SOURCE_CONTINUE;
+}
+
 SsHomeTemporalPresenter *ss_home_temporal_presenter_new(void)
 {
     SsHomeTemporalPresenter *presenter =
         g_new0(SsHomeTemporalPresenter, 1);
     g_autofree gchar *policy_path = NULL;
     g_autofree gchar *policy_dir = NULL;
-    g_autoptr(GFile) directory = NULL;
 
     presenter->settings = ss_cinnamon_interface_settings_new();
     presenter->use_24h =
@@ -233,13 +287,13 @@ SsHomeTemporalPresenter *ss_home_temporal_presenter_new(void)
         g_get_user_config_dir(), "infiltrator",
         "presentation.conf", NULL);
     policy_dir = g_path_get_dirname(policy_path);
-    directory = g_file_new_for_path(policy_dir);
-    presenter->policy_monitor =
-        g_file_monitor_directory(directory, G_FILE_MONITOR_NONE, NULL, NULL);
-    if (presenter->policy_monitor != NULL) {
-        g_signal_connect(
-            presenter->policy_monitor, "changed",
-            G_CALLBACK(on_policy_directory_changed), presenter);
+    presenter->policy_directory = g_steal_pointer(&policy_dir);
+    if (!ensure_policy_monitor(presenter)) {
+        presenter->policy_monitor_retry_id = g_timeout_add_seconds(
+            1U, retry_policy_monitor, presenter);
+        g_source_set_name_by_id(
+            presenter->policy_monitor_retry_id,
+            "[system-settings] Home temporal policy monitor retry");
     }
     return presenter;
 }
@@ -253,8 +307,13 @@ void ss_home_temporal_presenter_free(
         g_signal_handler_disconnect(
             presenter->settings, presenter->settings_changed_id);
     }
+    if (presenter->policy_monitor_retry_id != 0U) {
+        g_source_remove(presenter->policy_monitor_retry_id);
+        presenter->policy_monitor_retry_id = 0U;
+    }
     g_clear_object(&presenter->policy_monitor);
     g_clear_object(&presenter->settings);
+    g_clear_pointer(&presenter->policy_directory, g_free);
     ss_calendar_preview_provider_free(presenter->calendar_provider);
     g_free(presenter);
 }
