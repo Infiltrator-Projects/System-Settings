@@ -41,13 +41,20 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgtk-4-dev libgeocode-glib-dev pkg-config xvfb dbus-x11
 
-      - name: Verify self-hosted Linux UI dependencies
+      - name: Prepare self-hosted Linux UI dependencies
         if: runner.environment == 'self-hosted'
         shell: bash
         run: |
           set -euo pipefail
-          for command_name in curl tar cmake ctest pkg-config dpkg-deb; do
-            command -v "$command_name" >/dev/null 2>&1 || exit 1
+          if ! command -v cmake >/dev/null 2>&1 ||
+             ! command -v pkg-config >/dev/null 2>&1 ||
+             ! pkg-config --exists gtk4 ||
+             ! pkg-config --exists geocode-glib-2.0; then
+            sudo apt-get update
+            sudo apt-get install -y build-essential cmake pkg-config libgtk-4-dev libgeocode-glib-dev xvfb dbus-x11 curl
+          fi
+          for command_name in curl tar cmake ctest cc pkg-config dpkg-deb; do
+            command -v "$command_name" >/dev/null 2>&1
           done
           pkg-config --exists gtk4
           pkg-config --exists geocode-glib-2.0
@@ -154,13 +161,21 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgtk-4-dev libgeocode-glib-dev pkg-config xvfb dbus-x11
 
-      - name: Verify self-hosted sanitizer dependencies
+      - name: Prepare self-hosted sanitizer dependencies
         if: runner.environment == 'self-hosted'
         shell: bash
         run: |
           set -euo pipefail
+          if ! command -v cc >/dev/null 2>&1 ||
+             ! command -v cmake >/dev/null 2>&1 ||
+             ! command -v pkg-config >/dev/null 2>&1 ||
+             ! pkg-config --exists gtk4 ||
+             ! pkg-config --exists geocode-glib-2.0; then
+            sudo apt-get update
+            sudo apt-get install -y build-essential cmake pkg-config libgtk-4-dev libgeocode-glib-dev xvfb dbus-x11 curl
+          fi
           for command_name in curl tar cmake ctest cc pkg-config; do
-            command -v "$command_name" >/dev/null 2>&1 || exit 1
+            command -v "$command_name" >/dev/null 2>&1
           done
           pkg-config --exists gtk4
           pkg-config --exists geocode-glib-2.0
