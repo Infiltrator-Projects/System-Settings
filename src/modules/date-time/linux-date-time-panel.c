@@ -453,16 +453,38 @@ static void sync_system_time_controls(SsLinuxDateTimePanel *state)
             !system_state.ntp_enabled && !manual_supported);
     }
 
-    if (manual_visible) {
+    const bool protected_operation_active =
+        state->timezone_cancellable != NULL ||
+        state->ntp_cancellable != NULL ||
+        state->manual_time_cancellable != NULL;
+
+    if (!manual_visible) {
+        /*
+         * A hidden editor must never retain text authored under a different
+         * clock/calendar/NTP context. Re-seed it when manual mode becomes
+         * meaningful again.
+         */
+        state->manual_dirty = false;
+    } else {
         gtk_widget_set_sensitive(
-            GTK_WIDGET(state->manual_date), TRUE);
+            GTK_WIDGET(state->manual_date), !protected_operation_active);
         gtk_widget_set_sensitive(
-            GTK_WIDGET(state->manual_time), TRUE);
+            GTK_WIDGET(state->manual_time), !protected_operation_active);
         gtk_widget_set_sensitive(
-            GTK_WIDGET(state->manual_set_time), TRUE);
+            GTK_WIDGET(state->manual_set_time), !protected_operation_active);
         if (!state->manual_dirty) {
             fill_manual_time_entries(state);
         }
+    }
+
+    if (state->timezone != NULL) {
+        gtk_widget_set_sensitive(
+            GTK_WIDGET(state->timezone), !protected_operation_active);
+    }
+    if (state->network_time != NULL) {
+        gtk_widget_set_sensitive(
+            GTK_WIDGET(state->network_time),
+            system_state.can_ntp && !protected_operation_active);
     }
 
     state->updating_system_controls = false;
@@ -743,6 +765,40 @@ static gboolean refresh_preview_once(gpointer user_data)
     return G_SOURCE_REMOVE;
 }
 
+static void stop_preview_timer(SsLinuxDateTimePanel *state)
+{
+    if (state != NULL && state->timer_id != 0U) {
+        g_source_remove(state->timer_id);
+        state->timer_id = 0U;
+    }
+}
+
+static void on_panel_mapped(
+    GtkWidget *widget G_GNUC_UNUSED,
+    gpointer user_data)
+{
+    SsLinuxDateTimePanel *state = user_data;
+
+    if (state == NULL) {
+        return;
+    }
+    (void)refresh_preview(state);
+    if (state->timer_id == 0U) {
+        state->timer_id = g_timeout_add(
+            250U, refresh_preview, state);
+        g_source_set_name_by_id(
+            state->timer_id,
+            "[system-settings] visible Date & Time preview");
+    }
+}
+
+static void on_panel_unmapped(
+    GtkWidget *widget G_GNUC_UNUSED,
+    gpointer user_data)
+{
+    stop_preview_timer(user_data);
+}
+
 static void sync_controls(SsLinuxDateTimePanel *state)
 {
     const InfiltratrTemporalPolicyV3 *policy =
@@ -797,6 +853,7 @@ static void on_cinnamon_interface_changed(
     const InfiltratrTemporalPolicyV3 *policy;
     bool native_value = false;
     bool changed = false;
+    bool reconciliation_attempted = false;
 
     if (state == NULL || key == NULL || state->updating_controls || state->model.saving) {
         return;
@@ -824,6 +881,7 @@ static void on_cinnamon_interface_changed(
         const char *desired = ss_native_clock_mode_id(native_value);
 
         if (g_strcmp0(policy->clock_mode, desired) != 0) {
+            reconciliation_attempted = true;
             changed = ss_date_time_model_set_clock_mode(
                 &state->model, desired);
         }
@@ -833,8 +891,18 @@ static void on_cinnamon_interface_changed(
                    "clock-show-seconds",
                    &native_value) &&
                policy->show_seconds != native_value) {
+        reconciliation_attempted = true;
         changed = ss_date_time_model_set_show_seconds(
             &state->model, native_value);
+    }
+
+    if (reconciliation_attempted && !changed) {
+        set_status(
+            state,
+            "A Mint/Cinnamon time preference changed, but System Settings could not persist the matching temporal policy.",
+            true);
+        sync_controls(state);
+        return;
     }
 
     if (changed) {
@@ -878,6 +946,7 @@ void on_clock_changed(GObject *object,
         sync_controls(state);
         return;
     }
+    state->manual_dirty = false;
     policy_saved(state);
 }
 
@@ -901,6 +970,7 @@ void on_calendar_changed(GObject *object,
         sync_controls(state);
         return;
     }
+    state->manual_dirty = false;
     policy_saved(state);
 }
 
@@ -944,6 +1014,20 @@ static void system_time_changed(
     }
     (void)ss_regional_context_detect(&state->regional_context);
 
+    const bool timezone_changed =
+        system_state->timezone[0] != '\0' &&
+        g_strcmp0(
+            state->regional_context.timezone_id,
+            system_state->timezone) != 0;
+
+    if (timezone_changed || system_state->ntp_enabled) {
+        /*
+         * Typed wall time is meaningful only in the context in which it was
+         * entered. A time-zone or NTP authority change invalidates that draft.
+         */
+        state->manual_dirty = false;
+    }
+
     if (state->location_metadata_present &&
         system_state->timezone[0] != '\0' &&
         g_strcmp0(
@@ -953,7 +1037,12 @@ static void system_time_changed(
             state->location_metadata.timezone_id,
             system_state->timezone,
             sizeof(state->location_metadata.timezone_id));
-        (void)ss_location_metadata_save(&state->location_metadata);
+        if (!ss_location_metadata_save(&state->location_metadata)) {
+            set_status(
+                state,
+                "The operating-system time zone changed, but the locality metadata could not be updated on disk.",
+                true);
+        }
     }
 
     if (state->location_follows_timezone_reference &&
@@ -1044,6 +1133,21 @@ static SystemTimeUiRequest *begin_system_time_operation(
         return NULL;
     }
 
+    /*
+     * Time-zone, NTP and manual-clock changes are separate D-Bus operations,
+     * but their user-visible semantics overlap. Do not compute/apply a wall
+     * time while a zone or NTP transition is unresolved, and vice versa.
+     * A repeated request of the same kind may still supersede its predecessor.
+     */
+    if ((operation != SS_SYSTEM_TIME_OPERATION_TIMEZONE &&
+         state->timezone_cancellable != NULL) ||
+        (operation != SS_SYSTEM_TIME_OPERATION_NTP &&
+         state->ntp_cancellable != NULL) ||
+        (operation != SS_SYSTEM_TIME_OPERATION_MANUAL &&
+         state->manual_time_cancellable != NULL)) {
+        return NULL;
+    }
+
     if (*cancellable != NULL) {
         g_cancellable_cancel(*cancellable);
         g_clear_object(cancellable);
@@ -1084,10 +1188,13 @@ static void system_time_operation_complete(
 
     if (state != NULL && generation != NULL &&
         request->generation == *generation) {
+        GCancellable **cancellable =
+            operation_cancellable(state, request->operation);
+        if (cancellable != NULL) {
+            g_clear_object(cancellable);
+        }
         if (success) {
-            if (request->operation == SS_SYSTEM_TIME_OPERATION_MANUAL) {
-                state->manual_dirty = false;
-            }
+            state->manual_dirty = false;
             (void)ss_regional_context_detect(&state->regional_context);
             sync_system_time_controls(state);
             update_location_summary(state);
@@ -1123,8 +1230,14 @@ static void request_system_timezone(
             state, SS_SYSTEM_TIME_OPERATION_TIMEZONE);
 
     if (request == NULL) {
+        sync_system_time_controls(state);
+        set_status(
+            state,
+            "Another protected date/time change is still being applied.",
+            true);
         return;
     }
+    sync_system_time_controls(state);
     set_status(state, "Updating the operating-system time zone…", false);
     ss_system_time_service_set_timezone_async(
         state->system_time_service,
@@ -1173,8 +1286,14 @@ void on_network_time_changed(GObject *object,
     request = begin_system_time_operation(
         state, SS_SYSTEM_TIME_OPERATION_NTP);
     if (request == NULL) {
+        sync_system_time_controls(state);
+        set_status(
+            state,
+            "Another protected date/time change is still being applied.",
+            true);
         return;
     }
+    sync_system_time_controls(state);
     set_status(
         state,
         enabled ? "Enabling network time…" : "Disabling network time…",
@@ -1298,8 +1417,13 @@ void on_manual_set_time_clicked(
                 state, SS_SYSTEM_TIME_OPERATION_MANUAL);
 
         if (request == NULL) {
+            set_status(
+                state,
+                "Another protected date/time change is still being applied.",
+                true);
             return;
         }
+        sync_system_time_controls(state);
         set_status(
             state,
             "Setting the operating-system date and time…",
@@ -1437,30 +1561,38 @@ void on_location_result_activated(
             sizeof(state->location_metadata.timezone_id));
     }
 
-    if (result->country_code[0] != '\0' &&
-        ss_regional_context_nearest_timezone(
+    if (result->country_code[0] != '\0') {
+        (void)ss_regional_context_nearest_timezone(
             result->country_code,
             result->latitude,
             result->longitude,
             timezone_id,
-            sizeof(timezone_id))) {
-        (void)g_strlcpy(
-            state->location_metadata.timezone_id,
-            timezone_id,
-            sizeof(state->location_metadata.timezone_id));
+            sizeof(timezone_id));
     }
 
+    /*
+     * timezone_id is only a best-effort suggestion from tzdata representative
+     * points. Never persist it as authoritative metadata until timedated
+     * actually reports that zone.
+     */
     state->location_metadata_present =
         ss_location_metadata_save(&state->location_metadata);
     if (!state->location_metadata_present) {
-        (void)ss_date_time_model_set_location(
+        const bool restored = ss_date_time_model_set_location(
             &state->model,
             previous_policy.location_configured,
             previous_policy.latitude,
             previous_policy.longitude);
+        const bool reloaded = restored
+            ? true
+            : ss_date_time_model_reload(&state->model);
         set_status(
             state,
-            "The selected location could not be saved; the previous location was restored.",
+            restored
+                ? "The selected location could not be saved; the previous location was restored."
+                : (reloaded
+                    ? "The selected location could not be saved and rollback persistence failed; authoritative policy was reloaded."
+                    : "The selected location could not be saved, and neither rollback nor authoritative reload succeeded."),
             true);
         sync_controls(state);
         return;
@@ -1485,6 +1617,11 @@ void on_location_result_activated(
     policy_saved(state);
 
     if (timezone_id[0] != '\0') {
+        /*
+         * The nearest tzdata point is a suggestion, not stored truth. The
+         * asynchronous system-time path must succeed and timedated must report
+         * the result before metadata is reconciled to it.
+         */
         request_system_timezone(state, timezone_id);
     }
 }
@@ -1674,17 +1811,35 @@ void on_location_coordinate_changed(
         sizeof(state->location_metadata.display_name));
     state->location_metadata.latitude = latitude;
     state->location_metadata.longitude = longitude;
+    if (state->system_time_service != NULL) {
+        SsSystemTimeState current_system;
+        if (ss_system_time_service_read(
+                state->system_time_service, &current_system) &&
+            current_system.timezone[0] != '\0') {
+            (void)g_strlcpy(
+                state->location_metadata.timezone_id,
+                current_system.timezone,
+                sizeof(state->location_metadata.timezone_id));
+        }
+    }
     state->location_metadata_present =
         ss_location_metadata_save(&state->location_metadata);
     if (!state->location_metadata_present) {
-        (void)ss_date_time_model_set_location(
+        const bool restored = ss_date_time_model_set_location(
             &state->model,
             previous_policy.location_configured,
             previous_policy.latitude,
             previous_policy.longitude);
+        const bool reloaded = restored
+            ? true
+            : ss_date_time_model_reload(&state->model);
         set_status(
             state,
-            "Custom coordinates could not be saved; the previous location was restored.",
+            restored
+                ? "Custom coordinates could not be saved; the previous location was restored."
+                : (reloaded
+                    ? "Custom coordinates could not be saved and rollback persistence failed; authoritative policy was reloaded."
+                    : "Custom coordinates could not be saved, and neither rollback nor authoritative reload succeeded."),
             true);
         sync_controls(state);
         return;
@@ -1826,6 +1981,12 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
 
     legacy_migration_ok = migrate_legacy_native_clock(state);
     state->root = g_object_ref_sink(ss_linux_date_time_panel_build_ui(state));
+    g_signal_connect(
+        state->root, "map",
+        G_CALLBACK(on_panel_mapped), state);
+    g_signal_connect(
+        state->root, "unmap",
+        G_CALLBACK(on_panel_unmapped), state);
 
     gtk_widget_set_sensitive(GTK_WIDGET(state->show_date),
         state->cinnamon_interface_settings != NULL &&
@@ -1857,8 +2018,6 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
         g_object_ref(state->window));
     state->preview_idle_id =
         g_idle_add(refresh_preview_once, state);
-    state->timer_id =
-        g_timeout_add_seconds(1U, refresh_preview, state);
     return state;
 }
 
@@ -1886,10 +2045,7 @@ void ss_linux_date_time_panel_free(gpointer data)
         return;
     }
 
-    if (state->timer_id != 0U) {
-        g_source_remove(state->timer_id);
-        state->timer_id = 0U;
-    }
+    stop_preview_timer(state);
     if (state->preview_idle_id != 0U) {
         g_source_remove(state->preview_idle_id);
         state->preview_idle_id = 0U;
