@@ -1012,13 +1012,13 @@ static void system_time_changed(
         set_status(state, "The operating-system date/time service is unavailable.", true);
         return;
     }
-    (void)ss_regional_context_detect(&state->regional_context);
 
     const bool timezone_changed =
         system_state->timezone[0] != '\0' &&
         g_strcmp0(
             state->regional_context.timezone_id,
             system_state->timezone) != 0;
+    (void)ss_regional_context_detect(&state->regional_context);
 
     if (timezone_changed || system_state->ntp_enabled) {
         /*
@@ -1618,11 +1618,15 @@ void on_location_result_activated(
 
     if (timezone_id[0] != '\0') {
         /*
-         * The nearest tzdata point is a suggestion, not stored truth. The
-         * asynchronous system-time path must succeed and timedated must report
-         * the result before metadata is reconciled to it.
+         * zone.tab coordinates are representative points, not time-zone
+         * polygons. A nearest-zone result is therefore advisory only. Never
+         * change the machine's authoritative zone without an explicit choice
+         * in the Time zone control.
          */
-        request_system_timezone(state, timezone_id);
+        g_autofree gchar *message = g_strdup_printf(
+            "Location saved. Suggested time zone: %s. Review and choose it explicitly from Time zone if appropriate; the operating-system time zone was not changed.",
+            timezone_id);
+        set_status(state, message, false);
     }
 }
 
