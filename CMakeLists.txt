@@ -207,6 +207,14 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         RENAME temporal-v3)
     install(FILES modules/date-time.settings-module
         DESTINATION "${CMAKE_INSTALL_DATADIR}/infiltrator/system-settings/modules")
+
+    if(BUILD_TESTING)
+        add_executable(system-settings-native-installer-test
+            packaging/native-installer.c)
+        ss_configure(system-settings-native-installer-test)
+        add_test(NAME native-installer-help
+            COMMAND system-settings-native-installer-test --help)
+    endif()
 else()
     message(FATAL_ERROR "System Settings currently supports Windows policy tools and the Linux GUI.")
 endif()
