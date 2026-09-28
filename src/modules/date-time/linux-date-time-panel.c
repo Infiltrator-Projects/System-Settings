@@ -48,6 +48,9 @@ typedef struct SystemTimeUiRequest {
     SsSystemTimeOperation operation;
 } SystemTimeUiRequest;
 
+static void sync_controls(SsLinuxDateTimePanel *state);
+static gboolean refresh_preview(gpointer user_data);
+
 static void set_status(SsLinuxDateTimePanel *state,
                        const char *message,
                        bool error)
@@ -80,6 +83,109 @@ static SsCalendarPreviewProvider *ensure_calendar_preview_provider(
             ss_calendar_preview_provider_new();
     }
     return state->calendar_preview_provider;
+}
+
+static gchar *temporal_policy_path(void)
+{
+    return g_build_filename(
+        g_get_user_config_dir(),
+        "infiltrator",
+        "presentation.conf",
+        NULL);
+}
+
+static void cancel_coordinate_commit(SsLinuxDateTimePanel *state)
+{
+    if (state != NULL && state->coordinate_commit_id != 0U) {
+        g_source_remove(state->coordinate_commit_id);
+        state->coordinate_commit_id = 0U;
+    }
+}
+
+static gboolean retry_policy_monitor(gpointer user_data);
+
+static void policy_file_changed(
+    GFileMonitor *monitor G_GNUC_UNUSED,
+    GFile *file G_GNUC_UNUSED,
+    GFile *other_file G_GNUC_UNUSED,
+    GFileMonitorEvent event,
+    gpointer user_data)
+{
+    SsLinuxDateTimePanel *state = user_data;
+
+    if (state == NULL) {
+        return;
+    }
+    switch (event) {
+    case G_FILE_MONITOR_EVENT_CHANGED:
+    case G_FILE_MONITOR_EVENT_CHANGES_DONE_HINT:
+    case G_FILE_MONITOR_EVENT_CREATED:
+    case G_FILE_MONITOR_EVENT_DELETED:
+    case G_FILE_MONITOR_EVENT_MOVED:
+    case G_FILE_MONITOR_EVENT_RENAMED:
+        cancel_coordinate_commit(state);
+        if (ss_date_time_model_reload(&state->model)) {
+            state->manual_dirty = false;
+            sync_controls(state);
+            (void)refresh_preview(state);
+            set_status(
+                state,
+                "Temporal policy changed externally and was reloaded.",
+                false);
+        } else {
+            set_status(
+                state,
+                "The temporal policy changed externally but could not be reloaded; the last committed in-memory policy is still active.",
+                true);
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+static bool start_policy_monitor(SsLinuxDateTimePanel *state)
+{
+    g_autofree gchar *path = NULL;
+    g_autoptr(GFile) file = NULL;
+
+    if (state == NULL) {
+        return false;
+    }
+    if (state->policy_monitor != NULL) {
+        return true;
+    }
+
+    path = temporal_policy_path();
+    file = g_file_new_for_path(path);
+    state->policy_monitor =
+        g_file_monitor_file(file, G_FILE_MONITOR_NONE, NULL, NULL);
+    if (state->policy_monitor == NULL) {
+        return false;
+    }
+    g_signal_connect(
+        state->policy_monitor,
+        "changed",
+        G_CALLBACK(policy_file_changed),
+        state);
+    if (state->policy_monitor_retry_id != 0U) {
+        g_source_remove(state->policy_monitor_retry_id);
+        state->policy_monitor_retry_id = 0U;
+    }
+    return true;
+}
+
+static gboolean retry_policy_monitor(gpointer user_data)
+{
+    SsLinuxDateTimePanel *state = user_data;
+    if (state == NULL) {
+        return G_SOURCE_REMOVE;
+    }
+    if (start_policy_monitor(state)) {
+        state->policy_monitor_retry_id = 0U;
+        return G_SOURCE_REMOVE;
+    }
+    return G_SOURCE_CONTINUE;
 }
 
 static bool coordinate_close(double left, double right)
@@ -1059,11 +1165,29 @@ static void system_time_changed(
 
     if (state->location_follows_timezone_reference &&
         state->regional_context.has_reference_coordinates) {
-        const InfiltratrTemporalPolicyV3 *policy = ss_date_time_model_policy(&state->model);
-        if (!policy->location_configured || ss_date_time_model_set_location(
-                &state->model, true,
+        const InfiltratrTemporalPolicyV3 *policy =
+            ss_date_time_model_policy(&state->model);
+        const bool already_matches =
+            policy != NULL &&
+            policy->location_configured &&
+            coordinate_close(
+                policy->latitude,
+                state->regional_context.reference_latitude) &&
+            coordinate_close(
+                policy->longitude,
+                state->regional_context.reference_longitude);
+
+        if (!already_matches &&
+            !ss_date_time_model_set_location(
+                &state->model,
+                true,
                 state->regional_context.reference_latitude,
                 state->regional_context.reference_longitude)) {
+            set_status(
+                state,
+                "The system time zone changed, but its reference coordinates could not be persisted to the temporal policy.",
+                true);
+        } else {
             state->updating_controls = true;
             gtk_spin_button_set_value(
                 state->latitude,
@@ -1541,6 +1665,9 @@ void on_location_result_activated(
     char timezone_id[SS_TIMEZONE_ID_CAPACITY] = {0};
     const InfiltratrTemporalPolicyV3 *policy;
     InfiltratrTemporalPolicyV3 previous_policy;
+    SsLocationMetadata previous_metadata;
+    const bool previous_metadata_present =
+        state != NULL ? state->location_metadata_present : false;
     SsSystemTimeState current_system;
 
     if (state == NULL || row == NULL) {
@@ -1558,6 +1685,7 @@ void on_location_result_activated(
         return;
     }
     previous_policy = *policy;
+    previous_metadata = state->location_metadata;
 
     if (!ss_date_time_model_set_location(
             &state->model,
@@ -1615,13 +1743,21 @@ void on_location_result_activated(
         const bool reloaded = restored
             ? true
             : ss_date_time_model_reload(&state->model);
+        state->location_metadata = previous_metadata;
+        state->location_metadata_present = previous_metadata_present;
+        if (!previous_metadata_present) {
+            memset(
+                &state->location_metadata,
+                0,
+                sizeof(state->location_metadata));
+        }
         set_status(
             state,
             restored
-                ? "The selected location could not be saved; the previous location was restored."
+                ? "The selected location could not be saved; the previous location and metadata were restored."
                 : (reloaded
-                    ? "The selected location could not be saved and rollback persistence failed; authoritative policy was reloaded."
-                    : "The selected location could not be saved, and neither rollback nor authoritative reload succeeded."),
+                    ? "The selected location could not be saved and rollback persistence failed; authoritative policy was reloaded and previous metadata restored."
+                    : "The selected location could not be saved, and neither rollback nor authoritative reload succeeded; previous metadata was restored in memory."),
             true);
         sync_controls(state);
         return;
@@ -1806,19 +1942,22 @@ void on_location_search_activate(
     begin_location_search(user_data);
 }
 
-void on_location_coordinate_changed(
-    GObject *object G_GNUC_UNUSED,
-    GParamSpec *pspec G_GNUC_UNUSED,
-    gpointer user_data)
+static gboolean commit_location_coordinates(gpointer user_data)
 {
     SsLinuxDateTimePanel *state = user_data;
     double latitude;
     double longitude;
     const InfiltratrTemporalPolicyV3 *policy;
     InfiltratrTemporalPolicyV3 previous_policy;
+    SsLocationMetadata previous_metadata;
+    bool previous_metadata_present;
 
-    if (state == NULL || state->updating_controls) {
-        return;
+    if (state == NULL) {
+        return G_SOURCE_REMOVE;
+    }
+    state->coordinate_commit_id = 0U;
+    if (state->updating_controls) {
+        return G_SOURCE_REMOVE;
     }
 
     latitude = gtk_spin_button_get_value(state->latitude);
@@ -1828,6 +1967,8 @@ void on_location_coordinate_changed(
         return;
     }
     previous_policy = *policy;
+    previous_metadata = state->location_metadata;
+    previous_metadata_present = state->location_metadata_present;
 
     if (!ss_date_time_model_set_location(
             &state->model, true, latitude, longitude)) {
@@ -1866,22 +2007,52 @@ void on_location_coordinate_changed(
         const bool reloaded = restored
             ? true
             : ss_date_time_model_reload(&state->model);
+        state->location_metadata = previous_metadata;
+        state->location_metadata_present = previous_metadata_present;
+        if (!previous_metadata_present) {
+            memset(
+                &state->location_metadata,
+                0,
+                sizeof(state->location_metadata));
+        }
         set_status(
             state,
             restored
-                ? "Custom coordinates could not be saved; the previous location was restored."
+                ? "Custom coordinates could not be saved; the previous location and metadata were restored."
                 : (reloaded
-                    ? "Custom coordinates could not be saved and rollback persistence failed; authoritative policy was reloaded."
-                    : "Custom coordinates could not be saved, and neither rollback nor authoritative reload succeeded."),
+                    ? "Custom coordinates could not be saved and rollback persistence failed; authoritative policy was reloaded and previous metadata restored."
+                    : "Custom coordinates could not be saved, and neither rollback nor authoritative reload succeeded; previous metadata was restored in memory."),
             true);
         sync_controls(state);
-        return;
+        return G_SOURCE_REMOVE;
     }
     state->location_follows_timezone_reference = false;
     gtk_editable_set_text(
         GTK_EDITABLE(state->location_search),
         "Custom coordinates");
     policy_saved(state);
+    return G_SOURCE_REMOVE;
+}
+
+void on_location_coordinate_changed(
+    GObject *object G_GNUC_UNUSED,
+    GParamSpec *pspec G_GNUC_UNUSED,
+    gpointer user_data)
+{
+    SsLinuxDateTimePanel *state = user_data;
+
+    if (state == NULL || state->updating_controls) {
+        return;
+    }
+
+    cancel_coordinate_commit(state);
+    state->coordinate_commit_id = g_timeout_add(
+        300U,
+        commit_location_coordinates,
+        state);
+    g_source_set_name_by_id(
+        state->coordinate_commit_id,
+        "[system-settings] coordinate transaction debounce");
 }
 
 
@@ -2002,6 +2173,16 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
 
     state->service_cancellable = g_cancellable_new();
 
+    if (!start_policy_monitor(state)) {
+        state->policy_monitor_retry_id = g_timeout_add_seconds(
+            30U,
+            retry_policy_monitor,
+            state);
+        g_source_set_name_by_id(
+            state->policy_monitor_retry_id,
+            "[system-settings] Date & Time policy monitor retry");
+    }
+
     state->cinnamon_interface_settings =
         ss_cinnamon_interface_settings_new();
     if (state->cinnamon_interface_settings != NULL) {
@@ -2079,6 +2260,12 @@ void ss_linux_date_time_panel_free(gpointer data)
     }
 
     stop_preview_timer(state);
+    cancel_coordinate_commit(state);
+    if (state->policy_monitor_retry_id != 0U) {
+        g_source_remove(state->policy_monitor_retry_id);
+        state->policy_monitor_retry_id = 0U;
+    }
+    g_clear_object(&state->policy_monitor);
     if (state->preview_idle_id != 0U) {
         g_source_remove(state->preview_idle_id);
         state->preview_idle_id = 0U;
