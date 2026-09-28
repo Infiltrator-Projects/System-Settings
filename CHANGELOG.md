@@ -2,6 +2,25 @@
 
 # Changelog
 
+## 0.4.40 — 2026-09-28 — cross-process and release-integrity hardening
+
+- Serialize temporal-policy read/modify/write transactions across processes on Linux and Windows. Setters now lock, reload the latest authoritative document, mutate one semantic field and publish atomically, preventing unrelated GUI/CLI edits from being lost.
+- Put multi-option `system-settings-time` commands behind the same transaction lock and add a cross-process regression that proves GUI/model and CLI writers preserve one another's independent changes.
+- Observe `location.ini` through the same atomic-replacement-safe file observer as the temporal policy, recompute locality/time-zone-follow authority after external writes and retain the last known-good locality across transient read failures.
+- Prevent time-zone reconciliation from writing stale locality metadata whose coordinates no longer match the active temporal policy.
+- Add a private durable `location.pending` write-ahead journal so a crash between coordinate-policy publication and richer locality-metadata publication is recovered deterministically at the next Date & Time startup.
+- Preserve typed manual wall-time drafts across unrelated external policy changes; only a changed clock/calendar interpretation invalidates the draft.
+- Verify the conventional Cinnamon clock/seconds mirror after policy publication and surface partial synchronization instead of reporting unconditional success.
+- Remove source-tree UI/module paths from generic/native production binaries; retain source fallbacks only for development/CMake profiles.
+- Observe delegated settings-tool termination so an executable that rejects its requested module no longer masquerades as a successful handoff.
+- Reduce visible temporal polling: ordinary clocks use a one-second cadence while the faster 250 ms cadence is reserved for decimal seconds that need it; hidden-page timers remain stopped.
+- Expand responsive regression coverage to include the complete content-plus-custom-titlebar minimum and a dedicated `GDK_SCALE=2` shell run.
+- Keep LeakSanitizer enabled for the GTK shell and suppress only process-global Fontconfig cache allocations rather than disabling GUI leak detection.
+- Replace mutable/deprecated GitHub Action tags with reviewed immutable Node-24 action commits and use the exact pinned Common Git submodule object on BigBedroom instead of constructing provenance around a downloaded archive.
+- Make release/source generation reproducible from the release commit epoch, rebuild Debian/source/native artifacts twice in CI for byte comparison, and compare the complete extracted native-installer source tree against the exported source tree.
+- Strengthen the native installer profile to require GCC CPU-native code generation, LTO and a trained PGO generate/test/use cycle before packaging and installation.
+- Extend the shell ownership guard across every Linux shell translation unit and expand the Linux suite to seventeen project tests.
+
 ## 0.4.39 — 2026-09-28 — complete forensic repair pass
 
 - Reconcile external temporal-policy writes into an already-open Date & Time panel through an atomic-replacement-safe policy observer, preventing later GUI edits from publishing stale whole-policy snapshots.
