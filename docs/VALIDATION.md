@@ -257,33 +257,35 @@ A release commit must:
 - have no known mismatch between supported behaviour and documentation;
 - include only modules whose advertised read/write contracts meet their evidence requirements;
 - build release assets from the exact tested revision;
-- retain the exact pinned Common commit: Git checkouts verify the submodule HEAD, while official exported source carries a `.system-settings-common-commit` provenance marker that CMake validates before configuration continues;
-- retain immutable published tags/assets, with reruns comparing every published DEB/native/source/checksum asset byte-for-byte against the rebuilt artifacts.
+- retain the exact pinned Common commit: Git checkouts verify the submodule HEAD, while official exported source carries the pinned commit marker plus a complete per-file SHA-256 manifest; CMake validates every exported Common byte and rejects uncovered extra files before configuration continues;
+- retain immutable published tags/assets, with reruns requiring the exact expected asset-name set and comparing every published DEB/native/source/checksum asset byte-for-byte against the rebuilt artifacts.
 
 ## Implemented audit regressions (2026-09-25)
 
-CTest contains thirteen project tests on Linux with Xvfb available. Added checks
-exercise private-bus service lifetime after caller release, timedated owner
-loss/reacquisition, actual shell activation/dropdown ownership/close with
-pending construction, and CLI transaction rollback on malformed arguments.
-Existing tests cover non-finite coordinates, malformed locality records,
-private-directory permission repair, truncated zone rows, bounded time parsing,
-save/reload failure, synchronous model re-entry, Windows embedded-NUL input and
-cross-process Windows publication races. The Linux shell regression additionally
-checks keyboard-focusable custom window controls, a 1024-pixel minimum-width
-budget, visible-page preview timer ownership, advisory-only locality/time-zone
-inference, search filtering, navigation synchronisation and neutral missing-art
-fallbacks. Tests use isolated files and a memory settings backend.
+CTest contains fifteen System Settings project tests on Linux when Xvfb is
+available. Coverage now includes private-bus timedated success, denial,
+owner-loss/reacquisition and outstanding-call lifetime; CLI transaction rollback
+and first-save provenance; atomic policy-file observation; Home temporal
+read-failure resilience; native installer/source-asset-builder smoke tests; and
+the existing model, parsing, persistence, Calendar-runtime and regional-context
+tests. The Linux shell regression additionally checks keyboard-focusable custom
+window controls, a 1024×768 minimum allocation budget, visible-page timer
+ownership, live desktop-theme following, external temporal-policy reload,
+locality metadata rollback, manifest-derived search terms, advisory-only
+locality/time-zone inference, navigation synchronisation and neutral missing-art
+fallbacks. Tests use isolated files and a memory settings backend where
+appropriate.
 
 Manual acceptance still includes real Mint polkit cancellation/denial, network
-geocoding, desktop theme changes, screen-reader interaction and DST fold choice.
+geocoding, screen-reader interaction and DST fold choice.
 A passing fixture is not proof of those cases.
 Manual Gregorian time rejects GLib's normalisation of nonexistent DST wall
 times; repeated wall times use GLib's documented standard-time occurrence.
 
-Non-release Linux build/package and sanitizer jobs probe the labelled
-BigBedroom self-hosted runner first. If its required compiler/CMake/GTK/geocode
-development environment is not present, the jobs fall back to hosted Ubuntu
-without attempting privileged package installation on the home runner. Release
-commits deliberately use hosted Ubuntu so immutable publication is independent
-of home-runner state; Windows continues to use the hosted Windows runner.
+For trusted non-release pushes, a hosted routing job checks whether an idle
+labelled BigBedroom runner is online before assigning any work to it. If it is
+offline, busy, or lacks the required compiler/CMake/GTK/geocode environment,
+Linux build/package and sanitizer jobs use hosted Ubuntu without waiting on an
+unavailable home runner. Pull requests and release commits never execute
+repository-controlled code on BigBedroom. Release validation remains hosted;
+Windows continues to use the hosted Windows runner.
