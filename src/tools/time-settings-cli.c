@@ -27,11 +27,25 @@ static void print_usage(const char *program)
             program);
 }
 
+static void release_platform_update(
+    const SsTemporalPolicyStore *platform,
+    bool *locked)
+{
+    if (platform != NULL && locked != NULL && *locked &&
+        platform->end_update != NULL) {
+        platform->end_update();
+        *locked = false;
+    }
+}
+
 int main(int argc, char **argv)
 {
     SsDateTimeModel model;
     int index;
-    const SsTemporalPolicyStore *platform = ss_platform_temporal_policy_store();
+    int exit_code = 0;
+    bool platform_locked = false;
+    const SsTemporalPolicyStore *platform =
+        ss_platform_temporal_policy_store();
     static const SsTemporalPolicyStore staging = {
         .load = stage_load,
         .save = stage_save,
@@ -39,8 +53,25 @@ int main(int argc, char **argv)
         .end_update = NULL
     };
 
-    if (!ss_date_time_model_init(&model, ss_platform_temporal_policy_store())) {
+    /*
+     * Treat a multi-option CLI invocation as one cross-process transaction.
+     * Acquire the platform lock before loading the base snapshot and hold it
+     * through validation/publication so a simultaneous GUI/CLI writer cannot
+     * be overwritten by a stale staged document.
+     */
+    if (argc > 1 && platform != NULL &&
+        platform->begin_update != NULL) {
+        if (platform->end_update == NULL ||
+            !platform->begin_update()) {
+            fputs("Unable to acquire the temporal policy update lock.\n", stderr);
+            return 2;
+        }
+        platform_locked = true;
+    }
+
+    if (!ss_date_time_model_init(&model, platform)) {
         fputs("Unable to load temporal presentation policy.\n", stderr);
+        release_platform_update(platform, &platform_locked);
         return 1;
     }
 
@@ -49,29 +80,33 @@ int main(int argc, char **argv)
         if (strcmp(argv[index], "--clock") == 0 && index + 1 < argc) {
             if (!ss_date_time_model_set_clock_mode(&model, argv[++index])) {
                 fputs("Unable to set clock mode.\n", stderr);
-                return 2;
+                exit_code = 2;
+                goto done;
             }
         } else if (strcmp(argv[index], "--calendar") == 0 &&
                    index + 1 < argc) {
             if (!ss_date_time_model_set_calendar(&model, argv[++index])) {
                 fputs("Unable to set calendar.\n", stderr);
-                return 2;
+                exit_code = 2;
+                goto done;
             }
         } else if (strcmp(argv[index], "--seconds") == 0 &&
                    index + 1 < argc) {
             const char *value = argv[++index];
             bool show;
-            if (strcmp(value, "on") == 0)
+            if (strcmp(value, "on") == 0) {
                 show = true;
-            else if (strcmp(value, "off") == 0)
+            } else if (strcmp(value, "off") == 0) {
                 show = false;
-            else {
+            } else {
                 print_usage(argv[0]);
-                return 2;
+                exit_code = 2;
+                goto done;
             }
             if (!ss_date_time_model_set_show_seconds(&model, show)) {
                 fputs("Unable to set seconds policy.\n", stderr);
-                return 2;
+                exit_code = 2;
+                goto done;
             }
         } else if (strcmp(argv[index], "--location") == 0 &&
                    index + 2 < argc) {
@@ -87,27 +122,38 @@ int main(int argc, char **argv)
                 !ss_date_time_model_set_location(
                     &model, true, latitude, longitude)) {
                 fputs("Unable to set geographic location.\n", stderr);
-                return 2;
+                exit_code = 2;
+                goto done;
             }
         } else if (strcmp(argv[index], "--clear-location") == 0) {
             if (!ss_date_time_model_set_location(
                     &model, false,
                     model.policy.latitude, model.policy.longitude)) {
                 fputs("Unable to clear geographic location.\n", stderr);
-                return 2;
+                exit_code = 2;
+                goto done;
             }
         } else {
             print_usage(argv[0]);
-            return 2;
+            exit_code = 2;
+            goto done;
         }
     }
 
     if (argc > 1) {
-        if (!platform->save(&model.policy)) {
+        if (platform == NULL || platform->save == NULL ||
+            !platform->save(&model.policy)) {
             fputs("Unable to save temporal presentation policy.\n", stderr);
-            return 2;
+            exit_code = 2;
+            goto done;
         }
         model.persisted_policy_present = true;
+    }
+
+done:
+    release_platform_update(platform, &platform_locked);
+    if (exit_code != 0) {
+        return exit_code;
     }
 
     printf("clock-mode=%s\n"
