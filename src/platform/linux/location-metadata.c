@@ -346,9 +346,7 @@ SsLocationMetadataClearResult ss_location_metadata_clear_result(void)
     }
     failure = infiltratr_unlink_durable(path, true);
     if (failure == 0) {
-        return sync_metadata_parent_directory(path)
-            ? SS_LOCATION_METADATA_CLEAR_OK
-            : SS_LOCATION_METADATA_CLEAR_COMMIT_UNCERTAIN;
+        return SS_LOCATION_METADATA_CLEAR_OK;
     }
 
     if (g_lstat(path, &status) != 0 && errno == ENOENT) {
@@ -403,13 +401,15 @@ bool ss_location_metadata_finish_staged(void)
     if (!ss_location_metadata_save(&staged)) {
         return false;
     }
-    if (g_remove(path) != 0 && errno != ENOENT) {
-        /*
-         * location.ini is already the durable committed metadata at this
-         * point. A stale journal is cleanup debt, not transaction failure:
-         * rolling the policy back now would recreate policy/metadata skew.
-         */
-        g_warning("Unable to remove committed locality transaction journal; cleanup will be retried.");
+    /*
+     * location.ini is already the durable committed metadata at this point.
+     * Journal removal is cleanup debt, not transaction failure: rolling the
+     * policy back now would recreate policy/metadata skew. Use the durable
+     * cleanup helper, but preserve success if cleanup itself cannot yet be
+     * confirmed so recovery can retry it later.
+     */
+    if (!ss_location_metadata_discard_staged()) {
+        g_warning("Unable to durably remove committed locality transaction journal; cleanup will be retried.");
     }
     return true;
 }
