@@ -488,8 +488,8 @@ static void install_common_theme(void)
 
     g_string_append_printf(
         css,
-        ".home-hero { padding: 18px 20px; overflow: hidden; }\n"
-        ".home-hero-mark { min-width: 390px; min-height: 182px; padding: 0; overflow: hidden; border-radius: 18px; }\n"
+        ".home-hero { padding: 18px 20px; }\n"
+        ".home-hero-mark { min-width: 390px; min-height: 182px; padding: 0; border-radius: 18px; }\n"
         ".hero-scene { min-width: 390px; min-height: 182px; }\n"
         ".hero-brand-overlay { background: rgba(4,12,19,0.76); border: 1px solid %s; border-radius: 13px; padding: 10px 14px; margin: 12px; }\n"
         ".hero-brand-overlay image { color: %s; }\n"
@@ -509,10 +509,7 @@ static void install_common_theme(void)
         ".theme-preview { padding: 5px; border: 1px solid transparent; border-radius: 10px; }\n"
         ".theme-preview-selected { border-color: %s; background: %s; }\n"
         ".theme-preview-window { border: 1px solid %s; border-radius: 8px; }\n"
-        ".theme-light { background-image: linear-gradient(to bottom, #f4f6f8 0 22%%, #dce2e8 22%% 100%%); }\n"
-        ".theme-dark { background-image: linear-gradient(to bottom, #24282d 0 22%%, #0f1216 22%% 100%%); }\n"
-        ".theme-follow { background-image: linear-gradient(135deg, #e9eef3 0 50%%, #171b20 50%% 100%%); }\n"
-        ".theme-mercedes { background-image: linear-gradient(to bottom, #53575b 0 22%%, #202326 22%% 100%%); }\n"
+
         ".theme-preview-label { color: %s; font-size: 10px; }\n"
         ".network-visual { min-height: 84px; border-radius: 12px; }\n"
         ".date-status-card, .region-status-card, .appearance-status-card, .network-status-card { min-height: 186px; }\n",
