@@ -48,6 +48,13 @@ GtkWidget *ss_linux_ui_make_setting_row(const char *title,
         make_setting_identity(title, description));
     gtk_widget_set_valign(control, GTK_ALIGN_CENTER);
     gtk_widget_set_halign(control, GTK_ALIGN_END);
+    gtk_accessible_update_property(
+        GTK_ACCESSIBLE(control),
+        GTK_ACCESSIBLE_PROPERTY_LABEL,
+        title,
+        GTK_ACCESSIBLE_PROPERTY_DESCRIPTION,
+        description,
+        -1);
     gtk_box_append(GTK_BOX(row), control);
     return row;
 }
@@ -80,6 +87,13 @@ GtkWidget *ss_linux_ui_make_setting_tile(const char *icon_name,
     gtk_widget_set_hexpand(tile, TRUE);
     gtk_widget_set_valign(control, GTK_ALIGN_CENTER);
     gtk_widget_set_halign(control, GTK_ALIGN_END);
+    gtk_accessible_update_property(
+        GTK_ACCESSIBLE(control),
+        GTK_ACCESSIBLE_PROPERTY_LABEL,
+        title,
+        GTK_ACCESSIBLE_PROPERTY_DESCRIPTION,
+        description,
+        -1);
     gtk_box_append(GTK_BOX(tile), control);
     return tile;
 }
