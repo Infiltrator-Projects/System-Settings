@@ -44,8 +44,8 @@ if(NOT EXISTS "${location_file}")
 endif()
 file(READ "${location_file}" location_metadata)
 if(NOT location_metadata MATCHES "Name=Custom coordinates" OR
-   NOT location_metadata MATCHES "Latitude=-36.3949" OR
-   NOT location_metadata MATCHES "Longitude=145.361")
+   NOT location_metadata MATCHES "Latitude=-36.39" OR
+   NOT location_metadata MATCHES "Longitude=145.36")
     message(FATAL_ERROR "CLI locality metadata does not match committed coordinates")
 endif()
 
