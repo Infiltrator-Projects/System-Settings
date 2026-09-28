@@ -44,6 +44,7 @@ typedef struct SystemTimeUiRequest {
 
 static void sync_controls(SsLinuxDateTimePanel *state);
 static gboolean refresh_preview(gpointer user_data);
+static void restart_preview_timer(SsLinuxDateTimePanel *state);
 
 static void set_status(SsLinuxDateTimePanel *state,
                        const char *message,
