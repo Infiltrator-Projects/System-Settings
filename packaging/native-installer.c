@@ -451,6 +451,9 @@ int main(int argc, char **argv)
             return EXIT_FAILURE;
         }
     }
+    if (!use_pgo) {
+        fail("the native profile requires GCC so LTO and trained PGO are both guaranteed.");
+    }
 
     {
         char *gtk_argv[] = {
