@@ -2,6 +2,28 @@
 
 # Changelog
 
+## 0.4.39 — 2026-09-28 — complete forensic repair pass
+
+- Reconcile external temporal-policy writes into an already-open Date & Time panel through an atomic-replacement-safe policy observer, preventing later GUI edits from publishing stale whole-policy snapshots.
+- Keep Home temporal presentation alive through transient policy read/permission failures, observe policy permission/atomic-replacement changes, and retry failed reloads with bounded exponential backoff instead of a permanent tight retry loop.
+- Make locality metadata and temporal coordinates one truthful transaction: failed metadata publication restores the previous in-memory metadata as well as the persisted policy, while failed system-time-zone reference-coordinate persistence is surfaced explicitly.
+- Debounce latitude/longitude edits into one coordinate transaction instead of durably publishing every spin-button pulse or an intermediate half-edited pair.
+- Move locality search, coordinate persistence, rollback and advisory zone inference into a dedicated Date & Time locality controller, reducing the main Date & Time controller and clarifying domain ownership.
+- Keep nearest tzdata reference points advisory only; explicit Time zone selection remains the sole path that changes the authoritative operating-system zone.
+- Strengthen protected timedated coverage with private-bus SetTimezone, SetTime, NTP denial and outstanding-call lifetime tests while retaining independent cancellation/generation ownership.
+- Expose visible setting titles/descriptions as GTK accessibility properties, add explicit labels for locality/coordinate/manual controls, and move Date & Time operation status to a page-level surface rather than hiding unrelated failures inside the System Clock card.
+- Start and stop Home temporal/status timers with page map/unmap lifecycle, eliminating four-Hz hidden-page wakeups, and keep Date & Time's fine-grained preview similarly visible-only.
+- Follow live desktop theme preference changes through a dedicated Common-backed Linux theme component; consolidate the previously layered shell CSS into one authoritative selector owner per component.
+- Improve narrow-screen layout and validate both width and height against a 1024×768 allocation budget.
+- Drive Date & Time navigation filtering from the module manifest's actual Search/Target metadata, while presenting the current field honestly as a navigation filter until full multi-module deep-link search lands.
+- Correct delegated navigation labels so Cinnamon/Blueman handoffs describe the destination they actually open.
+- Report CLI policy provenance correctly after a first successful save and regress that first-save path.
+- Replace the release-only Bash source-asset builder with a native C builder and exercise it in ordinary CI.
+- Bind exported Common source to the exact 1.19.35 pin with a complete per-file SHA-256 manifest; CMake verifies every listed byte and rejects unlisted extra files when Git metadata is absent.
+- Route trusted non-release jobs to an online, idle BigBedroom runner only after a hosted availability probe; pull requests never execute repository-controlled code on the home runner, and offline/busy/unprovisioned states fall back to hosted Ubuntu.
+- Make immutable release verification require the exact expected asset-name set as well as byte-for-byte equality and checksum verification.
+- Expand the Linux System Settings suite to fifteen project tests, covering policy observation, Home resilience, external-policy reload, locality rollback, live theme following, manifest-derived search, protected timedated paths, 1024×768 responsiveness and both native release builders.
+
 ## 0.4.38 — 2026-09-28 — forensic correctness and lifecycle hardening
 
 - Stop treating nearest tzdata reference points as authoritative time-zone boundaries. Named locality selection now saves locality/coordinates and presents any nearest same-country IANA zone as an advisory suggestion; the operating-system zone changes only through the explicit Time zone control.
