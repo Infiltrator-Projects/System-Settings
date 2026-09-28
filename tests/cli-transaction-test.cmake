@@ -16,9 +16,15 @@ file(READ "${ROOT}/infiltrator/presentation.conf" after)
 if(NOT before STREQUAL after)
     message(FATAL_ERROR "Failed command partially persisted earlier options")
 endif()
-execute_process(COMMAND "${CLI}" --clock decimal --seconds on RESULT_VARIABLE status OUTPUT_QUIET)
+execute_process(
+    COMMAND "${CLI}" --clock decimal --seconds on
+    RESULT_VARIABLE status
+    OUTPUT_VARIABLE output)
 if(NOT status EQUAL 0)
     message(FATAL_ERROR "Valid multi-option command failed")
+endif()
+if(NOT output MATCHES "source=infiltrator-policy")
+    message(FATAL_ERROR "Successful policy save reported stale source provenance")
 endif()
 file(READ "${ROOT}/infiltrator/presentation.conf" after)
 if(NOT after MATCHES "clock-mode=decimal" OR NOT after MATCHES "show-seconds=true")
