@@ -70,11 +70,13 @@ int main(void)
         g_assert_true(gtk_widget_get_next_sibling(maximize) == close);
         g_assert_null(gtk_widget_get_next_sibling(close));
 
-        if (i == 0) {
+        if (i == 0 &&
+            g_strcmp0(g_getenv("GTK_A11Y"), "none") != 0) {
             /*
-             * Exercise the actual GtkAccessible properties rather than merely
-             * running under an accessibility backend. Removing these labels
-             * must make CI fail.
+             * Exercise the actual GtkAccessible properties in the dedicated
+             * accessibility run. The ordinary shell/scale tests deliberately
+             * disable the AT context, so querying properties there would itself
+             * be a GTK critical.
              */
             GtkWidget *home_nav_row =
                 gtk_widget_get_first_child(GTK_WIDGET(navigation));
@@ -125,9 +127,13 @@ int main(void)
                 GTK_ACCESSIBLE_PROPERTY_LABEL,
                 "Manual date");
             gtk_test_accessible_assert_property(
-                GTK_ACCESSIBLE(panel->status_label),
+                GTK_ACCESSIBLE(panel->location_search_button),
                 GTK_ACCESSIBLE_PROPERTY_LABEL,
-                "Date and time status");
+                "Search for locality");
+            gtk_test_accessible_assert_property(
+                GTK_ACCESSIBLE(panel->manual_set_time),
+                GTK_ACCESSIBLE_PROPERTY_LABEL,
+                "Set operating-system date and time");
 
 
             GtkSettings *gtk_settings = gtk_settings_get_default();
