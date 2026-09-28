@@ -1964,7 +1964,7 @@ static gboolean commit_location_coordinates(gpointer user_data)
     longitude = gtk_spin_button_get_value(state->longitude);
     policy = ss_date_time_model_policy(&state->model);
     if (policy == NULL) {
-        return;
+        return G_SOURCE_REMOVE;
     }
     previous_policy = *policy;
     previous_metadata = state->location_metadata;
@@ -1974,7 +1974,7 @@ static gboolean commit_location_coordinates(gpointer user_data)
             &state->model, true, latitude, longitude)) {
         set_status(state, "Could not save custom geographic coordinates.", true);
         sync_controls(state);
-        return;
+        return G_SOURCE_REMOVE;
     }
 
     memset(&state->location_metadata, 0,
