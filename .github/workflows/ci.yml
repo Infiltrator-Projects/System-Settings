@@ -23,13 +23,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           EVENT_NAME: ${{ github.event_name }}
-          HEAD_MESSAGE: ${{ github.event.head_commit.message }}
         shell: bash
         run: |
           set -euo pipefail
           online=false
-          if [[ "$EVENT_NAME" != "pull_request" &&
-                "$HEAD_MESSAGE" != Release\ * ]]; then
+          if [[ "$EVENT_NAME" != "pull_request" ]]; then
             if gh api "repos/${{ github.repository }}/actions/runners" \
               --jq '[.runners[] | select(.status == "online" and .busy == false) | .labels[].name] | any(. == "bigbedroom")' |
               grep -qx true; then
