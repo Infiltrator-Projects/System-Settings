@@ -291,6 +291,10 @@ int main(void)
     CHECK(g_remove(lock_file) == 0);
     {
         g_autofree gchar *infiltrator_dir = g_path_get_dirname(settings_dir);
+        g_autofree gchar *policy_lock =
+            g_build_filename(infiltrator_dir, "presentation.lock", NULL);
+        CHECK(policy_lock != NULL);
+        CHECK(g_remove(policy_lock) == 0);
         CHECK(g_rmdir(settings_dir) == 0);
         CHECK(g_rmdir(infiltrator_dir) == 0);
     }
