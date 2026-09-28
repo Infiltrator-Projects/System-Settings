@@ -2,6 +2,19 @@
 
 # Changelog
 
+## 0.4.42 — 2026-09-28 — locality recovery and shell hardening
+
+- Make CLI location changes participate in the same durable locality journal, temporal-policy publication and metadata-finalization transaction as the GUI, including rollback when metadata publication fails.
+- Reload both authoritative temporal policy and authoritative locality metadata after taking the locality lock before snapshotting rollback state, preventing concurrent locality updates from being restored to stale values.
+- Preserve an interrupted locality journal whenever the post-lock authoritative policy cannot be read, clear stale locality metadata when location authority is explicitly removed, and retry recovery without taking the Date & Time panel offline.
+- Remove the Linux temporal-policy transaction lock's fixed PATH_MAX buffer so long valid XDG configuration paths remain fully transactional.
+- Require the final CPU-native installer build to have complete PGO training data instead of suppressing missing-profile diagnostics.
+- Size the shell against the mapped monitor where available, reduce fixed logical-width floors, and keep delegated settings destinations retryable after transient child-process failures.
+- Move Home theme and network status to native change notifications while retaining a low-frequency refresh only for uptime and other time-derived environment state.
+- Add explicit accessibility metadata to navigation, search and Date & Time status surfaces and run a GTK shell regression with accessibility enabled.
+- Prefer a qualified BigBedroom runner for trusted release commits as well as ordinary trusted pushes, while retaining hosted publication and Windows validation.
+- Describe GitHub release publication as verified rather than platform-enforced immutable, matching the actual release configuration.
+
 ## 0.4.41 — 2026-09-28 — locality transaction and high-DPI correctness
 
 - Serialize the complete locality journal/policy/metadata transaction with a dedicated interprocess lock and make GUI and CLI coordinate writers use the same locality-before-policy lock order.

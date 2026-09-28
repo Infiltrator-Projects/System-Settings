@@ -292,6 +292,7 @@ offline, busy, or lacks the required compiler/CMake/GTK/geocode/Xvfb environment
 Linux build/package and sanitizer jobs use hosted Ubuntu without waiting on an
 unavailable home runner. BigBedroom and hosted jobs both use the exact pinned
 Git submodule object for Common rather than manufacturing provenance around a
-downloaded archive. Pull requests and release commits never execute
-repository-controlled code on BigBedroom. Release validation remains hosted;
-Windows continues to use the hosted Windows runner.
+downloaded archive. Pull requests never execute repository-controlled code on BigBedroom. Trusted
+pushes, including release commits, prefer an idle qualified BigBedroom runner;
+the release publication job itself remains hosted. Windows continues to use the
+hosted Windows runner.
