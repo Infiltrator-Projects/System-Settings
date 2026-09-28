@@ -18,6 +18,31 @@
 
 static int update_lock_fd = -1;
 
+#define POLICY_LOCK_WAIT_USEC G_GINT64_CONSTANT(500000)
+#define POLICY_LOCK_POLL_USEC 10000U
+
+static bool acquire_flock_bounded(int fd)
+{
+    const gint64 deadline = g_get_monotonic_time() + POLICY_LOCK_WAIT_USEC;
+
+    for (;;) {
+        if (flock(fd, LOCK_EX | LOCK_NB) == 0) {
+            return true;
+        }
+        if (errno == EINTR) {
+            continue;
+        }
+        if (errno != EWOULDBLOCK && errno != EAGAIN) {
+            return false;
+        }
+        if (g_get_monotonic_time() >= deadline) {
+            errno = EBUSY;
+            return false;
+        }
+        g_usleep(POLICY_LOCK_POLL_USEC);
+    }
+}
+
 static bool begin_update(void)
 {
     g_autofree gchar *directory = NULL;
@@ -52,11 +77,9 @@ static bool begin_update(void)
     if (fd < 0) {
         return false;
     }
-    while (flock(fd, LOCK_EX) != 0) {
-        if (errno != EINTR) {
-            close(fd);
-            return false;
-        }
+    if (!acquire_flock_bounded(fd)) {
+        close(fd);
+        return false;
     }
     update_lock_fd = fd;
     return true;
