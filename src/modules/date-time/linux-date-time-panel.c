@@ -45,6 +45,8 @@ typedef struct SystemTimeUiRequest {
 static void sync_controls(SsLinuxDateTimePanel *state);
 static gboolean refresh_preview(gpointer user_data);
 static void restart_preview_timer(SsLinuxDateTimePanel *state);
+static void schedule_locality_recovery_retry(
+    SsLinuxDateTimePanel *state);
 
 static void set_status(SsLinuxDateTimePanel *state,
                        const char *message,
@@ -172,6 +174,52 @@ static void location_metadata_file_changed(gpointer user_data)
     ss_linux_date_time_location_update_summary(state);
 }
 
+static gboolean retry_locality_recovery(gpointer user_data)
+{
+    SsLinuxDateTimePanel *state = user_data;
+    const InfiltratrTemporalPolicyV3 *policy;
+
+    if (state == NULL) {
+        return G_SOURCE_REMOVE;
+    }
+
+    state->locality_recovery_retry_id = 0U;
+    policy = ss_date_time_model_policy(&state->model);
+    if (policy != NULL &&
+        ss_location_metadata_recover(
+            policy->location_configured,
+            policy->latitude,
+            policy->longitude)) {
+        state->locality_recovery_failed = false;
+        location_metadata_file_changed(state);
+        set_status(
+            state,
+            "Interrupted locality metadata was recovered.",
+            false);
+        return G_SOURCE_REMOVE;
+    }
+
+    state->locality_recovery_failed = true;
+    schedule_locality_recovery_retry(state);
+    return G_SOURCE_REMOVE;
+}
+
+static void schedule_locality_recovery_retry(
+    SsLinuxDateTimePanel *state)
+{
+    if (state == NULL ||
+        state->locality_recovery_retry_id != 0U ||
+        !state->locality_recovery_failed) {
+        return;
+    }
+
+    state->locality_recovery_retry_id = g_timeout_add_seconds(
+        5U, retry_locality_recovery, state);
+    g_source_set_name_by_id(
+        state->locality_recovery_retry_id,
+        "[system-settings] locality recovery retry");
+}
+
 static void policy_file_changed(gpointer user_data)
 {
     SsLinuxDateTimePanel *state = user_data;
@@ -197,6 +245,14 @@ static void policy_file_changed(gpointer user_data)
             locality_recovery_ok &&
             ss_location_metadata_load(&recovered_metadata);
         state->locality_recovery_failed = !locality_recovery_ok;
+        if (locality_recovery_ok) {
+            if (state->locality_recovery_retry_id != 0U) {
+                g_source_remove(state->locality_recovery_retry_id);
+                state->locality_recovery_retry_id = 0U;
+            }
+        } else {
+            schedule_locality_recovery_retry(state);
+        }
         const bool changed =
             !temporal_policy_equal(&previous, &state->model.policy);
         const bool manual_context_changed =
@@ -1927,6 +1983,7 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
             state,
             "Date & Time is available, but interrupted locality metadata could not yet be recovered. The journal has been preserved for retry.",
             true);
+        schedule_locality_recovery_retry(state);
     } else {
         set_status(
             state,
@@ -1981,6 +2038,10 @@ void ss_linux_date_time_panel_free(gpointer data)
     if (state->preview_idle_id != 0U) {
         g_source_remove(state->preview_idle_id);
         state->preview_idle_id = 0U;
+    }
+    if (state->locality_recovery_retry_id != 0U) {
+        g_source_remove(state->locality_recovery_retry_id);
+        state->locality_recovery_retry_id = 0U;
     }
     if (state->location_search_cancellable != NULL) {
         g_cancellable_cancel(state->location_search_cancellable);
