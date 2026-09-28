@@ -457,7 +457,9 @@ if(BUILD_TESTING)
             system-settings-platform
             InfiltratrCommon::Common
             PkgConfig::GIO2)
-        add_test(NAME policy-concurrency COMMAND policy-concurrency-test)
+        add_test(
+            NAME policy-concurrency
+            COMMAND policy-concurrency-test $<TARGET_FILE:system-settings-time>)
 
         add_library(calendar-preview-runtime-fixture SHARED
             tests/calendar-preview-runtime-fixture.c)
