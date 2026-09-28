@@ -178,6 +178,21 @@ int main(void)
             CHECK(absolute_difference(loaded.latitude, -37.200002) < 0.000001);
             CHECK(absolute_difference(loaded.longitude, 146.200002) < 0.000001);
         }
+
+        /*
+         * Restore a clean unconfigured authority before exercising crash
+         * recovery below; that test deliberately starts without committed
+         * locality metadata.
+         */
+        {
+            const SsTemporalPolicyStore *store =
+                ss_platform_temporal_policy_store();
+            InfiltratrTemporalPolicyV3 reset;
+            CHECK(store != NULL && store->save != NULL);
+            CHECK(infiltratr_temporal_policy_v3_default(&reset));
+            CHECK(store->save(&reset));
+            CHECK(ss_location_metadata_clear());
+        }
     }
 
     /*
