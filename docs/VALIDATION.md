@@ -268,8 +268,11 @@ pending construction, and CLI transaction rollback on malformed arguments.
 Existing tests cover non-finite coordinates, malformed locality records,
 private-directory permission repair, truncated zone rows, bounded time parsing,
 save/reload failure, synchronous model re-entry, Windows embedded-NUL input and
-cross-process Windows publication races. Tests use isolated files and a memory
-settings backend.
+cross-process Windows publication races. The Linux shell regression additionally
+checks keyboard-focusable custom window controls, a 1024-pixel minimum-width
+budget, visible-page preview timer ownership, advisory-only locality/time-zone
+inference, search filtering, navigation synchronisation and neutral missing-art
+fallbacks. Tests use isolated files and a memory settings backend.
 
 Manual acceptance still includes real Mint polkit cancellation/denial, network
 geocoding, desktop theme changes, screen-reader interaction and DST fold choice.
@@ -277,7 +280,9 @@ A passing fixture is not proof of those cases.
 Manual Gregorian time rejects GLib's normalisation of nonexistent DST wall
 times; repeated wall times use GLib's documented standard-time occurrence.
 
-Non-release Linux build/package and sanitizer jobs prefer the labelled
-BigBedroom self-hosted runner. Release commits deliberately use hosted
-Ubuntu so immutable publication is independent of home-runner availability;
-Windows continues to use the hosted Windows runner.
+Non-release Linux build/package and sanitizer jobs probe the labelled
+BigBedroom self-hosted runner first. If its required compiler/CMake/GTK/geocode
+development environment is not present, the jobs fall back to hosted Ubuntu
+without attempting privileged package installation on the home runner. Release
+commits deliberately use hosted Ubuntu so immutable publication is independent
+of home-runner state; Windows continues to use the hosted Windows runner.
