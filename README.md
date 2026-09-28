@@ -348,7 +348,10 @@ Shannon Smith-owned source, documentation and project artwork are licensed under
 
 Each release publishes the Debian package, a `System-Settings-VERSION-native.run`
 source installer, a complete source ZIP (including pinned Common), and SHA256SUMS.
-The native installer builds and tests as the ordinary user with CPU-specific
-optimisation, then asks sudo only to install the generated Debian package through
-APT. Its `--help` and `--extract DIRECTORY` modes need no elevation. Build
-prerequisites are the same as above; it does not install dependencies silently.
+The native installer builds and tests as the ordinary user with GCC
+`-march=native`/`-mtune=native`, link-time optimisation and a trained PGO
+generate/test/use cycle, then asks sudo only to install the generated Debian
+package through APT. A compiler that cannot provide that full native profile is
+rejected rather than silently producing a weaker build. Its `--help` and
+`--extract DIRECTORY` modes need no elevation. Build prerequisites are the
+same as above; it does not install dependencies silently.
