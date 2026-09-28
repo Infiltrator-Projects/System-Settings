@@ -323,6 +323,40 @@ int main(void)
                 replacement_calendar);
 
             /*
+             * An unrelated external policy edit must not erase a wall-time
+             * draft the user is typing. Only clock/calendar context changes
+             * invalidate that draft.
+             */
+            gtk_editable_set_text(
+                GTK_EDITABLE(panel->manual_date),
+                "2026-09-28");
+            gtk_editable_set_text(
+                GTK_EDITABLE(panel->manual_time),
+                "11:42");
+            panel->manual_dirty = true;
+            external = *ss_date_time_model_policy(&panel->model);
+            external.show_seconds = !external.show_seconds;
+            g_assert_true(store->save(&external));
+            for (unsigned int attempt = 0U; attempt < 2000U; ++attempt) {
+                while (g_main_context_iteration(NULL, FALSE)) {
+                }
+                if (ss_date_time_model_policy(&panel->model)->show_seconds ==
+                    external.show_seconds) {
+                    break;
+                }
+                g_usleep(1000U);
+            }
+            g_assert_true(panel->manual_dirty);
+            g_assert_cmpstr(
+                gtk_editable_get_text(GTK_EDITABLE(panel->manual_date)),
+                ==,
+                "2026-09-28");
+            g_assert_cmpstr(
+                gtk_editable_get_text(GTK_EDITABLE(panel->manual_time)),
+                ==,
+                "11:42");
+
+            /*
              * Locality-to-zone inference is advisory. With the system service
              * deliberately unavailable, selecting Mooroopna must persist the
              * locality but must not persist the nearest Melbourne zone as if
@@ -356,6 +390,33 @@ int main(void)
             g_assert_nonnull(strstr(
                 gtk_label_get_text(GTK_LABEL(panel->status_label)),
                 "Suggested time zone: Australia/Melbourne"));
+
+            {
+                SsLocationMetadata external_metadata = metadata;
+                g_strlcpy(
+                    external_metadata.display_name,
+                    "Externally renamed locality",
+                    sizeof(external_metadata.display_name));
+                g_assert_true(
+                    ss_location_metadata_save(&external_metadata));
+                for (unsigned int attempt = 0U;
+                     attempt < 2000U;
+                     ++attempt) {
+                    while (g_main_context_iteration(NULL, FALSE)) {
+                    }
+                    if (g_strcmp0(
+                            panel->location_metadata.display_name,
+                            external_metadata.display_name) == 0) {
+                        break;
+                    }
+                    g_usleep(1000U);
+                }
+                g_assert_true(panel->location_metadata_present);
+                g_assert_cmpstr(
+                    panel->location_metadata.display_name,
+                    ==,
+                    "Externally renamed locality");
+            }
             g_assert_true(ss_date_time_model_set_location(
                 &panel->model, false, 0.0, 0.0));
             g_autofree gchar *metadata_file = g_build_filename(
