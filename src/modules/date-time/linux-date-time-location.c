@@ -177,8 +177,7 @@ void on_location_result_activated(
     const InfiltratrTemporalPolicyV3 *policy;
     InfiltratrTemporalPolicyV3 previous_policy;
     SsLocationMetadata previous_metadata;
-    const bool previous_metadata_present =
-        state != NULL ? state->location_metadata_present : false;
+    bool previous_metadata_present;
     SsSystemTimeState current_system;
 
     if (state == NULL || row == NULL) {
@@ -191,12 +190,30 @@ void on_location_result_activated(
         return;
     }
 
+    if (!ss_location_metadata_transaction_begin()) {
+        ss_linux_date_time_panel_set_status(
+            state,
+            "Could not acquire the locality transaction lock.",
+            true);
+        return;
+    }
+    if (!ss_date_time_model_reload(&state->model)) {
+        ss_location_metadata_transaction_end();
+        ss_linux_date_time_panel_set_status(
+            state,
+            "Could not reload the authoritative temporal policy before saving the locality.",
+            true);
+        return;
+    }
+
     policy = ss_date_time_model_policy(&state->model);
     if (policy == NULL) {
+        ss_location_metadata_transaction_end();
         return;
     }
     previous_policy = *policy;
     previous_metadata = state->location_metadata;
+    previous_metadata_present = state->location_metadata_present;
 
     memset(
         &state->location_metadata,
@@ -240,6 +257,7 @@ void on_location_result_activated(
     if (!ss_location_metadata_stage(&state->location_metadata)) {
         state->location_metadata = previous_metadata;
         state->location_metadata_present = previous_metadata_present;
+        ss_location_metadata_transaction_end();
         ss_linux_date_time_panel_set_status(
             state,
             "Could not stage the selected locality metadata.",
@@ -255,6 +273,7 @@ void on_location_result_activated(
         ss_location_metadata_discard_staged();
         state->location_metadata = previous_metadata;
         state->location_metadata_present = previous_metadata_present;
+        ss_location_metadata_transaction_end();
         ss_linux_date_time_panel_set_status(
             state,
             "Could not save the selected geographic location.",
@@ -299,10 +318,12 @@ void on_location_result_activated(
                     ? "The selected location could not be saved and rollback persistence failed; authoritative policy was reloaded and previous metadata restored."
                     : "The selected location could not be saved, and neither rollback nor authoritative reload succeeded; previous metadata was restored in memory."),
             true);
+        ss_location_metadata_transaction_end();
         ss_linux_date_time_panel_sync_controls(state);
         return;
     }
 
+    ss_location_metadata_transaction_end();
     state->location_follows_timezone_reference = false;
     state->updating_controls = true;
     gtk_editable_set_text(
@@ -498,8 +519,27 @@ static gboolean commit_location_coordinates(gpointer user_data)
 
     latitude = gtk_spin_button_get_value(state->latitude);
     longitude = gtk_spin_button_get_value(state->longitude);
+    if (!ss_location_metadata_transaction_begin()) {
+        ss_linux_date_time_panel_set_status(
+            state,
+            "Could not acquire the locality transaction lock.",
+            true);
+        ss_linux_date_time_panel_sync_controls(state);
+        return G_SOURCE_REMOVE;
+    }
+    if (!ss_date_time_model_reload(&state->model)) {
+        ss_location_metadata_transaction_end();
+        ss_linux_date_time_panel_set_status(
+            state,
+            "Could not reload the authoritative temporal policy before saving custom coordinates.",
+            true);
+        ss_linux_date_time_panel_sync_controls(state);
+        return G_SOURCE_REMOVE;
+    }
+
     policy = ss_date_time_model_policy(&state->model);
     if (policy == NULL) {
+        ss_location_metadata_transaction_end();
         return G_SOURCE_REMOVE;
     }
     previous_policy = *policy;
@@ -532,6 +572,7 @@ static gboolean commit_location_coordinates(gpointer user_data)
     if (!ss_location_metadata_stage(&state->location_metadata)) {
         state->location_metadata = previous_metadata;
         state->location_metadata_present = previous_metadata_present;
+        ss_location_metadata_transaction_end();
         ss_linux_date_time_panel_set_status(
             state,
             "Could not stage custom geographic coordinates.",
@@ -545,6 +586,7 @@ static gboolean commit_location_coordinates(gpointer user_data)
         ss_location_metadata_discard_staged();
         state->location_metadata = previous_metadata;
         state->location_metadata_present = previous_metadata_present;
+        ss_location_metadata_transaction_end();
         ss_linux_date_time_panel_set_status(
             state,
             "Could not save custom geographic coordinates.",
@@ -585,10 +627,12 @@ static gboolean commit_location_coordinates(gpointer user_data)
                     ? "Custom coordinates could not be saved and rollback persistence failed; authoritative policy was reloaded and previous metadata restored."
                     : "Custom coordinates could not be saved, and neither rollback nor authoritative reload succeeded; previous metadata was restored in memory."),
             true);
+        ss_location_metadata_transaction_end();
         ss_linux_date_time_panel_sync_controls(state);
         return G_SOURCE_REMOVE;
     }
 
+    ss_location_metadata_transaction_end();
     state->location_follows_timezone_reference = false;
     gtk_editable_set_text(
         GTK_EDITABLE(state->location_search),

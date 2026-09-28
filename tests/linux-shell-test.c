@@ -118,10 +118,16 @@ int main(void)
             "system-settings-home-status-source"));
 
         /*
-         * A 1024-wide desktop must be able to satisfy the shell's minimum
-         * allocation without horizontal scrolling. Home uses wrapping
-         * FlowBoxes and Date & Time starts its fast preview only while mapped.
+         * Validate against the actual logical desktop budget. The scale-2
+         * regression runs a 1920x1080 Xvfb screen, which becomes a 960x540
+         * logical desktop under GDK_SCALE=2.
          */
+        const bool scale2 =
+            g_strcmp0(g_getenv("GDK_SCALE"), "2") == 0;
+        const int desktop_budget_width = scale2 ? 960 : 1024;
+        const int desktop_budget_height = scale2 ? 540 : 768;
+        int default_width = 0;
+        int default_height = 0;
         int minimum_width = 0;
         int natural_width = 0;
         GtkWidget *window_child = gtk_window_get_child(window);
@@ -182,7 +188,14 @@ int main(void)
             &title_nat_width,
             NULL,
             NULL);
-        g_assert_cmpint(MAX(minimum_width, title_min_width), <=, 1024);
+        g_assert_cmpint(
+            MAX(minimum_width, title_min_width),
+            <=,
+            desktop_budget_width);
+        gtk_window_get_default_size(
+            window, &default_width, &default_height);
+        g_assert_cmpint(default_width, <=, desktop_budget_width);
+        g_assert_cmpint(default_height, <=, desktop_budget_height);
 
         int minimum_height = 0;
         int natural_height = 0;
@@ -208,7 +221,10 @@ int main(void)
             minimum_height + title_min_height,
             minimum_height,
             title_min_height);
-        g_assert_cmpint(minimum_height + title_min_height, <=, 768);
+        g_assert_cmpint(
+            minimum_height + title_min_height,
+            <=,
+            desktop_budget_height);
         g_assert_cmpuint(panel->timer_id, ==, 0U);
 
         HomeTemporalTicker *home_temporal = g_object_get_data(

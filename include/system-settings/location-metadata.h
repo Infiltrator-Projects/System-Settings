@@ -43,6 +43,17 @@ bool ss_location_metadata_save(const SsLocationMetadata *metadata);
 char *ss_location_metadata_path_alloc(void);
 
 /**
+ * Serialize the complete locality transaction across System Settings processes.
+ *
+ * Callers that perform the staged metadata -> temporal-policy -> metadata
+ * publication sequence must hold this lock for the complete sequence, including
+ * any rollback. This prevents one process from overwriting another process's
+ * journal or rolling a newer locality back to stale coordinates.
+ */
+bool ss_location_metadata_transaction_begin(void);
+void ss_location_metadata_transaction_end(void);
+
+/**
  * Stage locality metadata durably before the paired temporal-policy write.
  * finish_staged() publishes the staged record to location.ini and removes the
  * journal. discard_staged() removes an abandoned journal.

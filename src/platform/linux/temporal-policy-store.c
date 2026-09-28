@@ -40,10 +40,13 @@ static bool begin_update(void)
     if (g_chmod(directory, 0700) != 0) {
         return false;
     }
-    if (g_snprintf(
+    {
+        const int written = g_snprintf(
             lock_path, sizeof(lock_path),
-            "%s/presentation.lock", directory) <= 0) {
-        return false;
+            "%s/presentation.lock", directory);
+        if (written <= 0 || (size_t)written >= sizeof(lock_path)) {
+            return false;
+        }
     }
 
     fd = open(lock_path, O_CREAT | O_RDWR | O_CLOEXEC, 0600);
@@ -88,14 +91,16 @@ static void load_cinnamon_defaults(InfiltratrTemporalPolicyV3 *policy)
 
 }
 
-static void mirror_cinnamon_compatibility(
+static bool mirror_cinnamon_compatibility(
     const InfiltratrTemporalPolicyV3 *policy)
 {
     g_autoptr(GSettings) settings = ss_cinnamon_interface_settings_new();
     gboolean ok = TRUE;
 
-    if (policy == NULL || settings == NULL)
-        return;
+    if (policy == NULL)
+        return false;
+    if (settings == NULL)
+        return true;
 
     if (infiltratr_string_equal(policy->clock_mode, "standard-24")) {
         ok = ss_cinnamon_interface_set_clock_use_24h(
@@ -113,7 +118,36 @@ static void mirror_cinnamon_compatibility(
 
     if (!ok)
         g_warning("Unable to mirror temporal compatibility settings to Cinnamon.");
+    return ok;
+}
 
+static bool platform_compatibility_matches(
+    const InfiltratrTemporalPolicyV3 *policy)
+{
+    g_autoptr(GSettings) settings = ss_cinnamon_interface_settings_new();
+    bool value = false;
+
+    if (policy == NULL) {
+        return false;
+    }
+    if (settings == NULL) {
+        return true;
+    }
+
+    if (infiltratr_string_equal(policy->clock_mode, "standard-24") ||
+        infiltratr_string_equal(policy->clock_mode, "standard-12")) {
+        const bool expected_24h =
+            infiltratr_string_equal(policy->clock_mode, "standard-24");
+        if (!ss_cinnamon_interface_get_boolean(
+                settings, "clock-use-24h", &value) ||
+            value != expected_24h) {
+            return false;
+        }
+    }
+
+    return ss_cinnamon_interface_get_boolean(
+               settings, "clock-show-seconds", &value) &&
+           value == policy->show_seconds;
 }
 
 static bool platform_load(InfiltratrTemporalPolicyV3 *policy, bool *found)
@@ -156,7 +190,7 @@ static bool platform_save(const InfiltratrTemporalPolicyV3 *policy)
      * modes remain Infiltrator-only rather than being forced into a false
      * platform equivalent.
      */
-    mirror_cinnamon_compatibility(policy);
+    (void)mirror_cinnamon_compatibility(policy);
     return true;
 }
 
@@ -166,7 +200,8 @@ const SsTemporalPolicyStore *ss_platform_temporal_policy_store(void)
         .load = platform_load,
         .save = platform_save,
         .begin_update = begin_update,
-        .end_update = end_update
+        .end_update = end_update,
+        .compatibility_matches = platform_compatibility_matches
     };
     return &store;
 }

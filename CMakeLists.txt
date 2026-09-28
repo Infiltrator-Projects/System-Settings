@@ -20,6 +20,26 @@ if(NOT SYSTEM_SETTINGS_BUILD_PROFILE MATCHES "^(cmake|generic|native|development
     message(FATAL_ERROR "Unsupported SYSTEM_SETTINGS_BUILD_PROFILE")
 endif()
 
+if(SYSTEM_SETTINGS_BUILD_PROFILE STREQUAL "native")
+    if(NOT CMAKE_C_COMPILER_ID STREQUAL "GNU")
+        message(FATAL_ERROR
+            "The native build profile requires GCC so trained PGO identity is truthful.")
+    endif()
+    string(TOUPPER "${CMAKE_BUILD_TYPE}" SS_BUILD_TYPE_UPPER)
+    set(SS_BUILD_TYPE_FLAGS_VAR "CMAKE_C_FLAGS_${SS_BUILD_TYPE_UPPER}")
+    set(SS_NATIVE_PROFILE_FLAGS
+        "${CMAKE_C_FLAGS} ${${SS_BUILD_TYPE_FLAGS_VAR}}")
+    if(NOT SS_NATIVE_PROFILE_FLAGS MATCHES "(^|[ ;])-march=native([ ;]|$)" OR
+       NOT SS_NATIVE_PROFILE_FLAGS MATCHES "(^|[ ;])-flto([= ;]|$)" OR
+       NOT SS_NATIVE_PROFILE_FLAGS MATCHES "(^|[ ;])-fprofile-use(=|[ ;])")
+        message(FATAL_ERROR
+            "SYSTEM_SETTINGS_BUILD_PROFILE=native requires -march=native, LTO and a trained -fprofile-use build.")
+    endif()
+    unset(SS_NATIVE_PROFILE_FLAGS)
+    unset(SS_BUILD_TYPE_FLAGS_VAR)
+    unset(SS_BUILD_TYPE_UPPER)
+endif()
+
 set(SYSTEM_SETTINGS_COMMON_DIR
     "${CMAKE_CURRENT_SOURCE_DIR}/src/vendor/infiltratr-common")
 set(SYSTEM_SETTINGS_COMMON_EXPECTED_VERSION "1.19.35")
@@ -397,7 +417,10 @@ if(BUILD_TESTING)
             add_test(NAME linux-shell COMMAND ${SS_XVFB_RUN} -a $<TARGET_FILE:linux-shell-test>)
             set_tests_properties(linux-shell PROPERTIES TIMEOUT 30 ENVIRONMENT
                 "G_DEBUG=fatal-criticals;GTK_A11Y=none;GSK_RENDERER=cairo;GSETTINGS_BACKEND=memory")
-            add_test(NAME linux-shell-scale2 COMMAND ${SS_XVFB_RUN} -a $<TARGET_FILE:linux-shell-test>)
+            add_test(
+                NAME linux-shell-scale2
+                COMMAND ${SS_XVFB_RUN} -a -s "-screen 0 1920x1080x24"
+                    $<TARGET_FILE:linux-shell-test>)
             set_tests_properties(linux-shell-scale2 PROPERTIES TIMEOUT 30 ENVIRONMENT
                 "G_DEBUG=fatal-criticals;GTK_A11Y=none;GSK_RENDERER=cairo;GSETTINGS_BACKEND=memory;GDK_SCALE=2")
         else()

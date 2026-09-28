@@ -29,6 +29,7 @@ int main(void)
     g_autofree gchar *temporary_root = NULL;
     g_autofree gchar *expected_file = NULL;
     g_autofree gchar *settings_dir = NULL;
+    g_autofree gchar *lock_file = NULL;
     SsLocationMetadata saved = {0};
     GStatBuf settings_stat;
     SsLocationMetadata loaded = {0};
@@ -73,6 +74,17 @@ int main(void)
     CHECK(ss_location_metadata_save(&saved));
     CHECK(g_stat(settings_dir, &settings_stat) == 0);
     CHECK((settings_stat.st_mode & 0777) == 0700);
+
+    /*
+     * The transaction lock is process-owned and must be explicitly released;
+     * a second begin in the same process is rejected rather than silently
+     * weakening serialization.
+     */
+    CHECK(ss_location_metadata_transaction_begin());
+    CHECK(!ss_location_metadata_transaction_begin());
+    ss_location_metadata_transaction_end();
+    CHECK(ss_location_metadata_transaction_begin());
+    ss_location_metadata_transaction_end();
 
     /*
      * Interrupted paired locality writes leave a private journal. A matching
@@ -125,6 +137,9 @@ int main(void)
         CHECK(loaded.latitude == 0.0 && loaded.longitude == 0.0);
     }
     CHECK(g_remove(expected_file) == 0);
+    lock_file = g_build_filename(settings_dir, "location.lock", NULL);
+    CHECK(lock_file != NULL);
+    CHECK(g_remove(lock_file) == 0);
     {
         g_autofree gchar *infiltrator_dir = g_path_get_dirname(settings_dir);
         CHECK(g_rmdir(settings_dir) == 0);

@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "system-settings/date-time-model.h"
+#ifndef _WIN32
+#include "system-settings/location-metadata.h"
+#endif
 
 #include <infiltratr/core.h>
 
@@ -38,32 +41,78 @@ static void release_platform_update(
     }
 }
 
+static bool acquire_locality_transaction(void)
+{
+#ifdef _WIN32
+    return true;
+#else
+    return ss_location_metadata_transaction_begin();
+#endif
+}
+
+static void release_locality_transaction(void)
+{
+#ifndef _WIN32
+    ss_location_metadata_transaction_end();
+#endif
+}
+
+static bool command_touches_location(int argc, char **argv)
+{
+    for (int index = 1; index < argc; ++index) {
+        if (strcmp(argv[index], "--location") == 0 ||
+            strcmp(argv[index], "--clear-location") == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
 int main(int argc, char **argv)
 {
     SsDateTimeModel model;
     int index;
     int exit_code = 0;
     bool platform_locked = false;
+    bool locality_locked = false;
     const SsTemporalPolicyStore *platform =
         ss_platform_temporal_policy_store();
     static const SsTemporalPolicyStore staging = {
         .load = stage_load,
         .save = stage_save,
         .begin_update = NULL,
-        .end_update = NULL
+        .end_update = NULL,
+        .compatibility_matches = NULL
     };
 
     /*
+     * Location-changing commands take the locality lock before the policy
+     * lock, matching the Linux GUI's lock order. This serializes CLI
+     * coordinates with the metadata journal/rollback transaction there.
+     * Windows has no separate locality metadata journal, so the helper is a
+     * deliberate no-op on that platform.
+     */
+    if (argc > 1 && command_touches_location(argc, argv)) {
+        if (!acquire_locality_transaction()) {
+            fputs("Unable to acquire the locality transaction lock.\n", stderr);
+            return 2;
+        }
+        locality_locked = true;
+    }
+
+    /*
      * Treat a multi-option CLI invocation as one cross-process transaction.
-     * Acquire the platform lock before loading the base snapshot and hold it
-     * through validation/publication so a simultaneous GUI/CLI writer cannot
-     * be overwritten by a stale staged document.
+     * Hold the platform lock through validation/publication so simultaneous
+     * GUI/CLI writers cannot overwrite a fresh complete policy.
      */
     if (argc > 1 && platform != NULL &&
         platform->begin_update != NULL) {
         if (platform->end_update == NULL ||
             !platform->begin_update()) {
             fputs("Unable to acquire the temporal policy update lock.\n", stderr);
+            if (locality_locked) {
+                release_locality_transaction();
+            }
             return 2;
         }
         platform_locked = true;
@@ -72,6 +121,9 @@ int main(int argc, char **argv)
     if (!ss_date_time_model_init(&model, platform)) {
         fputs("Unable to load temporal presentation policy.\n", stderr);
         release_platform_update(platform, &platform_locked);
+        if (locality_locked) {
+            release_locality_transaction();
+        }
         return 1;
     }
 
@@ -148,10 +200,22 @@ int main(int argc, char **argv)
             goto done;
         }
         model.persisted_policy_present = true;
+        if (platform->compatibility_matches != NULL &&
+            !platform->compatibility_matches(&model.policy)) {
+            fputs(
+                "Temporal policy was saved, but native desktop compatibility settings did not fully synchronize.\n",
+                stderr);
+            exit_code = 3;
+            goto done;
+        }
     }
 
 done:
     release_platform_update(platform, &platform_locked);
+    if (locality_locked) {
+        release_locality_transaction();
+        locality_locked = false;
+    }
     if (exit_code != 0) {
         return exit_code;
     }

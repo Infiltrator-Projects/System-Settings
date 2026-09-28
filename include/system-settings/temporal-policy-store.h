@@ -32,6 +32,13 @@ typedef struct SsTemporalPolicyStore {
     bool (*begin_update)(void);
     /** Optional mate for begin_update(); called exactly once after acquisition. */
     void (*end_update)(void);
+    /**
+     * Optional post-save compatibility verification. The authoritative policy
+     * can commit successfully even when a desktop compatibility mirror cannot;
+     * callers that report native synchronization status use this separately.
+     */
+    bool (*compatibility_matches)(
+        const InfiltratrTemporalPolicyV3 *policy);
 } SsTemporalPolicyStore;
 
 /** Return the process-lifetime immutable store for the active platform. */

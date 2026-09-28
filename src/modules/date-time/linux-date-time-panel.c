@@ -106,8 +106,10 @@ static bool temporal_policy_equal(
         g_strcmp0(left->calendar, right->calendar) == 0 &&
         left->show_seconds == right->show_seconds &&
         left->location_configured == right->location_configured &&
-        left->latitude == right->latitude &&
-        left->longitude == right->longitude;
+        ss_linux_date_time_location_coordinate_close(
+            left->latitude, right->latitude) &&
+        ss_linux_date_time_location_coordinate_close(
+            left->longitude, right->longitude);
 }
 
 static void refresh_location_authority_state(
@@ -182,6 +184,18 @@ static void policy_file_changed(gpointer user_data)
     previous = state->model.policy;
     ss_linux_date_time_location_cancel_coordinate_commit(state);
     if (ss_date_time_model_reload(&state->model)) {
+        const InfiltratrTemporalPolicyV3 *policy =
+            ss_date_time_model_policy(&state->model);
+        const bool locality_recovery_ok =
+            policy != NULL &&
+            ss_location_metadata_recover(
+                policy->location_configured,
+                policy->latitude,
+                policy->longitude);
+        SsLocationMetadata recovered_metadata = {0};
+        const bool recovered_metadata_present =
+            locality_recovery_ok &&
+            ss_location_metadata_load(&recovered_metadata);
         const bool changed =
             !temporal_policy_equal(&previous, &state->model.policy);
         const bool manual_context_changed =
@@ -200,11 +214,20 @@ static void policy_file_changed(gpointer user_data)
         if (manual_context_changed) {
             state->manual_dirty = false;
         }
+        if (recovered_metadata_present) {
+            state->location_metadata = recovered_metadata;
+            state->location_metadata_present = true;
+        }
         refresh_location_authority_state(state);
         sync_controls(state);
         restart_preview_timer(state);
         (void)refresh_preview(state);
-        if (changed) {
+        if (!locality_recovery_ok) {
+            set_status(
+                state,
+                "Temporal policy changed externally, but interrupted locality recovery could not acquire or complete its transaction lock.",
+                true);
+        } else if (changed) {
             set_status(
                 state,
                 "Temporal policy changed externally and was reloaded.",
@@ -808,12 +831,14 @@ static guint preview_refresh_interval_ms(
             ? ss_date_time_model_policy(&state->model)
             : NULL;
 
-    if (policy != NULL &&
-        policy->show_seconds &&
-        g_strcmp0(policy->clock_mode, "decimal") == 0) {
-        return 250U;
-    }
-    return 1000U;
+    /*
+     * Common clock modes can advance displayed sub-second-equivalent units at
+     * different rates (for example decimal seconds, Internet centibeats and
+     * sidereal seconds). Until Common exposes a per-mode cadence capability,
+     * sample all visible seconds-enabled clocks at 250 ms so no displayed unit
+     * can be skipped. Seconds-disabled clocks remain at the low-cost 1 Hz rate.
+     */
+    return policy != NULL && policy->show_seconds ? 250U : 1000U;
 }
 
 static void restart_preview_timer(SsLinuxDateTimePanel *state)
@@ -988,37 +1013,19 @@ static void on_cinnamon_interface_changed(
 static bool native_compatibility_matches(
     const SsLinuxDateTimePanel *state)
 {
-    const InfiltratrTemporalPolicyV3 *policy;
-    bool value = false;
+    const SsTemporalPolicyStore *store =
+        ss_platform_temporal_policy_store();
+    const InfiltratrTemporalPolicyV3 *policy =
+        state != NULL
+            ? ss_date_time_model_policy(&state->model)
+            : NULL;
 
-    if (state == NULL || state->cinnamon_interface_settings == NULL) {
-        return true;
-    }
-    policy = ss_date_time_model_policy(&state->model);
     if (policy == NULL) {
         return false;
     }
-
-    if (ss_native_clock_mode_is_conventional(policy->clock_mode)) {
-        const bool expected_24h =
-            g_strcmp0(policy->clock_mode, "standard-24") == 0;
-        if (!ss_cinnamon_interface_get_boolean(
-                state->cinnamon_interface_settings,
-                "clock-use-24h",
-                &value) ||
-            value != expected_24h) {
-            return false;
-        }
-    }
-
-    if (!ss_cinnamon_interface_get_boolean(
-            state->cinnamon_interface_settings,
-            "clock-show-seconds",
-            &value) ||
-        value != policy->show_seconds) {
-        return false;
-    }
-    return true;
+    return store == NULL ||
+           store->compatibility_matches == NULL ||
+           store->compatibility_matches(policy);
 }
 
 static void policy_saved(SsLinuxDateTimePanel *state)
@@ -1145,76 +1152,105 @@ static void system_time_changed(
         state->manual_dirty = false;
     }
 
-    if (ss_linux_date_time_location_metadata_matches_policy(
-            state, ss_date_time_model_policy(&state->model)) &&
-        system_state->timezone[0] != '\0' &&
-        g_strcmp0(
-            state->location_metadata.timezone_id,
-            system_state->timezone) != 0) {
-        SsLocationMetadata candidate = state->location_metadata;
-        (void)g_strlcpy(
-            candidate.timezone_id,
-            system_state->timezone,
-            sizeof(candidate.timezone_id));
-        if (ss_location_metadata_save(&candidate)) {
-            state->location_metadata = candidate;
-            set_status(
-                state,
-                "Operating-system time zone and locality metadata reconciled.",
-                false);
-        } else {
-            /*
-             * Keep the old in-memory value so the next authoritative change
-             * notification retries persistence instead of falsely believing
-             * metadata is already synchronized.
-             */
-            set_status(
-                state,
-                "The operating-system time zone changed, but the locality metadata could not be updated on disk.",
-                true);
+    /*
+     * Time-zone reconciliation and automatic reference-coordinate publication
+     * are locality writers too. Serialize them with explicit locality changes
+     * and reload both policy and metadata after taking the locality lock, so a
+     * second System Settings process cannot overwrite a freshly selected place
+     * with stale metadata or stale time-zone reference coordinates.
+     */
+    if ((timezone_changed || state->location_follows_timezone_reference) &&
+        ss_location_metadata_transaction_begin()) {
+        SsLocationMetadata authoritative_metadata = {0};
+        const bool policy_reloaded =
+            ss_date_time_model_reload(&state->model);
+        const bool metadata_loaded =
+            ss_location_metadata_load(&authoritative_metadata);
+
+        if (metadata_loaded) {
+            state->location_metadata = authoritative_metadata;
+            state->location_metadata_present = true;
         }
-    }
+        if (policy_reloaded) {
+            refresh_location_authority_state(state);
+        }
 
-    if (state->location_follows_timezone_reference &&
-        state->regional_context.has_reference_coordinates) {
-        const InfiltratrTemporalPolicyV3 *policy =
-            ss_date_time_model_policy(&state->model);
-        const bool already_matches =
-            policy != NULL &&
-            policy->location_configured &&
-            ss_linux_date_time_location_coordinate_close(
-                policy->latitude,
-                state->regional_context.reference_latitude) &&
-            ss_linux_date_time_location_coordinate_close(
-                policy->longitude,
-                state->regional_context.reference_longitude);
-
-        if (!already_matches &&
-            !ss_date_time_model_set_location(
-                &state->model,
-                true,
-                state->regional_context.reference_latitude,
-                state->regional_context.reference_longitude)) {
-            set_status(
-                state,
-                "The system time zone changed, but its reference coordinates could not be persisted to the temporal policy.",
-                true);
-        } else {
-            state->updating_controls = true;
-            gtk_spin_button_set_value(
-                state->latitude,
-                state->regional_context.reference_latitude);
-            gtk_spin_button_set_value(
-                state->longitude,
-                state->regional_context.reference_longitude);
-            if (state->location_search != NULL &&
-                state->regional_context.timezone_city[0] != '\0') {
-                gtk_editable_set_text(
-                    GTK_EDITABLE(state->location_search),
-                    state->regional_context.timezone_city);
+        if (policy_reloaded &&
+            ss_linux_date_time_location_metadata_matches_policy(
+                state, ss_date_time_model_policy(&state->model)) &&
+            system_state->timezone[0] != '\0' &&
+            g_strcmp0(
+                state->location_metadata.timezone_id,
+                system_state->timezone) != 0) {
+            SsLocationMetadata candidate = state->location_metadata;
+            (void)g_strlcpy(
+                candidate.timezone_id,
+                system_state->timezone,
+                sizeof(candidate.timezone_id));
+            if (ss_location_metadata_save(&candidate)) {
+                state->location_metadata = candidate;
+                set_status(
+                    state,
+                    "Operating-system time zone and locality metadata reconciled.",
+                    false);
+            } else {
+                set_status(
+                    state,
+                    "The operating-system time zone changed, but the locality metadata could not be updated on disk.",
+                    true);
             }
-            state->updating_controls = false;
         }
+
+        if (policy_reloaded &&
+            state->location_follows_timezone_reference &&
+            state->regional_context.has_reference_coordinates) {
+            const InfiltratrTemporalPolicyV3 *policy =
+                ss_date_time_model_policy(&state->model);
+            const bool already_matches =
+                policy != NULL &&
+                policy->location_configured &&
+                ss_linux_date_time_location_coordinate_close(
+                    policy->latitude,
+                    state->regional_context.reference_latitude) &&
+                ss_linux_date_time_location_coordinate_close(
+                    policy->longitude,
+                    state->regional_context.reference_longitude);
+
+            if (!already_matches &&
+                !ss_date_time_model_set_location(
+                    &state->model,
+                    true,
+                    state->regional_context.reference_latitude,
+                    state->regional_context.reference_longitude)) {
+                set_status(
+                    state,
+                    "The system time zone changed, but its reference coordinates could not be persisted to the temporal policy.",
+                    true);
+            } else {
+                state->updating_controls = true;
+                gtk_spin_button_set_value(
+                    state->latitude,
+                    state->regional_context.reference_latitude);
+                gtk_spin_button_set_value(
+                    state->longitude,
+                    state->regional_context.reference_longitude);
+                if (state->location_search != NULL &&
+                    state->regional_context.timezone_city[0] != '\0') {
+                    gtk_editable_set_text(
+                        GTK_EDITABLE(state->location_search),
+                        state->regional_context.timezone_city);
+                }
+                state->updating_controls = false;
+            }
+        }
+
+        ss_location_metadata_transaction_end();
+    } else if (timezone_changed ||
+               state->location_follows_timezone_reference) {
+        set_status(
+            state,
+            "The system time changed, but the locality transaction lock could not be acquired.",
+            true);
     }
 
     sync_system_time_controls(state);

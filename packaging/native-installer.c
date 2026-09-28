@@ -525,10 +525,11 @@ int main(int argc, char **argv)
 
     {
         char c_flags_argument[PATH_MAX + 160U];
+        char build_profile_argument[64];
         char *configure_argv[] = {
             "cmake", "-S", work, "-B", build,
             "-DCMAKE_BUILD_TYPE=Release",
-            "-DSYSTEM_SETTINGS_BUILD_PROFILE=native",
+            build_profile_argument,
             "-DBUILD_TESTING=ON",
             c_flags_argument,
             NULL
@@ -545,6 +546,10 @@ int main(int argc, char **argv)
 
         if (use_pgo) {
             if (snprintf(
+                    build_profile_argument,
+                    sizeof(build_profile_argument),
+                    "-DSYSTEM_SETTINGS_BUILD_PROFILE=development") <= 0 ||
+                snprintf(
                     c_flags_argument,
                     sizeof(c_flags_argument),
                     "-DCMAKE_C_FLAGS_RELEASE=%s",
@@ -558,6 +563,10 @@ int main(int argc, char **argv)
         }
 
         if (snprintf(
+                build_profile_argument,
+                sizeof(build_profile_argument),
+                "-DSYSTEM_SETTINGS_BUILD_PROFILE=native") <= 0 ||
+            snprintf(
                 c_flags_argument,
                 sizeof(c_flags_argument),
                 "-DCMAKE_C_FLAGS_RELEASE=%s",

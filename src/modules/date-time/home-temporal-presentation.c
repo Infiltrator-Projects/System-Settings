@@ -335,17 +335,17 @@ bool ss_home_temporal_presenter_format_now(
 guint ss_home_temporal_presenter_refresh_interval_ms(
     const SsHomeTemporalPresenter *presenter)
 {
-    if (presenter != NULL &&
-        presenter->policy_valid &&
-        presenter->policy.show_seconds &&
-        g_strcmp0(presenter->policy.clock_mode, "decimal") == 0) {
-        /*
-         * A French decimal second is 0.864 SI seconds. Four samples per SI
-         * second prevents visible skips without penalising ordinary clocks.
-         */
-        return 250U;
-    }
-    return 1000U;
+    /*
+     * Seconds-enabled extended clocks can advance displayed units at rates
+     * other than one SI second. Sample at 250 ms so decimal, Internet and
+     * sidereal-style displays cannot skip visible units; seconds-disabled
+     * presentation remains at the low-cost 1 Hz cadence.
+     */
+    return presenter != NULL &&
+           presenter->policy_valid &&
+           presenter->policy.show_seconds
+        ? 250U
+        : 1000U;
 }
 
 bool ss_home_temporal_presentation_now(

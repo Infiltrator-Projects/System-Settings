@@ -2,6 +2,19 @@
 
 # Changelog
 
+## 0.4.41 — 2026-09-28 — locality transaction and high-DPI correctness
+
+- Serialize the complete locality journal/policy/metadata transaction with a dedicated interprocess lock and make GUI and CLI coordinate writers use the same locality-before-policy lock order.
+- Reload authoritative temporal state after acquiring the locality lock before snapshotting rollback coordinates, preventing failed metadata publication from restoring another process's older location.
+- Treat post-commit journal unlink failure as cleanup debt rather than transaction failure, so a successfully published location.ini never triggers an incorrect policy rollback or prevents Date & Time from opening.
+- Recover interrupted locality publication when an already-open panel observes the matching external policy change instead of waiting for the panel to be reconstructed.
+- Compare persisted coordinates at their six-decimal storage precision instead of exact floating-point equality, eliminating false external-change notifications after System Settings saves its own location.
+- Refresh every visible seconds-enabled clock at 250 ms so decimal, Internet and sidereal-rate displays cannot skip visible units; seconds-disabled clocks remain at 1 Hz.
+- Clamp the initial window to 90% of logical monitor geometry and exercise the actual 1920x1080-at-2x 960x540 budget in CI.
+- Expose policy-vs-native compatibility verification through the persistence boundary and make system-settings-time return a distinct failure when the policy committed but Cinnamon compatibility synchronization did not.
+- Reject truncated Linux presentation.lock paths instead of silently locking the wrong pathname.
+- Make the About native identity enforceable: CMake now refuses a native profile unless GCC, -march=native, LTO and trained -fprofile-use flags are present; the PGO training pass identifies itself as development and only the final optimized pass becomes native.
+
 ## 0.4.40 — 2026-09-28 — cross-process and release-integrity hardening
 
 - Serialize temporal-policy read/modify/write transactions across processes on Linux and Windows. Setters now lock, reload the latest authoritative document, mutate one semantic field and publish atomically, preventing unrelated GUI/CLI edits from being lost.

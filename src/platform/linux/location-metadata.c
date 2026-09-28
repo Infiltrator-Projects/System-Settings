@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#define _POSIX_C_SOURCE 200809L
 /**
  * @file location-metadata.c
  * @brief Durable Linux persistence for user-selected locality metadata.
@@ -8,13 +9,20 @@
  * as one authoritative setting.
  */
 #include "system-settings/location-metadata.h"
+#include "system-settings/temporal-policy-store.h"
 
 #include <glib.h>
+#include <infiltratr/temporal.h>
 #include <glib/gstdio.h>
 
 #include <errno.h>
+#include <fcntl.h>
 #include <math.h>
 #include <string.h>
+#include <sys/file.h>
+#include <unistd.h>
+
+static int locality_transaction_lock_fd = -1;
 
 /* Resolve through GLib's XDG configuration directory contract. */
 char *ss_location_metadata_path_alloc(void)
@@ -35,6 +43,67 @@ static gchar *metadata_pending_path(void)
         "system-settings",
         "location.pending",
         NULL);
+}
+
+static gchar *metadata_directory_path(void)
+{
+    return g_build_filename(
+        g_get_user_config_dir(),
+        "infiltrator",
+        "system-settings",
+        NULL);
+}
+
+static gchar *metadata_lock_path(void)
+{
+    return g_build_filename(
+        g_get_user_config_dir(),
+        "infiltrator",
+        "system-settings",
+        "location.lock",
+        NULL);
+}
+
+bool ss_location_metadata_transaction_begin(void)
+{
+    g_autofree gchar *directory = metadata_directory_path();
+    g_autofree gchar *lock_path = metadata_lock_path();
+    int fd;
+
+    if (locality_transaction_lock_fd >= 0 ||
+        directory == NULL || lock_path == NULL) {
+        return false;
+    }
+    if (g_mkdir_with_parents(directory, 0700) != 0 && errno != EEXIST) {
+        return false;
+    }
+    if (g_chmod(directory, 0700) != 0) {
+        return false;
+    }
+
+    fd = open(lock_path, O_CREAT | O_RDWR | O_CLOEXEC, 0600);
+    if (fd < 0) {
+        return false;
+    }
+    while (flock(fd, LOCK_EX) != 0) {
+        if (errno != EINTR) {
+            (void)close(fd);
+            return false;
+        }
+    }
+
+    locality_transaction_lock_fd = fd;
+    return true;
+}
+
+void ss_location_metadata_transaction_end(void)
+{
+    if (locality_transaction_lock_fd < 0) {
+        return;
+    }
+    (void)flock(locality_transaction_lock_fd, LOCK_UN);
+    (void)close(locality_transaction_lock_fd);
+    locality_transaction_lock_fd = -1;
 }
 
 /* Validate fixed arrays before passing them to NUL-terminated GLib APIs. */
@@ -224,7 +293,12 @@ bool ss_location_metadata_finish_staged(void)
         return false;
     }
     if (g_remove(path) != 0 && errno != ENOENT) {
-        return false;
+        /*
+         * location.ini is already the durable committed metadata at this
+         * point. A stale journal is cleanup debt, not transaction failure:
+         * rolling the policy back now would recreate policy/metadata skew.
+         */
+        g_warning("Unable to remove committed locality transaction journal; cleanup will be retried.");
     }
     return true;
 }
@@ -235,16 +309,41 @@ bool ss_location_metadata_recover(
     double longitude)
 {
     SsLocationMetadata staged = {0};
-    g_autofree gchar *path = metadata_pending_path();
+    g_autofree gchar *path = NULL;
     double latitude_difference;
     double longitude_difference;
+    bool recovered = true;
 
+    if (!ss_location_metadata_transaction_begin()) {
+        return false;
+    }
+
+    /*
+     * The supplied coordinates may have been read before this process waited
+     * for the locality lock. Re-read the authoritative policy after acquiring
+     * the lock so recovery never decides against a stale pre-lock snapshot.
+     */
+    {
+        const SsTemporalPolicyStore *store =
+            ss_platform_temporal_policy_store();
+        InfiltratrTemporalPolicyV3 authoritative;
+        bool found = false;
+
+        if (store != NULL && store->load != NULL &&
+            store->load(&authoritative, &found) && found) {
+            location_configured = authoritative.location_configured;
+            latitude = authoritative.latitude;
+            longitude = authoritative.longitude;
+        }
+    }
+
+    path = metadata_pending_path();
     if (path == NULL || !g_file_test(path, G_FILE_TEST_EXISTS)) {
-        return true;
+        goto done;
     }
     if (!metadata_load_path(path, &staged)) {
         ss_location_metadata_discard_staged();
-        return true;
+        goto done;
     }
 
     latitude_difference = staged.latitude - latitude;
@@ -259,9 +358,13 @@ bool ss_location_metadata_recover(
     if (location_configured &&
         latitude_difference < 0.000001 &&
         longitude_difference < 0.000001) {
-        return ss_location_metadata_finish_staged();
+        recovered = ss_location_metadata_finish_staged();
+        goto done;
     }
 
     ss_location_metadata_discard_staged();
-    return true;
+
+done:
+    ss_location_metadata_transaction_end();
+    return recovered;
 }

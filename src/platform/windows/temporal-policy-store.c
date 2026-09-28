@@ -347,7 +347,8 @@ const SsTemporalPolicyStore *ss_platform_temporal_policy_store(void)
         .load = platform_load,
         .save = platform_save,
         .begin_update = begin_update,
-        .end_update = end_update
+        .end_update = end_update,
+        .compatibility_matches = NULL
     };
     return &store;
 }

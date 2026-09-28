@@ -1933,6 +1933,38 @@ static gboolean on_close_requested(GtkWindow *window, gpointer user_data)
     return FALSE;
 }
 
+static void set_adaptive_default_window_size(GtkWindow *window)
+{
+    int width = 1180;
+    int height = 760;
+    GdkDisplay *display;
+    GListModel *monitors;
+
+    if (window == NULL) {
+        return;
+    }
+
+    display = gtk_widget_get_display(GTK_WIDGET(window));
+    monitors = display != NULL ? gdk_display_get_monitors(display) : NULL;
+    if (monitors != NULL && g_list_model_get_n_items(monitors) > 0U) {
+        GdkMonitor *monitor =
+            GDK_MONITOR(g_list_model_get_item(monitors, 0U));
+        if (monitor != NULL) {
+            GdkRectangle geometry = {0};
+            gdk_monitor_get_geometry(monitor, &geometry);
+            if (geometry.width > 0) {
+                width = MIN(width, MAX(1, geometry.width * 9 / 10));
+            }
+            if (geometry.height > 0) {
+                height = MIN(height, MAX(1, geometry.height * 9 / 10));
+            }
+            g_object_unref(monitor);
+        }
+    }
+
+    gtk_window_set_default_size(window, width, height);
+}
+
 static void on_activate(GtkApplication *application, gpointer user_data)
 {
     const InfiltratrProjectInfo *info = ss_project_info();
@@ -1960,7 +1992,7 @@ static void on_activate(GtkApplication *application, gpointer user_data)
     window = GTK_WINDOW(
         gtk_application_window_new(application));
     gtk_window_set_title(window, info->program_name);
-    gtk_window_set_default_size(window, 1180, 760);
+    set_adaptive_default_window_size(window);
     gtk_window_set_resizable(window, TRUE);
     g_signal_connect(
         window, "close-request",
