@@ -198,18 +198,6 @@ void on_location_result_activated(
     previous_policy = *policy;
     previous_metadata = state->location_metadata;
 
-    if (!ss_date_time_model_set_location(
-            &state->model,
-            true,
-            result->latitude,
-            result->longitude)) {
-        ss_linux_date_time_panel_set_status(
-            state,
-            "Could not save the selected geographic location.",
-            true);
-        return;
-    }
-
     memset(
         &state->location_metadata,
         0,
@@ -245,12 +233,42 @@ void on_location_result_activated(
     }
 
     /*
+     * Journal metadata before publishing coordinates. If the process dies
+     * after the policy commit but before metadata publication, startup can
+     * finish the exact staged record rather than exposing a mismatched pair.
+     */
+    if (!ss_location_metadata_stage(&state->location_metadata)) {
+        state->location_metadata = previous_metadata;
+        state->location_metadata_present = previous_metadata_present;
+        ss_linux_date_time_panel_set_status(
+            state,
+            "Could not stage the selected locality metadata.",
+            true);
+        return;
+    }
+
+    if (!ss_date_time_model_set_location(
+            &state->model,
+            true,
+            result->latitude,
+            result->longitude)) {
+        ss_location_metadata_discard_staged();
+        state->location_metadata = previous_metadata;
+        state->location_metadata_present = previous_metadata_present;
+        ss_linux_date_time_panel_set_status(
+            state,
+            "Could not save the selected geographic location.",
+            true);
+        return;
+    }
+
+    /*
      * zone.tab coordinates are representative points, not zone polygons.
      * Persist only the authoritative timedated value above; this inference is
      * user guidance and never an implicit system-time mutation.
      */
     state->location_metadata_present =
-        ss_location_metadata_save(&state->location_metadata);
+        ss_location_metadata_finish_staged();
     if (!state->location_metadata_present) {
         const bool restored = ss_date_time_model_set_location(
             &state->model,
@@ -261,6 +279,9 @@ void on_location_result_activated(
             ? true
             : ss_date_time_model_reload(&state->model);
 
+        if (restored) {
+            ss_location_metadata_discard_staged();
+        }
         state->location_metadata = previous_metadata;
         state->location_metadata_present = previous_metadata_present;
         if (!previous_metadata_present) {
@@ -485,16 +506,6 @@ static gboolean commit_location_coordinates(gpointer user_data)
     previous_metadata = state->location_metadata;
     previous_metadata_present = state->location_metadata_present;
 
-    if (!ss_date_time_model_set_location(
-            &state->model, true, latitude, longitude)) {
-        ss_linux_date_time_panel_set_status(
-            state,
-            "Could not save custom geographic coordinates.",
-            true);
-        ss_linux_date_time_panel_sync_controls(state);
-        return G_SOURCE_REMOVE;
-    }
-
     memset(
         &state->location_metadata,
         0,
@@ -518,8 +529,32 @@ static gboolean commit_location_coordinates(gpointer user_data)
         }
     }
 
+    if (!ss_location_metadata_stage(&state->location_metadata)) {
+        state->location_metadata = previous_metadata;
+        state->location_metadata_present = previous_metadata_present;
+        ss_linux_date_time_panel_set_status(
+            state,
+            "Could not stage custom geographic coordinates.",
+            true);
+        ss_linux_date_time_panel_sync_controls(state);
+        return G_SOURCE_REMOVE;
+    }
+
+    if (!ss_date_time_model_set_location(
+            &state->model, true, latitude, longitude)) {
+        ss_location_metadata_discard_staged();
+        state->location_metadata = previous_metadata;
+        state->location_metadata_present = previous_metadata_present;
+        ss_linux_date_time_panel_set_status(
+            state,
+            "Could not save custom geographic coordinates.",
+            true);
+        ss_linux_date_time_panel_sync_controls(state);
+        return G_SOURCE_REMOVE;
+    }
+
     state->location_metadata_present =
-        ss_location_metadata_save(&state->location_metadata);
+        ss_location_metadata_finish_staged();
     if (!state->location_metadata_present) {
         const bool restored = ss_date_time_model_set_location(
             &state->model,
@@ -530,6 +565,9 @@ static gboolean commit_location_coordinates(gpointer user_data)
             ? true
             : ss_date_time_model_reload(&state->model);
 
+        if (restored) {
+            ss_location_metadata_discard_staged();
+        }
         state->location_metadata = previous_metadata;
         state->location_metadata_present = previous_metadata_present;
         if (!previous_metadata_present) {
