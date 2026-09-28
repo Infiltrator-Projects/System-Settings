@@ -355,6 +355,16 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     gtk_entry_set_placeholder_text(
         state->location_search,
         "Town, suburb, city or place");
+    gtk_accessible_update_property(
+        GTK_ACCESSIBLE(state->location_search),
+        GTK_ACCESSIBLE_PROPERTY_LABEL,
+        "Locality search",
+        -1);
+    gtk_accessible_update_property(
+        GTK_ACCESSIBLE(state->location_search_button),
+        GTK_ACCESSIBLE_PROPERTY_LABEL,
+        "Search for locality",
+        -1);
     gtk_widget_set_hexpand(GTK_WIDGET(state->location_search), TRUE);
     gtk_widget_add_css_class(
         GTK_WIDGET(state->location_search), "setting-entry");
@@ -407,6 +417,16 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     gtk_widget_add_css_class(GTK_WIDGET(state->longitude), "setting-spin");
     gtk_spin_button_set_digits(state->latitude, 4U);
     gtk_spin_button_set_digits(state->longitude, 4U);
+    gtk_accessible_update_property(
+        GTK_ACCESSIBLE(state->latitude),
+        GTK_ACCESSIBLE_PROPERTY_LABEL,
+        "Latitude",
+        -1);
+    gtk_accessible_update_property(
+        GTK_ACCESSIBLE(state->longitude),
+        GTK_ACCESSIBLE_PROPERTY_LABEL,
+        "Longitude",
+        -1);
     gtk_widget_set_size_request(GTK_WIDGET(state->latitude), 130, -1);
     gtk_widget_set_size_request(GTK_WIDGET(state->longitude), 130, -1);
 
@@ -563,6 +583,21 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     gtk_entry_set_placeholder_text(state->manual_time, "Clock time");
     gtk_entry_set_max_length(state->manual_date, 10);
     gtk_entry_set_max_length(state->manual_time, 24);
+    gtk_accessible_update_property(
+        GTK_ACCESSIBLE(state->manual_date),
+        GTK_ACCESSIBLE_PROPERTY_LABEL,
+        "Manual date",
+        -1);
+    gtk_accessible_update_property(
+        GTK_ACCESSIBLE(state->manual_time),
+        GTK_ACCESSIBLE_PROPERTY_LABEL,
+        "Manual time",
+        -1);
+    gtk_accessible_update_property(
+        GTK_ACCESSIBLE(state->manual_set_time),
+        GTK_ACCESSIBLE_PROPERTY_LABEL,
+        "Set operating-system date and time",
+        -1);
     gtk_widget_set_size_request(GTK_WIDGET(state->manual_date), 108, -1);
     gtk_widget_set_size_request(GTK_WIDGET(state->manual_time), 128, -1);
     gtk_widget_add_css_class(GTK_WIDGET(state->manual_date), "setting-entry");
@@ -590,11 +625,12 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
 
     state->status_label = ss_linux_ui_make_label("", "status-ok");
     gtk_label_set_wrap(GTK_LABEL(state->status_label), TRUE);
-    gtk_box_append(GTK_BOX(system_card), state->status_label);
+    gtk_widget_add_css_class(state->status_label, "page-status");
 
     gtk_flow_box_insert(GTK_FLOW_BOX(lower), presentation_card, -1);
     gtk_flow_box_insert(GTK_FLOW_BOX(lower), system_card, -1);
     gtk_box_append(GTK_BOX(page), lower);
+    gtk_box_append(GTK_BOX(page), state->status_label);
 
     g_signal_connect(
         state->clock_mode, "notify::selected",
