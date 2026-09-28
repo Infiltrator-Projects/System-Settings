@@ -14,16 +14,57 @@
 /*
  * Persist-before-publish is the central model invariant. A failed write must
  * never make an uncommitted value visible through ss_date_time_model_policy().
+ *
+ * Stores that provide update locking get a stronger invariant: each setter
+ * acquires the cross-process lock, reloads the latest complete policy, changes
+ * only its own field, then publishes. Two processes editing unrelated fields
+ * therefore merge instead of silently replacing one another's fresh changes.
  */
-static bool save_candidate(SsDateTimeModel *model,
-                           const InfiltratrTemporalPolicyV3 *candidate)
+static bool begin_candidate(SsDateTimeModel *model,
+                            InfiltratrTemporalPolicyV3 *candidate)
 {
+    bool found = false;
+
     if (model == NULL || candidate == NULL ||
         model->store == NULL || model->store->save == NULL || model->saving) {
         return false;
     }
+
     model->saving = true;
-    const bool saved = model->store->save(candidate);
+    if (model->store->begin_update != NULL) {
+        if (!model->store->begin_update()) {
+            model->saving = false;
+            return false;
+        }
+        if (model->store->load == NULL ||
+            !model->store->load(candidate, &found)) {
+            if (model->store->end_update != NULL) {
+                model->store->end_update();
+            }
+            model->saving = false;
+            return false;
+        }
+    } else {
+        *candidate = model->policy;
+    }
+    return true;
+}
+
+static bool save_candidate(SsDateTimeModel *model,
+                           const InfiltratrTemporalPolicyV3 *candidate)
+{
+    bool saved;
+
+    if (model == NULL || candidate == NULL || !model->saving ||
+        model->store == NULL || model->store->save == NULL) {
+        return false;
+    }
+
+    saved = model->store->save(candidate);
+    if (model->store->begin_update != NULL &&
+        model->store->end_update != NULL) {
+        model->store->end_update();
+    }
     model->saving = false;
     if (!saved) {
         return false;
@@ -82,7 +123,9 @@ bool ss_date_time_model_set_clock_mode(SsDateTimeModel *model,
         return false;
     }
 
-    candidate = model->policy;
+    if (!begin_candidate(model, &candidate)) {
+        return false;
+    }
     infiltratr_copy_string(candidate.clock_mode,
                            sizeof(candidate.clock_mode),
                            info->id);
@@ -103,7 +146,9 @@ bool ss_date_time_model_set_calendar(SsDateTimeModel *model,
         return false;
     }
 
-    candidate = model->policy;
+    if (!begin_candidate(model, &candidate)) {
+        return false;
+    }
     infiltratr_copy_string(candidate.calendar,
                            sizeof(candidate.calendar),
                            info->id);
@@ -118,7 +163,9 @@ bool ss_date_time_model_set_show_seconds(SsDateTimeModel *model,
     if (model == NULL) {
         return false;
     }
-    candidate = model->policy;
+    if (!begin_candidate(model, &candidate)) {
+        return false;
+    }
     candidate.show_seconds = show_seconds;
     return save_candidate(model, &candidate);
 }
@@ -135,7 +182,9 @@ bool ss_date_time_model_set_location(SsDateTimeModel *model,
         longitude < -180.0 || longitude > 180.0) {
         return false;
     }
-    candidate = model->policy;
+    if (!begin_candidate(model, &candidate)) {
+        return false;
+    }
     candidate.location_configured = configured;
     candidate.latitude = latitude;
     candidate.longitude = longitude;
