@@ -1406,6 +1406,9 @@ static const char *network_connectivity_text(GNetworkConnectivity connectivity)
 #ifndef SYSTEM_SETTINGS_UI_ASSET_DIR
 #define SYSTEM_SETTINGS_UI_ASSET_DIR "/usr/share/infiltrator/system-settings/ui"
 #endif
+#ifndef SYSTEM_SETTINGS_UI_SOURCE_DIR
+#define SYSTEM_SETTINGS_UI_SOURCE_DIR ""
+#endif
 
 static GtkWidget *make_ui_asset_picture(const char *filename,
                                         int width,
@@ -1418,12 +1421,22 @@ static GtkWidget *make_ui_asset_picture(const char *filename,
     if (filename == NULL || filename[0] == '\0') {
         return NULL;
     }
-    const char *asset_dir =
+    const char *override_dir =
         g_getenv("SYSTEM_SETTINGS_UI_ASSET_DIR_OVERRIDE");
-    if (asset_dir == NULL || asset_dir[0] == '\0') {
-        asset_dir = SYSTEM_SETTINGS_UI_ASSET_DIR;
-    }
+    const bool override_active =
+        override_dir != NULL && override_dir[0] != '\0';
+    const char *asset_dir = override_active
+        ? override_dir
+        : SYSTEM_SETTINGS_UI_ASSET_DIR;
+
     path = g_build_filename(asset_dir, filename, NULL);
+    if (!g_file_test(path, G_FILE_TEST_IS_REGULAR) &&
+        !override_active &&
+        SYSTEM_SETTINGS_UI_SOURCE_DIR[0] != '\0') {
+        g_clear_pointer(&path, g_free);
+        path = g_build_filename(
+            SYSTEM_SETTINGS_UI_SOURCE_DIR, filename, NULL);
+    }
     if (!g_file_test(path, G_FILE_TEST_IS_REGULAR)) {
         return NULL;
     }
