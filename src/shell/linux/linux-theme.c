@@ -14,6 +14,7 @@
 
 static GtkCssProvider *common_theme_provider;
 static bool common_theme_watch_installed;
+static unsigned int common_theme_generation;
 
 static gchar *rgb_css(uint32_t rgb)
 {
@@ -394,6 +395,7 @@ void ss_linux_theme_install(void)
         display,
         GTK_STYLE_PROVIDER(common_theme_provider),
         GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+    ++common_theme_generation;
 
     g_object_unref(provider);
     g_string_free(css, TRUE);
@@ -424,6 +426,11 @@ static void on_system_theme_changed(
     gpointer user_data G_GNUC_UNUSED)
 {
     ss_linux_theme_install();
+}
+
+unsigned int ss_linux_theme_generation(void)
+{
+    return common_theme_generation;
 }
 
 void ss_linux_theme_watch(void)
