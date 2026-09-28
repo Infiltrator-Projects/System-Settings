@@ -233,6 +233,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         src/modules/date-time/home-temporal-presentation.c
         src/modules/date-time/policy-file-observer.c
         src/modules/date-time/linux-date-time-panel.c
+        src/modules/date-time/linux-date-time-location.c
         src/modules/date-time/linux-date-time-panel-ui.c
         src/platform/linux/location-search.c)
     ss_configure(system-settings-date-time-linux)
