@@ -192,6 +192,7 @@ Environment testing on a supported Mint/Cinnamon system must additionally prove:
 - native 12/24-hour, panel-date, seconds and first-day-of-week settings agree with Cinnamon when changed from either interface;
 - a locality query such as `Mooroopna` returns selectable named results when the geocoding service is reachable;
 - selecting a locality publishes its coordinates to the temporal policy without pretending that the locality name is an operating-system time-zone identifier;
+- a nearest-zone result derived from tzdata representative points is advisory only and does not change or persist the operating-system zone until the user explicitly chooses that zone;
 - closing the window or issuing a second search while a geocode request is outstanding cannot update destroyed/stale UI.
 
 The Mint GTK3 map is presentation, not authority. Functional replacement does not require embedding that widget in the GTK4 shell; it requires preserving or improving every underlying system operation it exposed.
@@ -260,7 +261,7 @@ A release commit must:
 
 ## Implemented audit regressions (2026-09-25)
 
-CTest contains eleven project tests on Linux with Xvfb available. Added checks
+CTest contains thirteen project tests on Linux with Xvfb available. Added checks
 exercise private-bus service lifetime after caller release, timedated owner
 loss/reacquisition, actual shell activation/dropdown ownership/close with
 pending construction, and CLI transaction rollback on malformed arguments.
@@ -276,6 +277,7 @@ A passing fixture is not proof of those cases.
 Manual Gregorian time rejects GLib's normalisation of nonexistent DST wall
 times; repeated wall times use GLib's documented standard-time occurrence.
 
-The hosted CI jobs run while home runners are offline. Self-hosted runner use
-requires an explicit future routing change; a label alone provides no automatic
-fallback when a runner is offline.
+Non-release Linux build/package and sanitizer jobs prefer the labelled
+BigBedroom self-hosted runner. Release commits deliberately use hosted
+Ubuntu so immutable publication is independent of home-runner availability;
+Windows continues to use the hosted Windows runner.
