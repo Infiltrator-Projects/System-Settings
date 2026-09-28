@@ -575,18 +575,45 @@ int main(int argc, char **argv)
         char c_flags_argument[PATH_MAX + 160U];
         char build_profile_argument[64];
         char evidence_argument[PATH_MAX + 64U];
+        char common_tests_argument[64];
         char *configure_argv[] = {
             "cmake", "-S", work, "-B", build,
             "-DCMAKE_BUILD_TYPE=Release",
             build_profile_argument,
             "-DBUILD_TESTING=ON",
-            "-DINFILTRATR_COMMON_BUILD_TESTS=ON",
+            common_tests_argument,
             c_flags_argument,
             evidence_argument,
             NULL
         };
         char *build_argv[] = {
             "cmake", "--build", build, "--parallel", jobs, NULL
+        };
+        char *common_training_argv[] = {
+            "cmake", "--build", build, "--parallel", jobs, "--target",
+            "infiltratr-arithmetic-smoke",
+            "infiltratr-config-smoke",
+            "infiltratr-i18n-smoke",
+            "infiltratr-token-smoke",
+            "infiltratr-timing-smoke",
+            "infiltratr-temporal-smoke",
+            "infiltratr-graphics-smoke",
+            "infiltratr-escape-smoke",
+            "infiltratr-design-smoke",
+            "infiltratr-format-smoke",
+            "infiltratr-dynlib-smoke",
+            "infiltratr-portable-smoke",
+            "infiltratr-portable-contract",
+            "infiltratr-encoding-contract",
+            "infiltratr-completion-contract",
+            "infiltratr-shared-smoke",
+            "infiltratr-core-smoke",
+            "infiltratr-posix-contract",
+            "infiltratr-posix-path-smoke",
+            "infiltratr-posix-io-contract",
+            "infiltratr-posix-numeric-contract",
+            "infiltratr-temporal-posix-smoke",
+            NULL
         };
         char *test_argv[] = {
             "ctest", "--test-dir", build, "--output-on-failure", NULL
@@ -601,6 +628,10 @@ int main(int argc, char **argv)
                     sizeof(evidence_argument),
                     "-DSYSTEM_SETTINGS_NATIVE_PGO_EVIDENCE=") <= 0 ||
                 snprintf(
+                    common_tests_argument,
+                    sizeof(common_tests_argument),
+                    "-DINFILTRATR_COMMON_BUILD_TESTS=ON") <= 0 ||
+                snprintf(
                     build_profile_argument,
                     sizeof(build_profile_argument),
                     "-DSYSTEM_SETTINGS_BUILD_PROFILE=development") <= 0 ||
@@ -611,6 +642,7 @@ int main(int argc, char **argv)
                     generate_flags) <= 0 ||
                 run_command(NULL, configure_argv) != 0 ||
                 run_command(NULL, build_argv) != 0 ||
+                run_command(NULL, common_training_argv) != 0 ||
                 run_command(NULL, test_argv) != 0 ||
                 !write_training_evidence(pgo_evidence)) {
                 (void)remove_tree(work);
@@ -625,6 +657,10 @@ int main(int argc, char **argv)
             pgo_evidence);
         if (evidence_count <= 0 ||
             (size_t)evidence_count >= sizeof(evidence_argument) ||
+            snprintf(
+                common_tests_argument,
+                sizeof(common_tests_argument),
+                "-DINFILTRATR_COMMON_BUILD_TESTS=OFF") <= 0 ||
             snprintf(
                 build_profile_argument,
                 sizeof(build_profile_argument),
