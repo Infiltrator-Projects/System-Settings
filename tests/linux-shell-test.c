@@ -5,6 +5,7 @@ int ss_shell_entry(int argc, char **argv);
 #include "../src/shell/linux/main.c"
 #undef main
 #include "linux-date-time-panel-private.h"
+#include "system-settings/location-search.h"
 #include <glib/gstdio.h>
 
 static gboolean end_wait(gpointer data)
@@ -27,6 +28,8 @@ int main(void)
     g_assert_true(g_application_register(G_APPLICATION(app), NULL, NULL));
     for (int i = 0; i < 8; ++i) {
         on_activate(app, NULL);
+        while (g_main_context_iteration(NULL, FALSE)) {
+        }
         GtkWindow *window = gtk_application_get_active_window(app);
         g_assert_nonnull(window);
         g_object_ref(window);
@@ -56,6 +59,9 @@ int main(void)
         g_assert_true(GTK_IS_BUTTON(minimize));
         g_assert_true(GTK_IS_BUTTON(maximize));
         g_assert_true(GTK_IS_BUTTON(close));
+        g_assert_true(gtk_widget_get_focusable(minimize));
+        g_assert_true(gtk_widget_get_focusable(maximize));
+        g_assert_true(gtk_widget_get_focusable(close));
         g_assert_true(gtk_widget_get_first_child(header_end) == search);
         g_assert_true(gtk_widget_get_next_sibling(search) == minimize);
         g_assert_true(gtk_widget_get_next_sibling(minimize) == maximize);
@@ -79,6 +85,26 @@ int main(void)
         g_assert_nonnull(g_object_get_data(
             G_OBJECT(home_scroller),
             "system-settings-home-status-source"));
+
+        /*
+         * A 1024-wide desktop must be able to satisfy the shell's minimum
+         * allocation without horizontal scrolling. Home uses wrapping
+         * FlowBoxes and Date & Time starts its fast preview only while mapped.
+         */
+        int minimum_width = 0;
+        int natural_width = 0;
+        GtkWidget *window_child = gtk_window_get_child(window);
+        gtk_widget_measure(
+            window_child,
+            GTK_ORIENTATION_HORIZONTAL,
+            -1,
+            &minimum_width,
+            &natural_width,
+            NULL,
+            NULL);
+        g_assert_cmpint(minimum_width, <=, 1024);
+        g_assert_cmpuint(panel->timer_id, ==, 0U);
+
         guint navigation_rows = 0U;
         for (GtkWidget *row = gtk_widget_get_first_child(GTK_WIDGET(navigation));
              row != NULL;
@@ -95,12 +121,18 @@ int main(void)
             G_OBJECT(window), "system-settings-search-state");
         g_assert_nonnull(search_state);
         open_date_time(NULL, search_state);
+        while (g_main_context_iteration(NULL, FALSE)) {
+        }
         g_assert_cmpstr(
             gtk_stack_get_visible_child_name(stack), ==, "date-time");
         g_assert_true(
             gtk_list_box_get_selected_row(navigation) ==
             search_state->date_row);
+        g_assert_cmpuint(panel->timer_id, !=, 0U);
         gtk_stack_set_visible_child_name(stack, "home");
+        while (g_main_context_iteration(NULL, FALSE)) {
+        }
+        g_assert_cmpuint(panel->timer_id, ==, 0U);
         gtk_editable_set_text(GTK_EDITABLE(search), "theme");
         on_search_changed(GTK_SEARCH_ENTRY(search), search_state);
         g_assert_cmpstr(search_state->query, ==, "theme");
@@ -113,6 +145,50 @@ int main(void)
         g_assert_true(navigation_filter(appearance_row, search_state));
         gtk_editable_set_text(GTK_EDITABLE(search), "");
         on_search_changed(GTK_SEARCH_ENTRY(search), search_state);
+
+        if (i == 0) {
+            /*
+             * Locality-to-zone inference is advisory. With the system service
+             * deliberately unavailable, selecting Mooroopna must persist the
+             * locality but must not persist the nearest Melbourne zone as if
+             * the OS had accepted it.
+             */
+            GtkWidget *row = gtk_list_box_row_new();
+            SsLocationSearchResult *candidate =
+                g_new0(SsLocationSearchResult, 1);
+            g_strlcpy(
+                candidate->display_name,
+                "Mooroopna, Victoria, Australia",
+                sizeof(candidate->display_name));
+            g_strlcpy(
+                candidate->country_code,
+                "AU",
+                sizeof(candidate->country_code));
+            candidate->latitude = -36.3949;
+            candidate->longitude = 145.3610;
+            g_object_set_data_full(
+                G_OBJECT(row),
+                "ss-location-result",
+                candidate,
+                g_free);
+            g_object_ref_sink(row);
+            on_location_result_activated(
+                NULL, GTK_LIST_BOX_ROW(row), panel);
+
+            SsLocationMetadata metadata;
+            g_assert_true(ss_location_metadata_load(&metadata));
+            g_assert_cmpstr(metadata.timezone_id, ==, "");
+            g_assert_nonnull(strstr(
+                gtk_label_get_text(GTK_LABEL(panel->status_label)),
+                "Suggested time zone: Australia/Melbourne"));
+            g_assert_true(ss_date_time_model_set_location(
+                &panel->model, false, 0.0, 0.0));
+            g_autofree gchar *metadata_file = g_build_filename(
+                root, "infiltrator", "system-settings",
+                "location.ini", NULL);
+            g_assert_cmpint(g_remove(metadata_file), ==, 0);
+            g_object_unref(row);
+        }
 
         GtkWidget *missing_visual = make_visual_panel(
             "definitely-missing.png", 80, 40, "test-visual");
