@@ -16,6 +16,8 @@
 
 #define SS_POLICY_CAPACITY 1024U
 
+static HANDLE update_lock_file = INVALID_HANDLE_VALUE;
+
 /*
  * Resolve the supported per-user storage root through Known Folders rather
  * than assuming an environment variable or a fixed profile layout.
@@ -223,6 +225,82 @@ done:
     return ok;
 }
 
+static bool begin_update(void)
+{
+    wchar_t *directory = NULL;
+    wchar_t *path = NULL;
+    wchar_t *lock_path = NULL;
+    size_t path_length;
+    OVERLAPPED overlapped = {0};
+    bool ok = false;
+
+    if (update_lock_file != INVALID_HANDLE_VALUE ||
+        !build_paths(&directory, &path)) {
+        return false;
+    }
+
+    if (!CreateDirectoryW(directory, NULL) &&
+        GetLastError() != ERROR_ALREADY_EXISTS) {
+        goto done;
+    }
+
+    path_length = wcslen(path);
+    lock_path = (wchar_t *)calloc(path_length + 6U, sizeof(wchar_t));
+    if (lock_path == NULL) {
+        goto done;
+    }
+    memcpy(lock_path, path, path_length * sizeof(wchar_t));
+    memcpy(lock_path + path_length, L".lock", 6U * sizeof(wchar_t));
+
+    update_lock_file = CreateFileW(
+        lock_path,
+        GENERIC_READ | GENERIC_WRITE,
+        FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+        NULL,
+        OPEN_ALWAYS,
+        FILE_ATTRIBUTE_HIDDEN | FILE_ATTRIBUTE_NORMAL,
+        NULL);
+    if (update_lock_file == INVALID_HANDLE_VALUE) {
+        goto done;
+    }
+
+    if (!LockFileEx(
+            update_lock_file,
+            LOCKFILE_EXCLUSIVE_LOCK,
+            0U,
+            MAXDWORD,
+            MAXDWORD,
+            &overlapped)) {
+        CloseHandle(update_lock_file);
+        update_lock_file = INVALID_HANDLE_VALUE;
+        goto done;
+    }
+    ok = true;
+
+done:
+    free(lock_path);
+    free(directory);
+    free(path);
+    return ok;
+}
+
+static void end_update(void)
+{
+    OVERLAPPED overlapped = {0};
+
+    if (update_lock_file == INVALID_HANDLE_VALUE) {
+        return;
+    }
+    (void)UnlockFileEx(
+        update_lock_file,
+        0U,
+        MAXDWORD,
+        MAXDWORD,
+        &overlapped);
+    CloseHandle(update_lock_file);
+    update_lock_file = INVALID_HANDLE_VALUE;
+}
+
 static bool platform_load(InfiltratrTemporalPolicyV3 *policy,
                           bool *found)
 {
@@ -267,7 +345,9 @@ const SsTemporalPolicyStore *ss_platform_temporal_policy_store(void)
 {
     static const SsTemporalPolicyStore store = {
         .load = platform_load,
-        .save = platform_save
+        .save = platform_save,
+        .begin_update = begin_update,
+        .end_update = end_update
     };
     return &store;
 }
