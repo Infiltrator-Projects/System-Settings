@@ -293,12 +293,18 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     install(FILES modules/date-time.settings-module
         DESTINATION "${CMAKE_INSTALL_DATADIR}/infiltrator/system-settings/modules")
 
+    add_executable(system-settings-source-asset-builder
+        packaging/source-asset-builder.c)
+    ss_configure(system-settings-source-asset-builder)
+
     if(BUILD_TESTING)
         add_executable(system-settings-native-installer-test
             packaging/native-installer.c)
         ss_configure(system-settings-native-installer-test)
         add_test(NAME native-installer-help
             COMMAND system-settings-native-installer-test --help)
+        add_test(NAME source-asset-builder-help
+            COMMAND system-settings-source-asset-builder --help)
     endif()
 else()
     message(FATAL_ERROR "System Settings currently supports Windows policy tools and the Linux GUI.")
