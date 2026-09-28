@@ -22,6 +22,7 @@ mkdir "$work/source"
 git archive HEAD | tar -x -C "$work/source"
 mkdir -p "$work/source/$common"
 git -C "$common" archive "$pin" | tar -x -C "$work/source/$common"
+printf '%s\n' "$pin" > "$work/source/$common/.system-settings-common-commit"
 tar -czf "$work/source.tar.gz" -C "$work/source" .
 
 cc -std=c11 -O2 -Wall -Wextra -Wpedantic -Werror \
