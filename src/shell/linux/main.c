@@ -222,16 +222,28 @@ static GtkWidget *make_navigation_row(const char *icon_name,
     GtkWidget *icon = gtk_image_new_from_icon_name(icon_name);
     GtkWidget *copy = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
 
+    GtkWidget *primary =
+        ss_linux_ui_make_label(title, "nav-primary");
+    GtkWidget *secondary =
+        ss_linux_ui_make_label(subtitle, "nav-secondary");
+
     gtk_widget_add_css_class(icon_wrap, "nav-icon-well");
     gtk_image_set_pixel_size(GTK_IMAGE(icon), 27);
     gtk_box_append(GTK_BOX(icon_wrap), icon);
     gtk_box_append(GTK_BOX(box), icon_wrap);
-    gtk_box_append(
-        GTK_BOX(copy),
-        ss_linux_ui_make_label(title, "nav-primary"));
-    gtk_box_append(
-        GTK_BOX(copy),
-        ss_linux_ui_make_label(subtitle, "nav-secondary"));
+
+    /*
+     * Navigation copy must never force the sidebar wider than the logical
+     * desktop budget. Ellipsising only affects unusually narrow windows; the
+     * full text remains available to accessibility and search metadata.
+     */
+    gtk_label_set_ellipsize(GTK_LABEL(primary), PANGO_ELLIPSIZE_END);
+    gtk_label_set_ellipsize(GTK_LABEL(secondary), PANGO_ELLIPSIZE_END);
+    gtk_label_set_max_width_chars(GTK_LABEL(primary), 20);
+    gtk_label_set_max_width_chars(GTK_LABEL(secondary), 22);
+    gtk_widget_set_hexpand(copy, TRUE);
+    gtk_box_append(GTK_BOX(copy), primary);
+    gtk_box_append(GTK_BOX(copy), secondary);
     gtk_box_append(GTK_BOX(box), copy);
     gtk_widget_add_css_class(row, "nav-row");
     gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), box);

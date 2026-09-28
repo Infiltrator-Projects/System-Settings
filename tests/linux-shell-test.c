@@ -194,8 +194,37 @@ int main(void)
             desktop_budget_width);
         gtk_window_get_default_size(
             window, &default_width, &default_height);
-        g_assert_cmpint(default_width, <=, desktop_budget_width);
-        g_assert_cmpint(default_height, <=, desktop_budget_height);
+        if (scale2) {
+            /*
+             * This exact regression represents a 1920x1080 desktop at 2x
+             * scaling, so its logical default must fit inside 960x540.
+             */
+            g_assert_cmpint(default_width, <=, 960);
+            g_assert_cmpint(default_height, <=, 540);
+        } else {
+            GdkDisplay *display =
+                gtk_widget_get_display(GTK_WIDGET(window));
+            GListModel *monitors =
+                display != NULL
+                    ? gdk_display_get_monitors(display)
+                    : NULL;
+            g_assert_nonnull(monitors);
+            g_assert_cmpuint(g_list_model_get_n_items(monitors), >, 0U);
+            GdkMonitor *monitor =
+                GDK_MONITOR(g_list_model_get_item(monitors, 0U));
+            GdkRectangle geometry = {0};
+            g_assert_nonnull(monitor);
+            gdk_monitor_get_geometry(monitor, &geometry);
+            g_assert_cmpint(
+                default_width,
+                <=,
+                MIN(1180, MAX(1, geometry.width * 9 / 10)));
+            g_assert_cmpint(
+                default_height,
+                <=,
+                MIN(760, MAX(1, geometry.height * 9 / 10)));
+            g_object_unref(monitor);
+        }
 
         int minimum_height = 0;
         int natural_height = 0;
