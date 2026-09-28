@@ -60,6 +60,7 @@ jobs:
           mkdir -p src/vendor/infiltratr-common
           curl -fsSL https://github.com/Infiltrator-Projects/Infiltrator-Libraries/archive/7cc5de3de0e94ed2cfcff0840bbb5346eb5c9c9f.tar.gz |
             tar -xz --strip-components=1 -C src/vendor/infiltratr-common
+          printf '%s\n' 7cc5de3de0e94ed2cfcff0840bbb5346eb5c9c9f > src/vendor/infiltratr-common/.system-settings-common-commit
 
       - name: Check out source and Common on hosted Linux
         if: runner.environment == 'github-hosted'
@@ -175,6 +176,7 @@ jobs:
           mkdir -p src/vendor/infiltratr-common
           curl -fsSL https://github.com/Infiltrator-Projects/Infiltrator-Libraries/archive/7cc5de3de0e94ed2cfcff0840bbb5346eb5c9c9f.tar.gz |
             tar -xz --strip-components=1 -C src/vendor/infiltratr-common
+          printf '%s\n' 7cc5de3de0e94ed2cfcff0840bbb5346eb5c9c9f > src/vendor/infiltratr-common/.system-settings-common-commit
 
       - name: Check out source and Common on hosted Linux
         if: runner.environment == 'github-hosted'
