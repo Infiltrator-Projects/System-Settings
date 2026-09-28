@@ -16,7 +16,6 @@
 #include "system-settings/cinnamon-interface.h"
 #include "system-settings/date-time-model.h"
 #include "system-settings/location-metadata.h"
-#include "system-settings/location-search.h"
 #include "system-settings/manual-time.h"
 #include "system-settings/native-clock-policy.h"
 #include "system-settings/regional-context.h"
@@ -30,11 +29,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-
-typedef struct LocationSearchUiRequest {
-    GtkWindow *window;
-    guint generation;
-} LocationSearchUiRequest;
 
 typedef enum SsSystemTimeOperation {
     SS_SYSTEM_TIME_OPERATION_TIMEZONE,
@@ -63,6 +57,14 @@ static void set_status(SsLinuxDateTimePanel *state,
     gtk_widget_remove_css_class(state->status_label, "error");
     gtk_widget_add_css_class(state->status_label,
                              error ? "error" : "status-ok");
+}
+
+void ss_linux_date_time_panel_set_status(
+    SsLinuxDateTimePanel *state,
+    const char *message,
+    bool error)
+{
+    set_status(state, message, error);
 }
 
 /*
@@ -94,14 +96,6 @@ static gchar *temporal_policy_path(void)
         NULL);
 }
 
-static void cancel_coordinate_commit(SsLinuxDateTimePanel *state)
-{
-    if (state != NULL && state->coordinate_commit_id != 0U) {
-        g_source_remove(state->coordinate_commit_id);
-        state->coordinate_commit_id = 0U;
-    }
-}
-
 static bool temporal_policy_equal(
     const InfiltratrTemporalPolicyV3 *left,
     const InfiltratrTemporalPolicyV3 *right)
@@ -125,7 +119,7 @@ static void policy_file_changed(gpointer user_data)
     }
 
     previous = state->model.policy;
-    cancel_coordinate_commit(state);
+    ss_linux_date_time_location_cancel_coordinate_commit(state);
     if (ss_date_time_model_reload(&state->model)) {
         const bool changed =
             !temporal_policy_equal(&previous, &state->model.policy);
@@ -144,43 +138,6 @@ static void policy_file_changed(gpointer user_data)
             "The temporal policy changed externally but could not be reloaded; the last committed in-memory policy is still active.",
             true);
     }
-}
-
-static bool coordinate_close(double left, double right)
-{
-    double difference = left - right;
-
-    if (difference < 0.0) {
-        difference = -difference;
-    }
-    return difference < 0.000001;
-}
-
-static bool location_metadata_matches_policy(
-    const SsLinuxDateTimePanel *state,
-    const InfiltratrTemporalPolicyV3 *policy)
-{
-    return state != NULL &&
-           policy != NULL &&
-           policy->location_configured &&
-           state->location_metadata_present &&
-           coordinate_close(
-               policy->latitude, state->location_metadata.latitude) &&
-           coordinate_close(
-               policy->longitude, state->location_metadata.longitude);
-}
-
-static gchar *format_coordinate_pair(double latitude, double longitude)
-{
-    const double latitude_magnitude =
-        latitude < 0.0 ? -latitude : latitude;
-    const double longitude_magnitude =
-        longitude < 0.0 ? -longitude : longitude;
-
-    return g_strdup_printf(
-        "%.4f° %c, %.4f° %c",
-        latitude_magnitude, latitude < 0.0 ? 'S' : 'N',
-        longitude_magnitude, longitude < 0.0 ? 'W' : 'E');
 }
 
 static guint timezone_index_for_id(
@@ -224,57 +181,6 @@ static int first_day_value(guint index)
         return 1;
     }
     return 7;
-}
-
-static void update_location_summary(SsLinuxDateTimePanel *state)
-{
-    const InfiltratrTemporalPolicyV3 *policy;
-    g_autofree gchar *coordinates = NULL;
-    g_autofree gchar *summary = NULL;
-
-    if (state == NULL || state->location_summary == NULL) {
-        return;
-    }
-
-    policy = ss_date_time_model_policy(&state->model);
-    if (policy == NULL) {
-        return;
-    }
-
-    if (policy->location_configured) {
-        coordinates = format_coordinate_pair(
-            policy->latitude, policy->longitude);
-        if (location_metadata_matches_policy(state, policy) &&
-            state->location_metadata.display_name[0] != '\0') {
-            summary = g_strdup_printf(
-                "%s • %s",
-                state->location_metadata.display_name,
-                coordinates);
-        } else {
-            summary = g_strdup_printf(
-                "Selected geographic coordinates • %s",
-                coordinates);
-        }
-    } else if (state->regional_context.has_reference_coordinates) {
-        const char *city =
-            state->regional_context.timezone_city[0] != '\0'
-                ? state->regional_context.timezone_city
-                : state->regional_context.timezone_id;
-        coordinates = format_coordinate_pair(
-            state->regional_context.reference_latitude,
-            state->regional_context.reference_longitude);
-        summary = g_strdup_printf(
-            "%s is the current approximation from system time zone %s • %s. "
-            "Search for your actual locality to refine it.",
-            city,
-            state->regional_context.timezone_id,
-            coordinates);
-    } else {
-        summary = g_strdup(
-            "Search for a locality to establish geographic coordinates.");
-    }
-
-    gtk_label_set_text(GTK_LABEL(state->location_summary), summary);
 }
 
 static void sync_native_format_controls(SsLinuxDateTimePanel *state)
@@ -331,27 +237,6 @@ static bool manual_representation_supported(
     return policy != NULL &&
            strcmp(policy->calendar, "gregorian") == 0 &&
            ss_manual_time_mode_supported(policy->clock_mode);
-}
-
-static bool location_policy_matches_reference(
-    const SsLinuxDateTimePanel *state)
-{
-    const InfiltratrTemporalPolicyV3 *policy;
-
-    if (state == NULL ||
-        !state->regional_context.has_reference_coordinates) {
-        return false;
-    }
-
-    policy = ss_date_time_model_policy(&state->model);
-    return policy != NULL &&
-           policy->location_configured &&
-           coordinate_close(
-               policy->latitude,
-               state->regional_context.reference_latitude) &&
-           coordinate_close(
-               policy->longitude,
-               state->regional_context.reference_longitude);
 }
 
 static void fill_manual_time_entries(SsLinuxDateTimePanel *state)
@@ -647,7 +532,7 @@ static void update_control_capabilities(SsLinuxDateTimePanel *state)
     gtk_widget_set_sensitive(GTK_WIDGET(state->latitude), TRUE);
     gtk_widget_set_sensitive(GTK_WIDGET(state->longitude), TRUE);
 
-    update_location_summary(state);
+    ss_linux_date_time_location_update_summary(state);
     update_overview_policy(state);
     sync_native_format_controls(state);
     sync_system_time_controls(state);
@@ -885,7 +770,7 @@ static void sync_controls(SsLinuxDateTimePanel *state)
         gtk_spin_button_set_value(
             state->longitude, policy->longitude);
         if (state->location_search != NULL &&
-            location_metadata_matches_policy(state, policy)) {
+            ss_linux_date_time_location_metadata_matches_policy(state, policy)) {
             gtk_editable_set_text(
                 GTK_EDITABLE(state->location_search),
                 state->location_metadata.display_name);
@@ -906,6 +791,12 @@ static void sync_controls(SsLinuxDateTimePanel *state)
     }
     state->updating_controls = false;
     update_control_capabilities(state);
+}
+
+void ss_linux_date_time_panel_sync_controls(
+    SsLinuxDateTimePanel *state)
+{
+    sync_controls(state);
 }
 
 static void on_cinnamon_interface_changed(
@@ -988,6 +879,12 @@ static void policy_saved(SsLinuxDateTimePanel *state)
                false);
     update_control_capabilities(state);
     (void)refresh_preview(state);
+}
+
+void ss_linux_date_time_panel_policy_saved(
+    SsLinuxDateTimePanel *state)
+{
+    policy_saved(state);
 }
 
 void on_clock_changed(GObject *object,
@@ -1128,10 +1025,10 @@ static void system_time_changed(
         const bool already_matches =
             policy != NULL &&
             policy->location_configured &&
-            coordinate_close(
+            ss_linux_date_time_location_coordinate_close(
                 policy->latitude,
                 state->regional_context.reference_latitude) &&
-            coordinate_close(
+            ss_linux_date_time_location_coordinate_close(
                 policy->longitude,
                 state->regional_context.reference_longitude);
 
@@ -1164,7 +1061,7 @@ static void system_time_changed(
     }
 
     sync_system_time_controls(state);
-    update_location_summary(state);
+    ss_linux_date_time_location_update_summary(state);
     (void)refresh_preview(state);
 }
 
@@ -1292,7 +1189,7 @@ static void system_time_operation_complete(
             state->manual_dirty = false;
             (void)ss_regional_context_detect(&state->regional_context);
             sync_system_time_controls(state);
-            update_location_summary(state);
+            ss_linux_date_time_location_update_summary(state);
 
             if (request->operation == SS_SYSTEM_TIME_OPERATION_TIMEZONE &&
                 state->location_metadata_present) {
@@ -1594,426 +1491,6 @@ void on_first_day_changed(GObject *object G_GNUC_UNUSED,
     set_status(state, "First day of week updated.", false);
 }
 
-static void clear_location_results(SsLinuxDateTimePanel *state)
-{
-    GtkWidget *child;
-
-    if (state == NULL || state->location_results == NULL) {
-        return;
-    }
-
-    child = gtk_widget_get_first_child(
-        GTK_WIDGET(state->location_results));
-    while (child != NULL) {
-        GtkWidget *next = gtk_widget_get_next_sibling(child);
-        gtk_list_box_remove(state->location_results, child);
-        child = next;
-    }
-    gtk_widget_set_visible(
-        GTK_WIDGET(state->location_results), FALSE);
-}
-
-void on_location_result_activated(
-    GtkListBox *box G_GNUC_UNUSED,
-    GtkListBoxRow *row,
-    gpointer user_data)
-{
-    SsLinuxDateTimePanel *state = user_data;
-    const SsLocationSearchResult *result;
-    char timezone_id[SS_TIMEZONE_ID_CAPACITY] = {0};
-    const InfiltratrTemporalPolicyV3 *policy;
-    InfiltratrTemporalPolicyV3 previous_policy;
-    SsLocationMetadata previous_metadata;
-    const bool previous_metadata_present =
-        state != NULL ? state->location_metadata_present : false;
-    SsSystemTimeState current_system;
-
-    if (state == NULL || row == NULL) {
-        return;
-    }
-
-    result = g_object_get_data(
-        G_OBJECT(row), "ss-location-result");
-    if (result == NULL) {
-        return;
-    }
-
-    policy = ss_date_time_model_policy(&state->model);
-    if (policy == NULL) {
-        return;
-    }
-    previous_policy = *policy;
-    previous_metadata = state->location_metadata;
-
-    if (!ss_date_time_model_set_location(
-            &state->model,
-            true,
-            result->latitude,
-            result->longitude)) {
-        set_status(state, "Could not save the selected geographic location.", true);
-        return;
-    }
-
-    memset(&state->location_metadata, 0,
-           sizeof(state->location_metadata));
-    (void)g_strlcpy(
-        state->location_metadata.display_name,
-        result->display_name,
-        sizeof(state->location_metadata.display_name));
-    (void)g_strlcpy(
-        state->location_metadata.country_code,
-        result->country_code,
-        sizeof(state->location_metadata.country_code));
-    state->location_metadata.latitude = result->latitude;
-    state->location_metadata.longitude = result->longitude;
-    if (state->system_time_service != NULL &&
-        ss_system_time_service_read(
-            state->system_time_service, &current_system) &&
-        current_system.timezone[0] != '\0') {
-        (void)g_strlcpy(
-            state->location_metadata.timezone_id,
-            current_system.timezone,
-            sizeof(state->location_metadata.timezone_id));
-    }
-
-    if (result->country_code[0] != '\0') {
-        (void)ss_regional_context_nearest_timezone(
-            result->country_code,
-            result->latitude,
-            result->longitude,
-            timezone_id,
-            sizeof(timezone_id));
-    }
-
-    /*
-     * timezone_id is only a best-effort suggestion from tzdata representative
-     * points. Never persist it as authoritative metadata until timedated
-     * actually reports that zone.
-     */
-    state->location_metadata_present =
-        ss_location_metadata_save(&state->location_metadata);
-    if (!state->location_metadata_present) {
-        const bool restored = ss_date_time_model_set_location(
-            &state->model,
-            previous_policy.location_configured,
-            previous_policy.latitude,
-            previous_policy.longitude);
-        const bool reloaded = restored
-            ? true
-            : ss_date_time_model_reload(&state->model);
-        state->location_metadata = previous_metadata;
-        state->location_metadata_present = previous_metadata_present;
-        if (!previous_metadata_present) {
-            memset(
-                &state->location_metadata,
-                0,
-                sizeof(state->location_metadata));
-        }
-        set_status(
-            state,
-            restored
-                ? "The selected location could not be saved; the previous location and metadata were restored."
-                : (reloaded
-                    ? "The selected location could not be saved and rollback persistence failed; authoritative policy was reloaded and previous metadata restored."
-                    : "The selected location could not be saved, and neither rollback nor authoritative reload succeeded; previous metadata was restored in memory."),
-            true);
-        sync_controls(state);
-        return;
-    }
-    state->location_follows_timezone_reference = false;
-
-    state->updating_controls = true;
-    gtk_editable_set_text(
-        GTK_EDITABLE(state->location_search),
-        result->display_name);
-    gtk_spin_button_set_value(
-        state->latitude, result->latitude);
-    gtk_spin_button_set_value(
-        state->longitude, result->longitude);
-    state->updating_controls = false;
-    clear_location_results(state);
-
-    policy = ss_date_time_model_policy(&state->model);
-    if (policy != NULL) {
-        update_location_summary(state);
-    }
-    policy_saved(state);
-
-    if (timezone_id[0] != '\0') {
-        /*
-         * zone.tab coordinates are representative points, not time-zone
-         * polygons. A nearest-zone result is therefore advisory only. Never
-         * change the machine's authoritative zone without an explicit choice
-         * in the Time zone control.
-         */
-        g_autofree gchar *message = g_strdup_printf(
-            "Location saved. Suggested time zone: %s. Review and choose it explicitly from Time zone if appropriate; the operating-system time zone was not changed.",
-            timezone_id);
-        set_status(state, message, false);
-    }
-}
-
-static void location_search_request_free(
-    LocationSearchUiRequest *request)
-{
-    if (request == NULL) {
-        return;
-    }
-    g_clear_object(&request->window);
-    g_free(request);
-}
-
-static void location_search_complete(
-    GPtrArray *results,
-    const char *error_message,
-    gpointer user_data)
-{
-    LocationSearchUiRequest *request = user_data;
-    SsLinuxDateTimePanel *state;
-    size_t index;
-
-    if (request == NULL || request->window == NULL) {
-        if (results != NULL) {
-            g_ptr_array_unref(results);
-        }
-        location_search_request_free(request);
-        return;
-    }
-
-    state = g_object_get_data(
-        G_OBJECT(request->window), "system-settings-date-time-panel");
-    if (state == NULL ||
-        request->generation != state->location_search_generation) {
-        if (results != NULL) {
-            g_ptr_array_unref(results);
-        }
-        location_search_request_free(request);
-        return;
-    }
-
-    clear_location_results(state);
-    if (results == NULL || results->len == 0U) {
-        set_status(
-            state,
-            error_message != NULL
-                ? error_message
-                : "No matching locations were found.",
-            true);
-        if (results != NULL) {
-            g_ptr_array_unref(results);
-        }
-        location_search_request_free(request);
-        return;
-    }
-
-    for (index = 0U; index < results->len; ++index) {
-        const SsLocationSearchResult *item =
-            g_ptr_array_index(results, (guint)index);
-        SsLocationSearchResult *copy;
-        GtkWidget *row = gtk_list_box_row_new();
-        GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
-        GtkWidget *title;
-        GtkWidget *coordinates;
-        g_autofree gchar *coordinate_text = NULL;
-
-        if (item == NULL) {
-            continue;
-        }
-        copy = g_memdup2(item, sizeof(*item));
-        g_object_set_data_full(
-            G_OBJECT(row),
-            "ss-location-result",
-            copy,
-            g_free);
-
-        title = ss_linux_ui_make_label(item->display_name, "setting-label");
-        coordinate_text = format_coordinate_pair(
-            item->latitude, item->longitude);
-        coordinates = ss_linux_ui_make_label(
-            coordinate_text, "setting-description");
-        gtk_box_append(GTK_BOX(box), title);
-        gtk_box_append(GTK_BOX(box), coordinates);
-        gtk_widget_add_css_class(row, "location-result-row");
-        gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), box);
-        gtk_list_box_append(state->location_results, row);
-    }
-
-    gtk_widget_set_visible(
-        GTK_WIDGET(state->location_results), TRUE);
-    set_status(
-        state,
-        "Select the matching locality. Its coordinates will become the system geographic location; any nearest IANA time zone is advisory and must be chosen explicitly.",
-        false);
-
-    g_ptr_array_unref(results);
-    location_search_request_free(request);
-}
-
-static void begin_location_search(SsLinuxDateTimePanel *state)
-{
-    const char *query;
-
-    if (state == NULL || state->location_search == NULL) {
-        return;
-    }
-
-    query = gtk_editable_get_text(
-        GTK_EDITABLE(state->location_search));
-    if (query == NULL || query[0] == '\0') {
-        set_status(state, "Enter a locality or place name.", true);
-        return;
-    }
-
-    if (state->location_search_cancellable != NULL) {
-        g_cancellable_cancel(state->location_search_cancellable);
-        g_clear_object(&state->location_search_cancellable);
-    }
-    state->location_search_cancellable = g_cancellable_new();
-    state->location_search_generation++;
-
-    clear_location_results(state);
-    set_status(state, "Searching for matching localities…", false);
-    {
-        LocationSearchUiRequest *request =
-            g_new0(LocationSearchUiRequest, 1);
-        request->window = g_object_ref(state->window);
-        request->generation = state->location_search_generation;
-        ss_location_search_async(
-            query,
-            state->location_search_cancellable,
-            location_search_complete,
-            request);
-    }
-}
-
-void on_location_search_clicked(
-    GtkButton *button G_GNUC_UNUSED,
-    gpointer user_data)
-{
-    begin_location_search(user_data);
-}
-
-void on_location_search_activate(
-    GtkEntry *entry G_GNUC_UNUSED,
-    gpointer user_data)
-{
-    begin_location_search(user_data);
-}
-
-static gboolean commit_location_coordinates(gpointer user_data)
-{
-    SsLinuxDateTimePanel *state = user_data;
-    double latitude;
-    double longitude;
-    const InfiltratrTemporalPolicyV3 *policy;
-    InfiltratrTemporalPolicyV3 previous_policy;
-    SsLocationMetadata previous_metadata;
-    bool previous_metadata_present;
-
-    if (state == NULL) {
-        return G_SOURCE_REMOVE;
-    }
-    state->coordinate_commit_id = 0U;
-    if (state->updating_controls) {
-        return G_SOURCE_REMOVE;
-    }
-
-    latitude = gtk_spin_button_get_value(state->latitude);
-    longitude = gtk_spin_button_get_value(state->longitude);
-    policy = ss_date_time_model_policy(&state->model);
-    if (policy == NULL) {
-        return G_SOURCE_REMOVE;
-    }
-    previous_policy = *policy;
-    previous_metadata = state->location_metadata;
-    previous_metadata_present = state->location_metadata_present;
-
-    if (!ss_date_time_model_set_location(
-            &state->model, true, latitude, longitude)) {
-        set_status(state, "Could not save custom geographic coordinates.", true);
-        sync_controls(state);
-        return G_SOURCE_REMOVE;
-    }
-
-    memset(&state->location_metadata, 0,
-           sizeof(state->location_metadata));
-    (void)g_strlcpy(
-        state->location_metadata.display_name,
-        "Custom coordinates",
-        sizeof(state->location_metadata.display_name));
-    state->location_metadata.latitude = latitude;
-    state->location_metadata.longitude = longitude;
-    if (state->system_time_service != NULL) {
-        SsSystemTimeState current_system;
-        if (ss_system_time_service_read(
-                state->system_time_service, &current_system) &&
-            current_system.timezone[0] != '\0') {
-            (void)g_strlcpy(
-                state->location_metadata.timezone_id,
-                current_system.timezone,
-                sizeof(state->location_metadata.timezone_id));
-        }
-    }
-    state->location_metadata_present =
-        ss_location_metadata_save(&state->location_metadata);
-    if (!state->location_metadata_present) {
-        const bool restored = ss_date_time_model_set_location(
-            &state->model,
-            previous_policy.location_configured,
-            previous_policy.latitude,
-            previous_policy.longitude);
-        const bool reloaded = restored
-            ? true
-            : ss_date_time_model_reload(&state->model);
-        state->location_metadata = previous_metadata;
-        state->location_metadata_present = previous_metadata_present;
-        if (!previous_metadata_present) {
-            memset(
-                &state->location_metadata,
-                0,
-                sizeof(state->location_metadata));
-        }
-        set_status(
-            state,
-            restored
-                ? "Custom coordinates could not be saved; the previous location and metadata were restored."
-                : (reloaded
-                    ? "Custom coordinates could not be saved and rollback persistence failed; authoritative policy was reloaded and previous metadata restored."
-                    : "Custom coordinates could not be saved, and neither rollback nor authoritative reload succeeded; previous metadata was restored in memory."),
-            true);
-        sync_controls(state);
-        return G_SOURCE_REMOVE;
-    }
-    state->location_follows_timezone_reference = false;
-    gtk_editable_set_text(
-        GTK_EDITABLE(state->location_search),
-        "Custom coordinates");
-    policy_saved(state);
-    return G_SOURCE_REMOVE;
-}
-
-void on_location_coordinate_changed(
-    GObject *object G_GNUC_UNUSED,
-    GParamSpec *pspec G_GNUC_UNUSED,
-    gpointer user_data)
-{
-    SsLinuxDateTimePanel *state = user_data;
-
-    if (state == NULL || state->updating_controls) {
-        return;
-    }
-
-    cancel_coordinate_commit(state);
-    state->coordinate_commit_id = g_timeout_add(
-        300U,
-        commit_location_coordinates,
-        state);
-    g_source_set_name_by_id(
-        state->coordinate_commit_id,
-        "[system-settings] coordinate transaction debounce");
-}
-
-
 static void system_time_service_ready(
     SsSystemTimeService *service,
     const char *error_message,
@@ -2127,7 +1604,7 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
     state->location_follows_timezone_reference =
         !state->location_metadata_present &&
         (!ss_date_time_model_policy(&state->model)->location_configured ||
-         location_policy_matches_reference(state));
+         ss_linux_date_time_location_policy_matches_reference(state));
 
     state->service_cancellable = g_cancellable_new();
 
@@ -2228,7 +1705,7 @@ void ss_linux_date_time_panel_free(gpointer data)
     }
 
     stop_preview_timer(state);
-    cancel_coordinate_commit(state);
+    ss_linux_date_time_location_cancel_coordinate_commit(state);
     ss_policy_file_observer_free(state->policy_observer);
     state->policy_observer = NULL;
     if (state->preview_idle_id != 0U) {
