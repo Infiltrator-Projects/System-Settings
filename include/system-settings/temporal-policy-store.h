@@ -6,6 +6,12 @@
  * load() distinguishes a valid explicit policy (found=true) from a successful
  * platform/default fallback (found=false). save() publishes one complete
  * policy or reports failure; callers must not assume partial success.
+ *
+ * begin_update()/end_update() are optional interprocess serialization hooks.
+ * When supplied, the model acquires them before reloading authoritative state,
+ * applies exactly one requested field mutation to that fresh state, publishes
+ * it, then releases the lock. This prevents unrelated concurrent edits from
+ * being lost through last-writer-wins whole-document replacement.
  */
 #ifndef SYSTEM_SETTINGS_TEMPORAL_POLICY_STORE_H
 #define SYSTEM_SETTINGS_TEMPORAL_POLICY_STORE_H
@@ -22,6 +28,10 @@ typedef struct SsTemporalPolicyStore {
     bool (*load)(InfiltratrTemporalPolicyV3 *policy, bool *found);
     /** Persist one complete validated version-3 policy. */
     bool (*save)(const InfiltratrTemporalPolicyV3 *policy);
+    /** Optional: acquire the platform's cross-process update lock. */
+    bool (*begin_update)(void);
+    /** Optional mate for begin_update(); called exactly once after acquisition. */
+    void (*end_update)(void);
 } SsTemporalPolicyStore;
 
 /** Return the process-lifetime immutable store for the active platform. */
