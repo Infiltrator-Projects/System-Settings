@@ -76,6 +76,14 @@ int main(void)
              * running under an accessibility backend. Removing these labels
              * must make CI fail.
              */
+            GtkWidget *home_nav_row =
+                gtk_widget_get_first_child(GTK_WIDGET(navigation));
+            GtkWidget *date_nav_row =
+                home_nav_row != NULL
+                    ? gtk_widget_get_next_sibling(home_nav_row)
+                    : NULL;
+            g_assert_nonnull(home_nav_row);
+            g_assert_nonnull(date_nav_row);
             gtk_test_accessible_assert_property(
                 GTK_ACCESSIBLE(search),
                 GTK_ACCESSIBLE_PROPERTY_LABEL,
@@ -93,15 +101,15 @@ int main(void)
                 GTK_ACCESSIBLE_PROPERTY_LABEL,
                 "Close");
             gtk_test_accessible_assert_property(
-                GTK_ACCESSIBLE(search_state->home_row),
+                GTK_ACCESSIBLE(home_nav_row),
                 GTK_ACCESSIBLE_PROPERTY_LABEL,
                 "Home");
             gtk_test_accessible_assert_property(
-                GTK_ACCESSIBLE(search_state->home_row),
+                GTK_ACCESSIBLE(home_nav_row),
                 GTK_ACCESSIBLE_PROPERTY_DESCRIPTION,
                 "Overview & quick access");
             gtk_test_accessible_assert_property(
-                GTK_ACCESSIBLE(search_state->date_row),
+                GTK_ACCESSIBLE(date_nav_row),
                 GTK_ACCESSIBLE_PROPERTY_LABEL,
                 "Date & Time");
             gtk_test_accessible_assert_property(
