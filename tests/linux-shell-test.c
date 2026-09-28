@@ -133,6 +133,41 @@ int main(void)
             &natural_width,
             NULL,
             NULL);
+        {
+            int stack_min = 0;
+            int stack_nat = 0;
+            int home_min = 0;
+            int home_nat = 0;
+            int date_min = 0;
+            int date_nat = 0;
+            gtk_widget_measure(
+                GTK_WIDGET(stack),
+                GTK_ORIENTATION_HORIZONTAL,
+                -1,
+                &stack_min,
+                &stack_nat,
+                NULL,
+                NULL);
+            gtk_widget_measure(
+                GTK_WIDGET(home_scroller),
+                GTK_ORIENTATION_HORIZONTAL,
+                -1,
+                &home_min,
+                &home_nat,
+                NULL,
+                NULL);
+            gtk_widget_measure(
+                GTK_WIDGET(date_scroller),
+                GTK_ORIENTATION_HORIZONTAL,
+                -1,
+                &date_min,
+                &date_nat,
+                NULL,
+                NULL);
+            g_test_message(
+                "responsive widths: root=%d stack=%d home=%d date=%d",
+                minimum_width, stack_min, home_min, date_min);
+        }
         g_assert_cmpint(minimum_width, <=, 1024);
         int minimum_height = 0;
         int natural_height = 0;
