@@ -72,6 +72,69 @@ elseif(EXISTS "${SYSTEM_SETTINGS_COMMON_PROVENANCE}")
             "${SYSTEM_SETTINGS_COMMON_EXPECTED_COMMIT}; found "
             "${SYSTEM_SETTINGS_COMMON_COMMIT}")
     endif()
+
+    set(SYSTEM_SETTINGS_COMMON_HASH_MANIFEST
+        "${SYSTEM_SETTINGS_COMMON_DIR}/.system-settings-common-sha256")
+    if(NOT EXISTS "${SYSTEM_SETTINGS_COMMON_HASH_MANIFEST}")
+        message(FATAL_ERROR
+            "Exported Common source is missing its byte-integrity manifest.")
+    endif()
+    file(STRINGS "${SYSTEM_SETTINGS_COMMON_HASH_MANIFEST}"
+        SYSTEM_SETTINGS_COMMON_HASH_LINES)
+    set(SYSTEM_SETTINGS_COMMON_MANIFEST_PATHS)
+    foreach(SYSTEM_SETTINGS_COMMON_HASH_LINE
+            IN LISTS SYSTEM_SETTINGS_COMMON_HASH_LINES)
+        string(LENGTH "${SYSTEM_SETTINGS_COMMON_HASH_LINE}"
+            SYSTEM_SETTINGS_COMMON_HASH_LINE_LENGTH)
+        if(SYSTEM_SETTINGS_COMMON_HASH_LINE_LENGTH LESS 67)
+            message(FATAL_ERROR
+                "Malformed Common byte-integrity manifest entry.")
+        endif()
+        string(SUBSTRING "${SYSTEM_SETTINGS_COMMON_HASH_LINE}" 0 64
+            SYSTEM_SETTINGS_COMMON_FILE_HASH)
+        string(SUBSTRING "${SYSTEM_SETTINGS_COMMON_HASH_LINE}" 64 2
+            SYSTEM_SETTINGS_COMMON_HASH_SEPARATOR)
+        string(SUBSTRING "${SYSTEM_SETTINGS_COMMON_HASH_LINE}" 66 -1
+            SYSTEM_SETTINGS_COMMON_RELATIVE_PATH)
+        if(NOT SYSTEM_SETTINGS_COMMON_FILE_HASH MATCHES "^[0-9a-fA-F]+$" OR
+           NOT SYSTEM_SETTINGS_COMMON_HASH_SEPARATOR STREQUAL "  " OR
+           SYSTEM_SETTINGS_COMMON_RELATIVE_PATH STREQUAL "" OR
+           SYSTEM_SETTINGS_COMMON_RELATIVE_PATH MATCHES "(^|/)\\.\\.(/|$)")
+            message(FATAL_ERROR
+                "Malformed Common byte-integrity manifest entry.")
+        endif()
+        set(SYSTEM_SETTINGS_COMMON_FILE
+            "${SYSTEM_SETTINGS_COMMON_DIR}/${SYSTEM_SETTINGS_COMMON_RELATIVE_PATH}")
+        if(NOT EXISTS "${SYSTEM_SETTINGS_COMMON_FILE}" OR
+           IS_DIRECTORY "${SYSTEM_SETTINGS_COMMON_FILE}")
+            message(FATAL_ERROR
+                "Common manifest references missing file: "
+                "${SYSTEM_SETTINGS_COMMON_RELATIVE_PATH}")
+        endif()
+        file(SHA256 "${SYSTEM_SETTINGS_COMMON_FILE}"
+            SYSTEM_SETTINGS_COMMON_ACTUAL_HASH)
+        if(NOT SYSTEM_SETTINGS_COMMON_ACTUAL_HASH STREQUAL
+           SYSTEM_SETTINGS_COMMON_FILE_HASH)
+            message(FATAL_ERROR
+                "Common source byte mismatch: "
+                "${SYSTEM_SETTINGS_COMMON_RELATIVE_PATH}")
+        endif()
+        list(APPEND SYSTEM_SETTINGS_COMMON_MANIFEST_PATHS
+            "${SYSTEM_SETTINGS_COMMON_RELATIVE_PATH}")
+    endforeach()
+    file(GLOB_RECURSE SYSTEM_SETTINGS_COMMON_EXPORTED_FILES
+        RELATIVE "${SYSTEM_SETTINGS_COMMON_DIR}"
+        "${SYSTEM_SETTINGS_COMMON_DIR}/*")
+    list(REMOVE_ITEM SYSTEM_SETTINGS_COMMON_EXPORTED_FILES
+        ".system-settings-common-commit"
+        ".system-settings-common-sha256")
+    list(SORT SYSTEM_SETTINGS_COMMON_EXPORTED_FILES)
+    list(SORT SYSTEM_SETTINGS_COMMON_MANIFEST_PATHS)
+    if(NOT SYSTEM_SETTINGS_COMMON_EXPORTED_FILES STREQUAL
+       SYSTEM_SETTINGS_COMMON_MANIFEST_PATHS)
+        message(FATAL_ERROR
+            "Exported Common source contains files not covered by its byte-integrity manifest.")
+    endif()
 else()
     message(FATAL_ERROR
         "Exact Common provenance is required. Use the pinned Git submodule "
