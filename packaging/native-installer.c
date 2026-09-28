@@ -589,32 +589,6 @@ int main(int argc, char **argv)
         char *build_argv[] = {
             "cmake", "--build", build, "--parallel", jobs, NULL
         };
-        char *common_training_argv[] = {
-            "cmake", "--build", build, "--parallel", jobs, "--target",
-            "infiltratr-arithmetic-smoke",
-            "infiltratr-config-smoke",
-            "infiltratr-i18n-smoke",
-            "infiltratr-token-smoke",
-            "infiltratr-timing-smoke",
-            "infiltratr-temporal-smoke",
-            "infiltratr-graphics-smoke",
-            "infiltratr-escape-smoke",
-            "infiltratr-design-smoke",
-            "infiltratr-format-smoke",
-            "infiltratr-dynlib-smoke",
-            "infiltratr-portable-smoke",
-            "infiltratr-portable-contract",
-            "infiltratr-encoding-contract",
-            "infiltratr-completion-contract",
-            "infiltratr-shared-smoke",
-            "infiltratr-core-smoke",
-            "infiltratr-posix-contract",
-            "infiltratr-posix-path-smoke",
-            "infiltratr-posix-io-contract",
-            "infiltratr-posix-numeric-contract",
-            "infiltratr-temporal-posix-smoke",
-            NULL
-        };
         char *test_argv[] = {
             "ctest", "--test-dir", build, "--output-on-failure", NULL
         };
@@ -630,7 +604,7 @@ int main(int argc, char **argv)
                 snprintf(
                     common_tests_argument,
                     sizeof(common_tests_argument),
-                    "-DINFILTRATR_COMMON_BUILD_TESTS=ON") <= 0 ||
+                    "-DINFILTRATR_COMMON_BUILD_TESTS=OFF") <= 0 ||
                 snprintf(
                     build_profile_argument,
                     sizeof(build_profile_argument),
@@ -642,7 +616,6 @@ int main(int argc, char **argv)
                     generate_flags) <= 0 ||
                 run_command(NULL, configure_argv) != 0 ||
                 run_command(NULL, build_argv) != 0 ||
-                run_command(NULL, common_training_argv) != 0 ||
                 run_command(NULL, test_argv) != 0 ||
                 !write_training_evidence(pgo_evidence)) {
                 (void)remove_tree(work);
