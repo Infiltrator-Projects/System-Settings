@@ -176,27 +176,31 @@ target_link_libraries(system-settings-core PUBLIC InfiltratrCommon::Portable)
 # Keep the generic shell free of Date & Time domain/back-end ownership.
 # The current built-in module uses a private GTK bridge, while the future
 # public module ABI remains toolkit-neutral.
-file(READ "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux/main.c"
-    SS_LINUX_SHELL_SOURCE)
-foreach(SS_FORBIDDEN_SHELL_TOKEN
-        "date-time-model.h"
-        "system-time-service.h"
-        "location-search.h"
-        "location-metadata.h"
-        "regional-context.h"
-        "temporal-policy-store.h"
-        "SsDateTimeModel"
-        "SsSystemTimeService")
-    string(FIND "${SS_LINUX_SHELL_SOURCE}"
-        "${SS_FORBIDDEN_SHELL_TOKEN}"
-        SS_FORBIDDEN_SHELL_INDEX)
-    if(NOT SS_FORBIDDEN_SHELL_INDEX EQUAL -1)
-        message(FATAL_ERROR
-            "Linux shell regained Date & Time domain ownership: "
-            "${SS_FORBIDDEN_SHELL_TOKEN}")
-    endif()
+file(GLOB SS_LINUX_SHELL_SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux/*.c")
+foreach(SS_LINUX_SHELL_FILE IN LISTS SS_LINUX_SHELL_SOURCES)
+    file(READ "${SS_LINUX_SHELL_FILE}" SS_LINUX_SHELL_SOURCE)
+    foreach(SS_FORBIDDEN_SHELL_TOKEN
+            "date-time-model.h"
+            "system-time-service.h"
+            "location-search.h"
+            "location-metadata.h"
+            "regional-context.h"
+            "temporal-policy-store.h"
+            "SsDateTimeModel"
+            "SsSystemTimeService")
+        string(FIND "${SS_LINUX_SHELL_SOURCE}"
+            "${SS_FORBIDDEN_SHELL_TOKEN}"
+            SS_FORBIDDEN_SHELL_INDEX)
+        if(NOT SS_FORBIDDEN_SHELL_INDEX EQUAL -1)
+            message(FATAL_ERROR
+                "Linux shell regained Date & Time domain ownership in "
+                "${SS_LINUX_SHELL_FILE}: ${SS_FORBIDDEN_SHELL_TOKEN}")
+        endif()
+    endforeach()
 endforeach()
 unset(SS_LINUX_SHELL_SOURCE)
+unset(SS_LINUX_SHELL_SOURCES)
 
 if(WIN32)
     add_library(system-settings-platform STATIC
@@ -257,14 +261,24 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     add_executable(system-settings
         src/shell/linux/main.c)
     ss_configure(system-settings)
+
+    set(SYSTEM_SETTINGS_RUNTIME_UI_SOURCE_DIR "")
+    set(SYSTEM_SETTINGS_RUNTIME_MODULE_SOURCE_DIR "")
+    if(SYSTEM_SETTINGS_BUILD_PROFILE STREQUAL "cmake" OR
+       SYSTEM_SETTINGS_BUILD_PROFILE STREQUAL "development")
+        set(SYSTEM_SETTINGS_RUNTIME_UI_SOURCE_DIR
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets/ui")
+        set(SYSTEM_SETTINGS_RUNTIME_MODULE_SOURCE_DIR
+            "${CMAKE_CURRENT_SOURCE_DIR}/modules")
+    endif()
     target_include_directories(system-settings PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/modules/date-time"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux")
     target_compile_definitions(system-settings PRIVATE
         SYSTEM_SETTINGS_UI_ASSET_DIR="${CMAKE_INSTALL_FULL_DATADIR}/infiltrator/system-settings/ui"
-        SYSTEM_SETTINGS_UI_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/ui"
+        SYSTEM_SETTINGS_UI_SOURCE_DIR="${SYSTEM_SETTINGS_RUNTIME_UI_SOURCE_DIR}"
         SYSTEM_SETTINGS_MODULE_DIR="${CMAKE_INSTALL_FULL_DATADIR}/infiltrator/system-settings/modules"
-        SYSTEM_SETTINGS_MODULE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/modules")
+        SYSTEM_SETTINGS_MODULE_SOURCE_DIR="${SYSTEM_SETTINGS_RUNTIME_MODULE_SOURCE_DIR}")
     target_link_libraries(system-settings PRIVATE
         system-settings-date-time-linux
         system-settings-linux-ui
