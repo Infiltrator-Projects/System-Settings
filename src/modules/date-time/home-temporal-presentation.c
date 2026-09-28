@@ -230,6 +230,7 @@ static void on_policy_directory_changed(
     case G_FILE_MONITOR_EVENT_DELETED:
     case G_FILE_MONITOR_EVENT_MOVED:
     case G_FILE_MONITOR_EVENT_RENAMED:
+    case G_FILE_MONITOR_EVENT_ATTRIBUTE_CHANGED:
         if (!presenter_reload_policy(presenter)) {
             schedule_policy_reload_retry(presenter);
         }
