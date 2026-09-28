@@ -324,7 +324,7 @@ static bool sync_metadata_parent_directory(const char *path)
     if (directory == NULL) {
         return false;
     }
-    fd = open(directory, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    fd = open(directory, O_RDONLY | O_CLOEXEC);
     if (fd < 0) {
         return errno == ENOENT;
     }
