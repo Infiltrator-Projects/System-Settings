@@ -121,6 +121,9 @@ int main(void)
         ShellSearchState *search_state = g_object_get_data(
             G_OBJECT(window), "system-settings-search-state");
         g_assert_nonnull(search_state);
+        /* Avoid waiting for the production crossfade when testing map/unmap
+         * source ownership; the lifecycle contract is independent of animation. */
+        gtk_stack_set_transition_duration(stack, 0U);
         open_date_time(NULL, search_state);
         while (g_main_context_iteration(NULL, FALSE)) {
         }
