@@ -1129,9 +1129,10 @@ static GtkWidget *build_sidebar(GtkWindow *parent,
         }
     }
 
-    gtk_list_box_select_row(
-        GTK_LIST_BOX(list), GTK_LIST_BOX_ROW(home_row));
-
+    /*
+     * Selection is established by the host after stack pages exist. Selecting
+     * here used to emit row-selected while "home" had not yet been added.
+     */
     gtk_scrolled_window_set_policy(
         GTK_SCROLLED_WINDOW(nav_scroller),
         GTK_POLICY_NEVER,
@@ -2358,6 +2359,10 @@ static void on_activate(GtkApplication *application, gpointer user_data)
         date_scroller,
         "date-time");
     gtk_stack_set_visible_child_name(stack, "home");
+    if (search_state->list != NULL && search_state->home_row != NULL) {
+        gtk_list_box_select_row(
+            search_state->list, search_state->home_row);
+    }
     g_object_set_data(
         G_OBJECT(window),
         "system-settings-stack",
