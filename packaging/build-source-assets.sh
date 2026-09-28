@@ -23,6 +23,18 @@ git archive HEAD | tar -x -C "$work/source"
 mkdir -p "$work/source/$common"
 git -C "$common" archive "$pin" | tar -x -C "$work/source/$common"
 printf '%s\n' "$pin" > "$work/source/$common/.system-settings-common-commit"
+(
+    cd "$work/source/$common"
+    find . -type f \
+        ! -name '.system-settings-common-commit' \
+        ! -name '.system-settings-common-sha256' \
+        -print0 |
+        sort -z |
+        while IFS= read -r -d '' file; do
+            hash=$(sha256sum "$file" | awk '{print $1}')
+            printf '%s  %s\n' "$hash" "${file#./}"
+        done
+) > "$work/source/$common/.system-settings-common-sha256"
 tar -czf "$work/source.tar.gz" -C "$work/source" .
 
 cc -std=c11 -O2 -Wall -Wextra -Wpedantic -Werror \
