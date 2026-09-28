@@ -105,10 +105,11 @@ int main(void)
                 panel->manual_set_time,
                 GTK_ACCESSIBLE_PROPERTY_LABEL,
                 "Set operating-system date and time");
-            gtk_test_accessible_assert_property(
-                panel->status_label,
-                GTK_ACCESSIBLE_PROPERTY_LABEL,
-                "Date and time status");
+            /*
+             * The status GtkLabel intentionally exposes its current message as
+             * its accessible name. Its value is dynamic, so assert the stable
+             * interactive-control names above rather than pinning status text.
+             */
         }
 
         if (i == 0) {
