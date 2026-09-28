@@ -45,7 +45,7 @@ static int child_edit(int start_fd, bool calendar_edit)
         : EXIT_FAILURE;
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
     g_autofree gchar *root =
         g_dir_make_tmp("ss-policy-concurrency-XXXXXX", NULL);
@@ -58,6 +58,7 @@ int main(void)
     SsDateTimeModel initial;
     SsDateTimeModel final;
 
+    CHECK(argc == 2);
     CHECK(root != NULL);
     CHECK(g_setenv("XDG_CONFIG_HOME", root, TRUE));
     CHECK(g_setenv("GSETTINGS_BACKEND", "memory", TRUE));
@@ -97,6 +98,44 @@ int main(void)
         final.policy.calendar,
         "egyptian-nabonassar") == 0);
     CHECK(final.policy.show_seconds);
+    CHECK(strcmp(final.policy.clock_mode, "standard-24") == 0);
+
+    /*
+     * Exercise the public CLI transaction boundary too. Each process changes
+     * a different field. Whichever acquires the platform lock second must
+     * reload the first process's committed field before publishing its own.
+     */
+    calendar_child = fork();
+    CHECK(calendar_child >= 0);
+    if (calendar_child == 0) {
+        execl(
+            argv[1],
+            argv[1],
+            "--calendar",
+            "gregorian",
+            (char *)NULL);
+        _exit(127);
+    }
+    seconds_child = fork();
+    CHECK(seconds_child >= 0);
+    if (seconds_child == 0) {
+        execl(
+            argv[1],
+            argv[1],
+            "--seconds",
+            "off",
+            (char *)NULL);
+        _exit(127);
+    }
+
+    CHECK(waitpid(calendar_child, &status, 0) == calendar_child);
+    CHECK(WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS);
+    CHECK(waitpid(seconds_child, &status, 0) == seconds_child);
+    CHECK(WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS);
+
+    CHECK(ss_date_time_model_reload(&final));
+    CHECK(strcmp(final.policy.calendar, "gregorian") == 0);
+    CHECK(!final.policy.show_seconds);
     CHECK(strcmp(final.policy.clock_mode, "standard-24") == 0);
 
     policy_path = g_build_filename(
