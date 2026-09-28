@@ -26,6 +26,7 @@ struct SsHomeTemporalPresenter {
     gulong settings_changed_id;
     SsPolicyFileObserver *policy_observer;
     guint policy_reload_retry_id;
+    guint policy_reload_retry_seconds;
     gchar *policy_path;
     SsCalendarPreviewProvider *calendar_provider;
 };
@@ -205,14 +206,23 @@ static gboolean retry_policy_reload(gpointer user_data);
 static void schedule_policy_reload_retry(
     SsHomeTemporalPresenter *presenter)
 {
+    guint delay;
+
     if (presenter == NULL || presenter->policy_reload_retry_id != 0U) {
         return;
     }
+
+    delay = presenter->policy_reload_retry_seconds != 0U
+        ? presenter->policy_reload_retry_seconds
+        : 2U;
     presenter->policy_reload_retry_id = g_timeout_add_seconds(
-        2U, retry_policy_reload, presenter);
+        delay, retry_policy_reload, presenter);
     g_source_set_name_by_id(
         presenter->policy_reload_retry_id,
         "[system-settings] Home temporal policy reload retry");
+
+    presenter->policy_reload_retry_seconds =
+        delay < 60U ? MIN(delay * 2U, 60U) : 60U;
 }
 
 static void on_policy_file_changed(gpointer user_data)
@@ -224,6 +234,12 @@ static void on_policy_file_changed(gpointer user_data)
     }
     if (!presenter_reload_policy(presenter)) {
         schedule_policy_reload_retry(presenter);
+    } else {
+        if (presenter->policy_reload_retry_id != 0U) {
+            g_source_remove(presenter->policy_reload_retry_id);
+            presenter->policy_reload_retry_id = 0U;
+        }
+        presenter->policy_reload_retry_seconds = 2U;
     }
 }
 
@@ -234,11 +250,15 @@ static gboolean retry_policy_reload(gpointer user_data)
     if (presenter == NULL) {
         return G_SOURCE_REMOVE;
     }
+
+    presenter->policy_reload_retry_id = 0U;
     if (presenter_reload_policy(presenter)) {
-        presenter->policy_reload_retry_id = 0U;
+        presenter->policy_reload_retry_seconds = 2U;
         return G_SOURCE_REMOVE;
     }
-    return G_SOURCE_CONTINUE;
+
+    schedule_policy_reload_retry(presenter);
+    return G_SOURCE_REMOVE;
 }
 
 SsHomeTemporalPresenter *ss_home_temporal_presenter_new(void)
@@ -247,6 +267,7 @@ SsHomeTemporalPresenter *ss_home_temporal_presenter_new(void)
         g_new0(SsHomeTemporalPresenter, 1);
     g_autofree gchar *policy_path = NULL;
 
+    presenter->policy_reload_retry_seconds = 2U;
     presenter->settings = ss_cinnamon_interface_settings_new();
     presenter->use_24h =
         desktop_uses_24h_from_settings(presenter->settings);
