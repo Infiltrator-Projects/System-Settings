@@ -122,7 +122,7 @@ static bool metadata_valid(const SsLocationMetadata *value)
         value->longitude >= -180.0 && value->longitude <= 180.0;
 }
 
-static bool metadata_load_path(
+static SsLocationMetadataLoadStatus metadata_load_path(
     const char *path,
     SsLocationMetadata *metadata)
 {
@@ -133,66 +133,50 @@ static bool metadata_load_path(
     g_autofree gchar *timezone = NULL;
     g_autoptr(GError) error = NULL;
 
-    if (metadata == NULL) {
-        return false;
+    if (metadata == NULL || path == NULL || path[0] == '\0') {
+        return SS_LOCATION_METADATA_LOAD_IO_ERROR;
     }
     memset(metadata, 0, sizeof(*metadata));
 
-    if (path == NULL || path[0] == '\0') {
-        return false;
-    }
-
     key_file = g_key_file_new();
-    if (!g_key_file_load_from_file(
-            key_file, path, G_KEY_FILE_NONE, &error)) {
-        return false;
+    if (!g_key_file_load_from_file(key_file, path, G_KEY_FILE_NONE, &error)) {
+        if (error != NULL && error->domain == G_FILE_ERROR &&
+            error->code == G_FILE_ERROR_NOENT) {
+            return SS_LOCATION_METADATA_LOAD_MISSING;
+        }
+        if (error != NULL && error->domain == G_KEY_FILE_ERROR) {
+            return SS_LOCATION_METADATA_LOAD_INVALID;
+        }
+        return SS_LOCATION_METADATA_LOAD_IO_ERROR;
     }
 
-    name = g_key_file_get_string(
-        key_file, "Location", "Name", &error);
-    if (error != NULL) {
-        return false;
-    }
-    country = g_key_file_get_string(
-        key_file, "Location", "CountryCode", NULL);
-    timezone = g_key_file_get_string(
-        key_file, "Location", "Timezone", NULL);
+    name = g_key_file_get_string(key_file, "Location", "Name", &error);
+    if (error != NULL) return SS_LOCATION_METADATA_LOAD_INVALID;
+    country = g_key_file_get_string(key_file, "Location", "CountryCode", NULL);
+    timezone = g_key_file_get_string(key_file, "Location", "Timezone", NULL);
 
-    candidate.latitude = g_key_file_get_double(
-        key_file, "Location", "Latitude", &error);
-    if (error != NULL) {
-        return false;
-    }
-    candidate.longitude = g_key_file_get_double(
-        key_file, "Location", "Longitude", &error);
-    if (error != NULL) {
-        return false;
-    }
+    candidate.latitude =
+        g_key_file_get_double(key_file, "Location", "Latitude", &error);
+    if (error != NULL) return SS_LOCATION_METADATA_LOAD_INVALID;
+    candidate.longitude =
+        g_key_file_get_double(key_file, "Location", "Longitude", &error);
+    if (error != NULL) return SS_LOCATION_METADATA_LOAD_INVALID;
 
     if (name == NULL ||
-        g_strlcpy(candidate.display_name,
-                  name,
-                  sizeof(candidate.display_name)) >=
-            sizeof(candidate.display_name)) {
-        return false;
+        g_strlcpy(candidate.display_name, name,
+                  sizeof(candidate.display_name)) >= sizeof(candidate.display_name) ||
+        (country != NULL &&
+         g_strlcpy(candidate.country_code, country,
+                   sizeof(candidate.country_code)) >= sizeof(candidate.country_code)) ||
+        (timezone != NULL &&
+         g_strlcpy(candidate.timezone_id, timezone,
+                   sizeof(candidate.timezone_id)) >= sizeof(candidate.timezone_id)) ||
+        !metadata_valid(&candidate)) {
+        return SS_LOCATION_METADATA_LOAD_INVALID;
     }
-    if (country != NULL) {
-        if (g_strlcpy(candidate.country_code, country,
-                      sizeof(candidate.country_code)) >= sizeof(candidate.country_code)) {
-            return false;
-        }
-    }
-    if (timezone != NULL) {
-        if (g_strlcpy(candidate.timezone_id, timezone,
-                      sizeof(candidate.timezone_id)) >= sizeof(candidate.timezone_id)) {
-            return false;
-        }
-    }
-    if (!metadata_valid(&candidate)) {
-        return false;
-    }
+
     *metadata = candidate;
-    return true;
+    return SS_LOCATION_METADATA_LOAD_OK;
 }
 
 static bool metadata_save_path(
@@ -255,10 +239,17 @@ static bool metadata_save_path(
 }
 
 
-bool ss_location_metadata_load(SsLocationMetadata *metadata)
+SsLocationMetadataLoadStatus
+ss_location_metadata_load_status(SsLocationMetadata *metadata)
 {
     g_autofree gchar *path = ss_location_metadata_path_alloc();
     return metadata_load_path(path, metadata);
+}
+
+bool ss_location_metadata_load(SsLocationMetadata *metadata)
+{
+    return ss_location_metadata_load_status(metadata) ==
+           SS_LOCATION_METADATA_LOAD_OK;
 }
 
 bool ss_location_metadata_save(const SsLocationMetadata *metadata)
@@ -270,9 +261,34 @@ bool ss_location_metadata_save(const SsLocationMetadata *metadata)
 bool ss_location_metadata_clear(void)
 {
     g_autofree gchar *path = ss_location_metadata_path_alloc();
+    g_autofree gchar *directory = NULL;
+    int directory_fd;
 
-    return path != NULL &&
-           infiltratr_unlink_durable(path, true) == 0;
+    if (path == NULL) return false;
+    directory = g_path_get_dirname(path);
+    if (directory == NULL) return false;
+
+    directory_fd = open(directory, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    if (directory_fd < 0) return errno == ENOENT;
+
+    if (unlink(path) != 0) {
+        const int saved_errno = errno;
+        (void)close(directory_fd);
+        if (saved_errno == ENOENT) return true;
+        errno = saved_errno;
+        return false;
+    }
+
+    /*
+     * unlink() has committed the namespace change. A failed directory fsync
+     * is durability debt, not grounds to roll policy back against metadata
+     * that has already disappeared from this running system.
+     */
+    if (fsync(directory_fd) != 0) {
+        g_warning("Locality metadata was removed, but its parent directory could not be synchronized.");
+    }
+    (void)close(directory_fd);
+    return true;
 }
 
 bool ss_location_metadata_stage(const SsLocationMetadata *metadata)
@@ -281,13 +297,14 @@ bool ss_location_metadata_stage(const SsLocationMetadata *metadata)
     return metadata_save_path(path, metadata);
 }
 
-void ss_location_metadata_discard_staged(void)
+bool ss_location_metadata_discard_staged(void)
 {
     g_autofree gchar *path = metadata_pending_path();
 
-    if (path != NULL && g_remove(path) != 0 && errno != ENOENT) {
-        g_warning("Unable to remove stale locality transaction journal.");
-    }
+    if (path == NULL) return false;
+    if (g_remove(path) == 0 || errno == ENOENT) return true;
+    g_warning("Unable to remove stale locality transaction journal.");
+    return false;
 }
 
 bool ss_location_metadata_finish_staged(void)
@@ -295,7 +312,8 @@ bool ss_location_metadata_finish_staged(void)
     SsLocationMetadata staged = {0};
     g_autofree gchar *path = metadata_pending_path();
 
-    if (path == NULL || !metadata_load_path(path, &staged)) {
+    if (path == NULL ||
+        metadata_load_path(path, &staged) != SS_LOCATION_METADATA_LOAD_OK) {
         return false;
     }
     if (!ss_location_metadata_save(&staged)) {
@@ -358,23 +376,27 @@ bool ss_location_metadata_recover(
         recovered = false;
         goto done;
     }
-    if (!g_file_test(path, G_FILE_TEST_EXISTS)) {
-        /*
-         * A cleared location has no rich locality authority. Remove any old
-         * location.ini left by a crash between the policy write and metadata
-         * cleanup.
-         */
-        if (!location_configured) {
-            recovered = ss_location_metadata_clear();
+
+    {
+        const SsLocationMetadataLoadStatus staged_status =
+            metadata_load_path(path, &staged);
+
+        if (staged_status == SS_LOCATION_METADATA_LOAD_MISSING) {
+            if (!location_configured) recovered = ss_location_metadata_clear();
+            goto done;
         }
-        goto done;
-    }
-    if (!metadata_load_path(path, &staged)) {
-        ss_location_metadata_discard_staged();
-        if (!location_configured) {
-            recovered = ss_location_metadata_clear();
+        if (staged_status == SS_LOCATION_METADATA_LOAD_IO_ERROR) {
+            recovered = false; /* Preserve unreadable journal for retry. */
+            goto done;
         }
-        goto done;
+        if (staged_status == SS_LOCATION_METADATA_LOAD_INVALID) {
+            if (!ss_location_metadata_discard_staged()) {
+                recovered = false;
+                goto done;
+            }
+            if (!location_configured) recovered = ss_location_metadata_clear();
+            goto done;
+        }
     }
 
     latitude_difference = staged.latitude - latitude;
@@ -393,7 +415,10 @@ bool ss_location_metadata_recover(
         goto done;
     }
 
-    ss_location_metadata_discard_staged();
+    if (!ss_location_metadata_discard_staged()) {
+        recovered = false;
+        goto done;
+    }
     if (!location_configured && !ss_location_metadata_clear()) {
         recovered = false;
     }

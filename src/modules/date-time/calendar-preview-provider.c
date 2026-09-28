@@ -245,11 +245,12 @@ static bool discover_runtime(SsCalendarPreviewProvider *provider)
     }
 
     /*
-     * Standard multiarch directories are already represented by the
-     * compile-time architecture and the dynamic loader's configured search
-     * path. Do not recursively walk library roots from the GTK thread.
+     * Optional in-process Calendar code is admitted only from explicit
+     * system-owned roots. Bare-soname resolution can consult environment-
+     * controlled search paths and therefore is outside the trusted runtime
+     * contract.
      */
-    return open_runtime(provider, CALENDAR_RUNTIME_SONAME);
+    return false;
 }
 
 /*

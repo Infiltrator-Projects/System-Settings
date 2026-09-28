@@ -25,6 +25,13 @@ typedef struct SsLocationMetadata {
     double longitude;
 } SsLocationMetadata;
 
+typedef enum SsLocationMetadataLoadStatus {
+    SS_LOCATION_METADATA_LOAD_OK = 0,
+    SS_LOCATION_METADATA_LOAD_MISSING,
+    SS_LOCATION_METADATA_LOAD_INVALID,
+    SS_LOCATION_METADATA_LOAD_IO_ERROR
+} SsLocationMetadataLoadStatus;
+
 /**
  * Load ~/.config/infiltrator/system-settings/location.ini.
  * Honors XDG_CONFIG_HOME. The output stays cleared on failure; false covers
@@ -32,6 +39,10 @@ typedef struct SsLocationMetadata {
  * and all text must fit, be terminated and contain valid UTF-8.
  */
 bool ss_location_metadata_load(SsLocationMetadata *metadata);
+
+/** Preserve missing/invalid/I/O distinctions for recovery-sensitive callers. */
+SsLocationMetadataLoadStatus
+ss_location_metadata_load_status(SsLocationMetadata *metadata);
 
 /**
  * Durably replace the per-user metadata file.
@@ -66,7 +77,7 @@ void ss_location_metadata_transaction_end(void);
  */
 bool ss_location_metadata_stage(const SsLocationMetadata *metadata);
 bool ss_location_metadata_finish_staged(void);
-void ss_location_metadata_discard_staged(void);
+bool ss_location_metadata_discard_staged(void);
 
 /**
  * Recover an interrupted two-file locality transaction. If the staged

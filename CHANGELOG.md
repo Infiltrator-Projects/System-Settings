@@ -1,3 +1,12 @@
+## 0.4.43 — 2026-09-29
+
+- Distinguish missing, invalid and I/O-failed locality metadata so transient filesystem and permission failures cannot masquerade as deletion or corruption.
+- Preserve unreadable locality journals for retry, make journal discard success observable, and never roll the temporal policy back merely because directory durability confirmation failed after metadata was already unlinked.
+- Replace error-blind locality existence probes in Date & Time with typed authoritative load results.
+- Back off repeated locality recovery exponentially from two seconds to a capped sixty seconds instead of polling forever at a fixed cadence.
+- Restrict the optional Calendar preview bridge to explicit system library roots and exercise the full native build/test/package path in CI.
+- Pin Infiltratr Common 1.19.38 for the latest temporal coordinate validation and POSIX hardening.
+
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 
 # Changelog

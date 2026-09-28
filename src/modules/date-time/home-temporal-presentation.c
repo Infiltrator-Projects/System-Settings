@@ -341,11 +341,16 @@ guint ss_home_temporal_presenter_refresh_interval_ms(
      * sidereal-style displays cannot skip visible units; seconds-disabled
      * presentation remains at the low-cost 1 Hz cadence.
      */
-    return presenter != NULL &&
-           presenter->policy_valid &&
-           presenter->policy.show_seconds
-        ? 250U
-        : 1000U;
+    if (presenter == NULL || !presenter->policy_valid ||
+        !presenter->policy.show_seconds) {
+        return 1000U;
+    }
+    if (g_strcmp0(presenter->policy.clock_mode, "standard") == 0 ||
+        g_strcmp0(presenter->policy.clock_mode, "standard-12") == 0 ||
+        g_strcmp0(presenter->policy.clock_mode, "standard-24") == 0) {
+        return 1000U;
+    }
+    return 250U;
 }
 
 bool ss_home_temporal_presentation_now(

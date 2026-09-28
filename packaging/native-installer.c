@@ -63,7 +63,9 @@ static bool command_exists(const char *name)
          part != NULL;
          part = strtok_r(NULL, ":", &save)) {
         char candidate[PATH_MAX];
-        if (snprintf(candidate, sizeof(candidate), "%s/%s", part, name) > 0 &&
+        const int count =
+            snprintf(candidate, sizeof(candidate), "%s/%s", part, name);
+        if (count > 0 && (size_t)count < sizeof(candidate) &&
             access(candidate, X_OK) == 0) {
             found = true;
             break;
@@ -395,7 +397,7 @@ static bool find_debian_package(
 static void show_help(void)
 {
     puts("System Settings native installer");
-    puts("Usage: ./System-Settings-VERSION-native.run [--extract DIRECTORY]");
+    puts("Usage: ./System-Settings-VERSION-native.run [--extract DIRECTORY|--build-only]");
     puts("Default: build for this CPU with LTO and GCC PGO when available, test, package, then install through APT.");
     puts("Build prerequisites: build-essential cmake pkg-config libgtk-4-dev libgeocode-glib-dev xvfb dbus-x11");
 }
@@ -417,12 +419,20 @@ int main(int argc, char **argv)
     char jobs[32];
     long processors;
     const bool use_pgo = compiler_supports_gcc_pgo();
+    bool build_only = false;
 
     if (argc == 2 &&
         (strcmp(argv[1], "--help") == 0 ||
          strcmp(argv[1], "-h") == 0)) {
         show_help();
         return EXIT_SUCCESS;
+    }
+    if (argc == 2 && strcmp(argv[1], "--build-only") == 0) {
+        build_only = true;
+    } else if (argc != 1 &&
+               !(argc == 3 && strcmp(argv[1], "--extract") == 0)) {
+        show_help();
+        return 2;
     }
     if (!executable_path(argv[0], self, sizeof(self))) {
         fail("cannot resolve the installer executable path.");
@@ -587,7 +597,7 @@ int main(int argc, char **argv)
         }
     }
 
-    {
+    if (!build_only) {
         char *install_argv[] = {
             "sudo", "apt-get", "install", "-y", deb, NULL
         };

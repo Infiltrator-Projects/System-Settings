@@ -105,6 +105,8 @@ int main(void)
         CHECK(ss_location_metadata_recover(
             false, staged.latitude, staged.longitude));
         CHECK(!ss_location_metadata_load(&loaded));
+    CHECK(ss_location_metadata_load_status(&loaded) ==
+          SS_LOCATION_METADATA_LOAD_MISSING);
 
         {
             const SsTemporalPolicyStore *store =

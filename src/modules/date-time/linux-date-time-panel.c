@@ -138,35 +138,24 @@ static void location_metadata_file_changed(gpointer user_data)
 {
     SsLinuxDateTimePanel *state = user_data;
     SsLocationMetadata loaded = {0};
-    g_autofree gchar *path = NULL;
+    SsLocationMetadataLoadStatus status;
 
     if (state == NULL) {
         return;
     }
 
-    if (ss_location_metadata_load(&loaded)) {
+    status = ss_location_metadata_load_status(&loaded);
+    if (status == SS_LOCATION_METADATA_LOAD_OK) {
         state->location_metadata = loaded;
         state->location_metadata_present = true;
+    } else if (status == SS_LOCATION_METADATA_LOAD_MISSING) {
+        memset(&state->location_metadata, 0, sizeof(state->location_metadata));
+        state->location_metadata_present = false;
     } else {
-        path = ss_location_metadata_path_alloc();
-        if (path == NULL ||
-            !g_file_test(path, G_FILE_TEST_EXISTS)) {
-            memset(
-                &state->location_metadata,
-                0,
-                sizeof(state->location_metadata));
-            state->location_metadata_present = false;
-        } else {
-            /*
-             * Permission failures, malformed transient content, or a target
-             * temporarily replaced by a non-regular entry must not erase the
-             * last known-good locality. Keep it and wait for a later event.
-             */
-            set_status(
-                state,
-                "Locality metadata changed externally but could not be read; the last known-good locality remains active.",
-                true);
-        }
+        set_status(
+            state,
+            "Locality metadata changed externally but could not be read; the last known-good locality remains active.",
+            true);
     }
 
     refresh_location_authority_state(state);
@@ -191,6 +180,7 @@ static gboolean retry_locality_recovery(gpointer user_data)
             policy->latitude,
             policy->longitude)) {
         state->locality_recovery_failed = false;
+        state->locality_recovery_retry_seconds = 2U;
         location_metadata_file_changed(state);
         set_status(
             state,
@@ -213,8 +203,14 @@ static void schedule_locality_recovery_retry(
         return;
     }
 
+    if (state->locality_recovery_retry_seconds == 0U)
+        state->locality_recovery_retry_seconds = 2U;
     state->locality_recovery_retry_id = g_timeout_add_seconds(
-        5U, retry_locality_recovery, state);
+        state->locality_recovery_retry_seconds,
+        retry_locality_recovery,
+        state);
+    state->locality_recovery_retry_seconds =
+        MIN(state->locality_recovery_retry_seconds * 2U, 60U);
     g_source_set_name_by_id(
         state->locality_recovery_retry_id,
         "[system-settings] locality recovery retry");
@@ -241,9 +237,12 @@ static void policy_file_changed(gpointer user_data)
                 policy->latitude,
                 policy->longitude);
         SsLocationMetadata recovered_metadata = {0};
+        const SsLocationMetadataLoadStatus recovered_metadata_status =
+            locality_recovery_ok
+                ? ss_location_metadata_load_status(&recovered_metadata)
+                : SS_LOCATION_METADATA_LOAD_IO_ERROR;
         const bool recovered_metadata_present =
-            locality_recovery_ok &&
-            ss_location_metadata_load(&recovered_metadata);
+            recovered_metadata_status == SS_LOCATION_METADATA_LOAD_OK;
         state->locality_recovery_failed = !locality_recovery_ok;
         if (locality_recovery_ok) {
             if (state->locality_recovery_retry_id != 0U) {
@@ -274,17 +273,11 @@ static void policy_file_changed(gpointer user_data)
         if (recovered_metadata_present) {
             state->location_metadata = recovered_metadata;
             state->location_metadata_present = true;
-        } else if (locality_recovery_ok) {
-            g_autofree gchar *metadata_path =
-                ss_location_metadata_path_alloc();
-            if (metadata_path != NULL &&
-                !g_file_test(metadata_path, G_FILE_TEST_EXISTS)) {
-                memset(
-                    &state->location_metadata,
-                    0,
-                    sizeof(state->location_metadata));
-                state->location_metadata_present = false;
-            }
+        } else if (locality_recovery_ok &&
+                   recovered_metadata_status ==
+                       SS_LOCATION_METADATA_LOAD_MISSING) {
+            memset(&state->location_metadata, 0, sizeof(state->location_metadata));
+            state->location_metadata_present = false;
         }
         refresh_location_authority_state(state);
         sync_controls(state);
@@ -1230,25 +1223,17 @@ static void system_time_changed(
     if ((timezone_changed || state->location_follows_timezone_reference) &&
         ss_location_metadata_transaction_begin()) {
         SsLocationMetadata authoritative_metadata = {0};
-        g_autofree gchar *metadata_path = NULL;
         const bool policy_reloaded =
             ss_date_time_model_reload(&state->model);
-        const bool metadata_loaded =
-            ss_location_metadata_load(&authoritative_metadata);
+        const SsLocationMetadataLoadStatus metadata_status =
+            ss_location_metadata_load_status(&authoritative_metadata);
 
-        if (metadata_loaded) {
+        if (metadata_status == SS_LOCATION_METADATA_LOAD_OK) {
             state->location_metadata = authoritative_metadata;
             state->location_metadata_present = true;
-        } else {
-            metadata_path = ss_location_metadata_path_alloc();
-            if (metadata_path != NULL &&
-                !g_file_test(metadata_path, G_FILE_TEST_EXISTS)) {
-                memset(
-                    &state->location_metadata,
-                    0,
-                    sizeof(state->location_metadata));
-                state->location_metadata_present = false;
-            }
+        } else if (metadata_status == SS_LOCATION_METADATA_LOAD_MISSING) {
+            memset(&state->location_metadata, 0, sizeof(state->location_metadata));
+            state->location_metadata_present = false;
         }
         if (policy_reloaded) {
             refresh_location_authority_state(state);
