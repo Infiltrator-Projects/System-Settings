@@ -366,7 +366,6 @@ bool ss_location_metadata_clear(void)
 }
 
 bool ss_location_metadata_stage(const SsLocationMetadata *metadata)
-bool ss_location_metadata_stage(const SsLocationMetadata *metadata)
 {
     g_autofree gchar *path = metadata_pending_path();
     return metadata_save_path(path, metadata);
