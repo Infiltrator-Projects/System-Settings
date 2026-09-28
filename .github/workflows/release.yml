@@ -85,8 +85,16 @@ jobs:
           fi
 
           if gh release view "$tag" >/dev/null 2>&1; then
-            echo "Release $tag already exists; verifying asset name."
-            gh release view "$tag" --json assets --jq '.assets[].name' |               grep -qx "$(basename "$deb")"
+            echo "Release $tag already exists; verifying every immutable asset."
+            verify="$(mktemp -d)"
+            trap 'rm -rf "$verify"' EXIT
+            gh release download "$tag" --dir "$verify"
+            for asset in "$deb" "$native" "$source" build/SHA256SUMS; do
+              name="$(basename "$asset")"
+              test -s "$verify/$name"
+              cmp "$asset" "$verify/$name"
+            done
+            (cd "$verify" && sha256sum -c SHA256SUMS)
           else
             gh release create "$tag" "$deb" "$native" "$source" build/SHA256SUMS \
               --verify-tag \
