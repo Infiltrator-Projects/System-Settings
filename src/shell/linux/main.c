@@ -290,8 +290,8 @@ static gchar *date_time_search_text(void)
     const bool override_active =
         override_dir != NULL && override_dir[0] != '\0';
     const char *directories[] = {
-        override_active ? override_dir : SYSTEM_SETTINGS_MODULE_DIR,
-        override_active ? NULL : SYSTEM_SETTINGS_MODULE_SOURCE_DIR,
+        override_active ? override_dir : SYSTEM_SETTINGS_MODULE_SOURCE_DIR,
+        override_active ? NULL : SYSTEM_SETTINGS_MODULE_DIR,
         NULL
     };
 
