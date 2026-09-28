@@ -88,10 +88,11 @@ int main(void)
 
         presenter = ss_home_temporal_presenter_new();
         g_assert_nonnull(presenter);
+        /* Conventional HH:MM:SS advances only once per SI second. */
         g_assert_cmpuint(
             ss_home_temporal_presenter_refresh_interval_ms(presenter),
             ==,
-            250U);
+            1000U);
         ss_home_temporal_presentation_init(&first);
         ss_home_temporal_presentation_init(&second);
         g_assert_true(ss_home_temporal_presenter_format_now(
