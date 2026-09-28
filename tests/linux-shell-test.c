@@ -24,6 +24,8 @@ int main(void)
     /* No requests can reach the host's protected time service. */
     g_setenv("DBUS_SYSTEM_BUS_ADDRESS", "unix:path=/nonexistent/ss-test-bus", TRUE);
     gtk_init();
+    const bool accessibility_enabled =
+        g_strcmp0(g_getenv("GTK_A11Y"), "none") != 0;
     g_autoptr(GtkApplication) app = gtk_application_new(
         "org.infiltrator.SystemSettings.Test", G_APPLICATION_NON_UNIQUE);
     g_assert_true(g_application_register(G_APPLICATION(app), NULL, NULL));
@@ -69,6 +71,45 @@ int main(void)
         g_assert_true(gtk_widget_get_next_sibling(minimize) == maximize);
         g_assert_true(gtk_widget_get_next_sibling(maximize) == close);
         g_assert_null(gtk_widget_get_next_sibling(close));
+
+        if (accessibility_enabled && i == 0) {
+            gtk_test_accessible_assert_property(
+                search, GTK_ACCESSIBLE_PROPERTY_LABEL, "Search settings");
+            gtk_test_accessible_assert_property(
+                minimize, GTK_ACCESSIBLE_PROPERTY_LABEL, "Minimize");
+            gtk_test_accessible_assert_property(
+                maximize, GTK_ACCESSIBLE_PROPERTY_LABEL, "Maximize / Restore");
+            gtk_test_accessible_assert_property(
+                close, GTK_ACCESSIBLE_PROPERTY_LABEL, "Close");
+            gtk_test_accessible_assert_property(
+                panel->location_search,
+                GTK_ACCESSIBLE_PROPERTY_LABEL,
+                "Locality search");
+            gtk_test_accessible_assert_property(
+                panel->location_search_button,
+                GTK_ACCESSIBLE_PROPERTY_LABEL,
+                "Search for locality");
+            gtk_test_accessible_assert_property(
+                panel->latitude, GTK_ACCESSIBLE_PROPERTY_LABEL, "Latitude");
+            gtk_test_accessible_assert_property(
+                panel->longitude, GTK_ACCESSIBLE_PROPERTY_LABEL, "Longitude");
+            gtk_test_accessible_assert_property(
+                panel->manual_date,
+                GTK_ACCESSIBLE_PROPERTY_LABEL,
+                "Manual date");
+            gtk_test_accessible_assert_property(
+                panel->manual_time,
+                GTK_ACCESSIBLE_PROPERTY_LABEL,
+                "Manual time");
+            gtk_test_accessible_assert_property(
+                panel->manual_set_time,
+                GTK_ACCESSIBLE_PROPERTY_LABEL,
+                "Set operating-system date and time");
+            gtk_test_accessible_assert_property(
+                panel->status_label,
+                GTK_ACCESSIBLE_PROPERTY_LABEL,
+                "Date and time status");
+        }
 
         if (i == 0) {
             GtkSettings *gtk_settings = gtk_settings_get_default();

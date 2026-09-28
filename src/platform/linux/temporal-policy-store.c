@@ -52,10 +52,22 @@ static bool begin_update(void)
     if (fd < 0) {
         return false;
     }
-    while (flock(fd, LOCK_EX) != 0) {
-        if (errno != EINTR) {
-            close(fd);
-            return false;
+    {
+        const gint64 deadline =
+            g_get_monotonic_time() + (2 * G_USEC_PER_SEC);
+        for (;;) {
+            if (flock(fd, LOCK_EX | LOCK_NB) == 0) {
+                break;
+            }
+            if (errno == EINTR) {
+                continue;
+            }
+            if ((errno != EWOULDBLOCK && errno != EAGAIN) ||
+                g_get_monotonic_time() >= deadline) {
+                close(fd);
+                return false;
+            }
+            g_usleep(10000U);
         }
     }
     update_lock_fd = fd;

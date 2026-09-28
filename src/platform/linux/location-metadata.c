@@ -86,10 +86,22 @@ bool ss_location_metadata_transaction_begin(void)
     if (fd < 0) {
         return false;
     }
-    while (flock(fd, LOCK_EX) != 0) {
-        if (errno != EINTR) {
-            (void)close(fd);
-            return false;
+    {
+        const gint64 deadline =
+            g_get_monotonic_time() + (2 * G_USEC_PER_SEC);
+        for (;;) {
+            if (flock(fd, LOCK_EX | LOCK_NB) == 0) {
+                break;
+            }
+            if (errno == EINTR) {
+                continue;
+            }
+            if ((errno != EWOULDBLOCK && errno != EAGAIN) ||
+                g_get_monotonic_time() >= deadline) {
+                (void)close(fd);
+                return false;
+            }
+            g_usleep(10000U);
         }
     }
 

@@ -4,6 +4,9 @@
 - Preserve unreadable locality journals for retry, make journal discard success observable, and never roll the temporal policy back merely because directory durability confirmation failed after metadata was already unlinked.
 - Replace error-blind locality existence probes in Date & Time with typed authoritative load results.
 - Back off repeated locality recovery exponentially from two seconds to a capped sixty seconds instead of polling forever at a fixed cadence.
+- Bound Linux and Windows cross-process policy/locality lock acquisition to two seconds so a stalled peer cannot freeze the GTK main thread indefinitely.
+- Add a real forked two-process locality transaction race regression and assert the accessibility labels that the dedicated accessibility CI job is intended to protect.
+- Require actual GCC .gcda training data before a build may identify itself as native, in addition to the existing native/LTO/profile-use flag checks.
 - Restrict the optional Calendar preview bridge to explicit system library roots and exercise the full native build/test/package path in CI.
 - Pin Infiltratr Common 1.19.38 for the latest temporal coordinate validation and POSIX hardening.
 

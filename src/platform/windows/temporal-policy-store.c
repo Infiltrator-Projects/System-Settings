@@ -264,18 +264,29 @@ static bool begin_update(void)
         goto done;
     }
 
-    if (!LockFileEx(
-            update_lock_file,
-            LOCKFILE_EXCLUSIVE_LOCK,
-            0U,
-            MAXDWORD,
-            MAXDWORD,
-            &overlapped)) {
+    for (unsigned int attempt = 0U; attempt < 200U; ++attempt) {
+        if (LockFileEx(
+                update_lock_file,
+                LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY,
+                0U,
+                MAXDWORD,
+                MAXDWORD,
+                &overlapped)) {
+            ok = true;
+            break;
+        }
+        const DWORD lock_error = GetLastError();
+        if (lock_error != ERROR_LOCK_VIOLATION &&
+            lock_error != ERROR_IO_PENDING) {
+            break;
+        }
+        Sleep(10U);
+    }
+    if (!ok) {
         CloseHandle(update_lock_file);
         update_lock_file = INVALID_HANDLE_VALUE;
         goto done;
     }
-    ok = true;
 
 done:
     free(lock_path);

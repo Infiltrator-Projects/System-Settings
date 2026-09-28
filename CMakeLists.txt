@@ -16,6 +16,8 @@ set(SYSTEM_SETTINGS_BUILD_PROFILE "cmake" CACHE STRING
     "Common build-profile identity for this System Settings build")
 set_property(CACHE SYSTEM_SETTINGS_BUILD_PROFILE PROPERTY STRINGS
     cmake generic native development)
+set(SYSTEM_SETTINGS_NATIVE_PROFILE_DATA_DIR "" CACHE PATH
+    "Directory containing trained GCC PGO data for native builds")
 if(NOT SYSTEM_SETTINGS_BUILD_PROFILE MATCHES "^(cmake|generic|native|development)$")
     message(FATAL_ERROR "Unsupported SYSTEM_SETTINGS_BUILD_PROFILE")
 endif()
@@ -35,6 +37,18 @@ if(SYSTEM_SETTINGS_BUILD_PROFILE STREQUAL "native")
         message(FATAL_ERROR
             "SYSTEM_SETTINGS_BUILD_PROFILE=native requires -march=native, LTO and a trained -fprofile-use build.")
     endif()
+    if(SYSTEM_SETTINGS_NATIVE_PROFILE_DATA_DIR STREQUAL "" OR
+       NOT IS_DIRECTORY "${SYSTEM_SETTINGS_NATIVE_PROFILE_DATA_DIR}")
+        message(FATAL_ERROR
+            "Native identity requires the trained GCC PGO data directory.")
+    endif()
+    file(GLOB_RECURSE SS_NATIVE_PROFILE_DATA
+        "${SYSTEM_SETTINGS_NATIVE_PROFILE_DATA_DIR}/*.gcda")
+    if(NOT SS_NATIVE_PROFILE_DATA)
+        message(FATAL_ERROR
+            "Native identity requires actual GCC training data (*.gcda).")
+    endif()
+    unset(SS_NATIVE_PROFILE_DATA)
     unset(SS_NATIVE_PROFILE_FLAGS)
     unset(SS_BUILD_TYPE_FLAGS_VAR)
     unset(SS_BUILD_TYPE_UPPER)
@@ -488,6 +502,16 @@ if(BUILD_TESTING)
         add_test(
             NAME policy-concurrency
             COMMAND policy-concurrency-test $<TARGET_FILE:system-settings-time>)
+
+        add_executable(location-concurrency-test
+            tests/location-concurrency-test.c)
+        ss_configure(location-concurrency-test)
+        target_link_libraries(location-concurrency-test PRIVATE
+            system-settings-core
+            system-settings-platform
+            InfiltratrCommon::Common
+            PkgConfig::GIO2)
+        add_test(NAME location-concurrency COMMAND location-concurrency-test)
 
         add_library(calendar-preview-runtime-fixture SHARED
             tests/calendar-preview-runtime-fixture.c)

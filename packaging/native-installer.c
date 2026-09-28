@@ -536,12 +536,14 @@ int main(int argc, char **argv)
     {
         char c_flags_argument[PATH_MAX + 160U];
         char build_profile_argument[64];
+        char profile_data_argument[PATH_MAX + 64U];
         char *configure_argv[] = {
             "cmake", "-S", work, "-B", build,
             "-DCMAKE_BUILD_TYPE=Release",
             build_profile_argument,
             "-DBUILD_TESTING=ON",
             c_flags_argument,
+            profile_data_argument,
             NULL
         };
         char *build_argv[] = {
@@ -554,6 +556,10 @@ int main(int argc, char **argv)
             "cpack", "-G", "DEB", NULL
         };
 
+        (void)snprintf(
+            profile_data_argument,
+            sizeof(profile_data_argument),
+            "-DSYSTEM_SETTINGS_NATIVE_PROFILE_DATA_DIR=");
         if (use_pgo) {
             if (snprintf(
                     build_profile_argument,
@@ -576,6 +582,11 @@ int main(int argc, char **argv)
                 build_profile_argument,
                 sizeof(build_profile_argument),
                 "-DSYSTEM_SETTINGS_BUILD_PROFILE=native") <= 0 ||
+            snprintf(
+                profile_data_argument,
+                sizeof(profile_data_argument),
+                "-DSYSTEM_SETTINGS_NATIVE_PROFILE_DATA_DIR=%s",
+                pgo) <= 0 ||
             snprintf(
                 c_flags_argument,
                 sizeof(c_flags_argument),
