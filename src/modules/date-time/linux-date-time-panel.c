@@ -196,6 +196,7 @@ static void policy_file_changed(gpointer user_data)
         const bool recovered_metadata_present =
             locality_recovery_ok &&
             ss_location_metadata_load(&recovered_metadata);
+        state->locality_recovery_failed = !locality_recovery_ok;
         const bool changed =
             !temporal_policy_equal(&previous, &state->model.policy);
         const bool manual_context_changed =
@@ -217,6 +218,17 @@ static void policy_file_changed(gpointer user_data)
         if (recovered_metadata_present) {
             state->location_metadata = recovered_metadata;
             state->location_metadata_present = true;
+        } else if (locality_recovery_ok) {
+            g_autofree gchar *metadata_path =
+                ss_location_metadata_path_alloc();
+            if (metadata_path != NULL &&
+                !g_file_test(metadata_path, G_FILE_TEST_EXISTS)) {
+                memset(
+                    &state->location_metadata,
+                    0,
+                    sizeof(state->location_metadata));
+                state->location_metadata_present = false;
+            }
         }
         refresh_location_authority_state(state);
         sync_controls(state);
@@ -1162,6 +1174,7 @@ static void system_time_changed(
     if ((timezone_changed || state->location_follows_timezone_reference) &&
         ss_location_metadata_transaction_begin()) {
         SsLocationMetadata authoritative_metadata = {0};
+        g_autofree gchar *metadata_path = NULL;
         const bool policy_reloaded =
             ss_date_time_model_reload(&state->model);
         const bool metadata_loaded =
@@ -1170,6 +1183,16 @@ static void system_time_changed(
         if (metadata_loaded) {
             state->location_metadata = authoritative_metadata;
             state->location_metadata_present = true;
+        } else {
+            metadata_path = ss_location_metadata_path_alloc();
+            if (metadata_path != NULL &&
+                !g_file_test(metadata_path, G_FILE_TEST_EXISTS)) {
+                memset(
+                    &state->location_metadata,
+                    0,
+                    sizeof(state->location_metadata));
+                state->location_metadata_present = false;
+            }
         }
         if (policy_reloaded) {
             refresh_location_authority_state(state);
@@ -1722,12 +1745,19 @@ static void system_time_service_ready(
         g_object_unref(window);
         return;
     }
-    set_status(
-        state,
-        state->model.persisted_policy_present
-            ? "Using the saved system-wide temporal policy. Native Mint/Linux date and time controls are live."
-            : "Using Mint/Cinnamon temporal preferences as the initial policy. Native Mint/Linux date and time controls are live.",
-        false);
+    if (state->locality_recovery_failed) {
+        set_status(
+            state,
+            "Date & Time is available, but interrupted locality metadata could not yet be recovered. The journal has been preserved for retry.",
+            true);
+    } else {
+        set_status(
+            state,
+            state->model.persisted_policy_present
+                ? "Using the saved system-wide temporal policy. Native Mint/Linux date and time controls are live."
+                : "Using Mint/Cinnamon temporal preferences as the initial policy. Native Mint/Linux date and time controls are live.",
+            false);
+    }
     g_object_unref(window);
 }
 
@@ -1795,21 +1825,22 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
     {
         const InfiltratrTemporalPolicyV3 *policy =
             ss_date_time_model_policy(&state->model);
-        if (policy == NULL ||
-            !ss_location_metadata_recover(
-                policy->location_configured,
-                policy->latitude,
-                policy->longitude)) {
+        if (policy == NULL) {
             g_set_error_literal(
                 error,
                 G_IO_ERROR,
                 G_IO_ERROR_FAILED,
-                "Unable to recover an interrupted locality transaction.");
+                "Unable to read the temporal policy during locality recovery.");
             ss_calendar_preview_provider_free(
                 state->calendar_preview_provider);
             g_free(state);
             return NULL;
         }
+        state->locality_recovery_failed =
+            !ss_location_metadata_recover(
+                policy->location_configured,
+                policy->latitude,
+                policy->longitude);
     }
     state->location_metadata_present =
         ss_location_metadata_load(&state->location_metadata);
@@ -1890,6 +1921,11 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
         set_status(
             state,
             "The legacy native-default clock policy could not be migrated to an explicit 12-hour or 24-hour clock selection.",
+            true);
+    } else if (state->locality_recovery_failed) {
+        set_status(
+            state,
+            "Date & Time is available, but interrupted locality metadata could not yet be recovered. The journal has been preserved for retry.",
             true);
     } else {
         set_status(

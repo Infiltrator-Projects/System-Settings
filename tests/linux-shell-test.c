@@ -210,8 +210,17 @@ int main(void)
                     : NULL;
             g_assert_nonnull(monitors);
             g_assert_cmpuint(g_list_model_get_n_items(monitors), >, 0U);
-            GdkMonitor *monitor =
-                GDK_MONITOR(g_list_model_get_item(monitors, 0U));
+            GdkSurface *surface =
+                gtk_native_get_surface(GTK_NATIVE(window));
+            GdkMonitor *monitor = surface != NULL
+                ? gdk_display_get_monitor_at_surface(display, surface)
+                : NULL;
+            g_autoptr(GdkMonitor) fallback_monitor = NULL;
+            if (monitor == NULL) {
+                fallback_monitor =
+                    GDK_MONITOR(g_list_model_get_item(monitors, 0U));
+                monitor = fallback_monitor;
+            }
             GdkRectangle geometry = {0};
             g_assert_nonnull(monitor);
             gdk_monitor_get_geometry(monitor, &geometry);
@@ -223,7 +232,6 @@ int main(void)
                 default_height,
                 <=,
                 MIN(760, MAX(1, geometry.height * 9 / 10)));
-            g_object_unref(monitor);
         }
 
         int minimum_height = 0;

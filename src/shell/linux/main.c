@@ -108,12 +108,16 @@ static void launch_command_finished(
         G_SUBPROCESS(process), result, &error);
 
     if (!success && source != NULL) {
+        /*
+         * A non-zero child exit can be transient (authorization, D-Bus,
+         * backend crash, unsupported state). Report it, but do not permanently
+         * disable a row whose executable still exists and may work on retry.
+         */
         gtk_widget_set_tooltip_text(
             source,
             error != NULL
                 ? error->message
                 : "The delegated settings tool exited without completing.");
-        gtk_widget_set_sensitive(source, FALSE);
     }
     if (source != NULL) {
         g_object_unref(source);
@@ -1951,30 +1955,47 @@ static void set_adaptive_default_window_size(GtkWindow *window)
     int height = 760;
     GdkDisplay *display;
     GListModel *monitors;
+    GdkMonitor *monitor = NULL;
+    g_autoptr(GdkMonitor) fallback_monitor = NULL;
+    GdkSurface *surface;
 
     if (window == NULL) {
         return;
     }
 
     display = gtk_widget_get_display(GTK_WIDGET(window));
+    surface = gtk_native_get_surface(GTK_NATIVE(window));
+    if (display != NULL && surface != NULL) {
+        monitor = gdk_display_get_monitor_at_surface(display, surface);
+    }
+
     monitors = display != NULL ? gdk_display_get_monitors(display) : NULL;
-    if (monitors != NULL && g_list_model_get_n_items(monitors) > 0U) {
-        GdkMonitor *monitor =
+    if (monitor == NULL && monitors != NULL &&
+        g_list_model_get_n_items(monitors) > 0U) {
+        fallback_monitor =
             GDK_MONITOR(g_list_model_get_item(monitors, 0U));
-        if (monitor != NULL) {
-            GdkRectangle geometry = {0};
-            gdk_monitor_get_geometry(monitor, &geometry);
-            if (geometry.width > 0) {
-                width = MIN(width, MAX(1, geometry.width * 9 / 10));
-            }
-            if (geometry.height > 0) {
-                height = MIN(height, MAX(1, geometry.height * 9 / 10));
-            }
-            g_object_unref(monitor);
+        monitor = fallback_monitor;
+    }
+
+    if (monitor != NULL) {
+        GdkRectangle geometry = {0};
+        gdk_monitor_get_geometry(monitor, &geometry);
+        if (geometry.width > 0) {
+            width = MIN(width, MAX(1, geometry.width * 9 / 10));
+        }
+        if (geometry.height > 0) {
+            height = MIN(height, MAX(1, geometry.height * 9 / 10));
         }
     }
 
     gtk_window_set_default_size(window, width, height);
+}
+
+static void adapt_window_to_mapped_monitor(
+    GtkWidget *widget,
+    gpointer user_data G_GNUC_UNUSED)
+{
+    set_adaptive_default_window_size(GTK_WINDOW(widget));
 }
 
 static void on_activate(GtkApplication *application, gpointer user_data)
@@ -2009,6 +2030,9 @@ static void on_activate(GtkApplication *application, gpointer user_data)
     g_signal_connect(
         window, "close-request",
         G_CALLBACK(on_close_requested), NULL);
+    g_signal_connect(
+        window, "map",
+        G_CALLBACK(adapt_window_to_mapped_monitor), NULL);
 
     gtk_window_set_titlebar(
         window, build_header(window, &search_entry));

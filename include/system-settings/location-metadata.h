@@ -39,6 +39,12 @@ bool ss_location_metadata_load(SsLocationMetadata *metadata);
  */
 bool ss_location_metadata_save(const SsLocationMetadata *metadata);
 
+/**
+ * Durably remove the persisted locality metadata.
+ * Missing metadata is already a successful cleared state.
+ */
+bool ss_location_metadata_clear(void);
+
 /** Return the XDG metadata path; caller releases with g_free(). */
 char *ss_location_metadata_path_alloc(void);
 

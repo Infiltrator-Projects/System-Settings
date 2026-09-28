@@ -498,7 +498,7 @@ int main(int argc, char **argv)
             snprintf(
                 final_flags,
                 sizeof(final_flags),
-                "-O3 -DNDEBUG -march=native -mtune=native -flto -fprofile-use=%s -fprofile-correction -Wno-missing-profile",
+                "-O3 -DNDEBUG -march=native -mtune=native -flto -fprofile-use=%s -fprofile-correction -Werror=missing-profile",
                 pgo) <= 0 ||
             strlen(generate_flags) >= sizeof(generate_flags) - 1U ||
             strlen(final_flags) >= sizeof(final_flags) - 1U) {

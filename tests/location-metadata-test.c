@@ -118,6 +118,20 @@ int main(void)
         saved = staged;
     }
 
+    CHECK(ss_location_metadata_clear());
+    CHECK(!g_file_test(expected_file, G_FILE_TEST_EXISTS));
+    CHECK(ss_location_metadata_clear());
+    CHECK(ss_location_metadata_save(&saved));
+    CHECK(g_file_test(expected_file, G_FILE_TEST_IS_REGULAR));
+
+    /*
+     * Recovery of a policy with no configured location removes metadata left
+     * by a crash after the policy commit but before metadata cleanup.
+     */
+    CHECK(ss_location_metadata_recover(false, 0.0, 0.0));
+    CHECK(!g_file_test(expected_file, G_FILE_TEST_EXISTS));
+    CHECK(ss_location_metadata_save(&saved));
+
     saved.latitude = NAN;
     CHECK(!ss_location_metadata_save(&saved));
     saved.latitude = -36.3949;

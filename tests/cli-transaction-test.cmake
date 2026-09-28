@@ -30,4 +30,38 @@ file(READ "${ROOT}/infiltrator/presentation.conf" after)
 if(NOT after MATCHES "clock-mode=decimal" OR NOT after MATCHES "show-seconds=true")
     message(FATAL_ERROR "Multi-option transaction lost a setting")
 endif()
+
+execute_process(
+    COMMAND "${CLI}" --location -36.3949 145.3610
+    RESULT_VARIABLE status
+    OUTPUT_QUIET)
+if(NOT status EQUAL 0)
+    message(FATAL_ERROR "CLI location transaction failed")
+endif()
+set(location_file "${ROOT}/infiltrator/system-settings/location.ini")
+if(NOT EXISTS "${location_file}")
+    message(FATAL_ERROR "CLI location transaction did not publish locality metadata")
+endif()
+file(READ "${location_file}" location_metadata)
+if(NOT location_metadata MATCHES "Name=Custom coordinates" OR
+   NOT location_metadata MATCHES "Latitude=-36.3949" OR
+   NOT location_metadata MATCHES "Longitude=145.361")
+    message(FATAL_ERROR "CLI locality metadata does not match committed coordinates")
+endif()
+
+execute_process(
+    COMMAND "${CLI}" --clear-location
+    RESULT_VARIABLE status
+    OUTPUT_QUIET)
+if(NOT status EQUAL 0)
+    message(FATAL_ERROR "CLI clear-location transaction failed")
+endif()
+if(EXISTS "${location_file}")
+    message(FATAL_ERROR "CLI clear-location left stale locality metadata")
+endif()
+file(READ "${ROOT}/infiltrator/presentation.conf" after)
+if(NOT after MATCHES "location-configured=false")
+    message(FATAL_ERROR "CLI clear-location did not clear temporal location authority")
+endif()
+
 file(REMOVE_RECURSE "${ROOT}")

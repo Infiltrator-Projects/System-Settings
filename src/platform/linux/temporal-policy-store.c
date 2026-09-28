@@ -13,25 +13,32 @@
 #include <errno.h>
 #include <glib/gstdio.h>
 #include <fcntl.h>
-#include <limits.h>
 #include <sys/file.h>
 #include <unistd.h>
-
-#ifndef PATH_MAX
-#define PATH_MAX 4096
-#endif
 
 static int update_lock_fd = -1;
 
 static bool begin_update(void)
 {
-    char directory[PATH_MAX];
-    char lock_path[PATH_MAX];
+    g_autofree gchar *directory = NULL;
+    g_autofree gchar *lock_path = NULL;
     int fd;
 
-    if (update_lock_fd >= 0 ||
-        !infiltratr_temporal_posix_policy_directory(
-            directory, sizeof(directory))) {
+    if (update_lock_fd >= 0) {
+        return false;
+    }
+
+    /*
+     * Keep the lock path allocation-backed just like Common's policy path.
+     * A valid long XDG_CONFIG_HOME must not be writable by the persistence
+     * layer while being impossible to serialize at the transaction boundary.
+     */
+    directory = g_build_filename(
+        g_get_user_config_dir(), "infiltrator", NULL);
+    lock_path = directory != NULL
+        ? g_build_filename(directory, "presentation.lock", NULL)
+        : NULL;
+    if (directory == NULL || lock_path == NULL) {
         return false;
     }
     if (g_mkdir_with_parents(directory, 0700) != 0 && errno != EEXIST) {
@@ -39,14 +46,6 @@ static bool begin_update(void)
     }
     if (g_chmod(directory, 0700) != 0) {
         return false;
-    }
-    {
-        const int written = g_snprintf(
-            lock_path, sizeof(lock_path),
-            "%s/presentation.lock", directory);
-        if (written <= 0 || (size_t)written >= sizeof(lock_path)) {
-            return false;
-        }
     }
 
     fd = open(lock_path, O_CREAT | O_RDWR | O_CLOEXEC, 0600);

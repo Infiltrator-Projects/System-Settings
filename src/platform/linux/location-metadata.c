@@ -12,6 +12,7 @@
 #include "system-settings/temporal-policy-store.h"
 
 #include <glib.h>
+#include <infiltratr/posix.h>
 #include <infiltratr/temporal.h>
 #include <glib/gstdio.h>
 
@@ -266,6 +267,14 @@ bool ss_location_metadata_save(const SsLocationMetadata *metadata)
     return metadata_save_path(path, metadata);
 }
 
+bool ss_location_metadata_clear(void)
+{
+    g_autofree gchar *path = ss_location_metadata_path_alloc();
+
+    return path != NULL &&
+           infiltratr_unlink_durable(path, true) == 0;
+}
+
 bool ss_location_metadata_stage(const SsLocationMetadata *metadata)
 {
     g_autofree gchar *path = metadata_pending_path();
@@ -329,16 +338,35 @@ bool ss_location_metadata_recover(
         InfiltratrTemporalPolicyV3 authoritative;
         bool found = false;
 
-        if (store != NULL && store->load != NULL &&
-            store->load(&authoritative, &found) && found) {
-            location_configured = authoritative.location_configured;
-            latitude = authoritative.latitude;
-            longitude = authoritative.longitude;
+        if (store == NULL || store->load == NULL ||
+            !store->load(&authoritative, &found)) {
+            /*
+             * Recovery must be conservative: if the authoritative policy
+             * cannot be read after taking the locality lock, do not destroy
+             * the journal or make a decision from the caller's pre-lock view.
+             */
+            recovered = false;
+            goto done;
         }
+        location_configured = authoritative.location_configured;
+        latitude = authoritative.latitude;
+        longitude = authoritative.longitude;
     }
 
     path = metadata_pending_path();
-    if (path == NULL || !g_file_test(path, G_FILE_TEST_EXISTS)) {
+    if (path == NULL) {
+        recovered = false;
+        goto done;
+    }
+    if (!g_file_test(path, G_FILE_TEST_EXISTS)) {
+        /*
+         * A cleared location has no rich locality authority. Remove any old
+         * location.ini left by a crash between the policy write and metadata
+         * cleanup.
+         */
+        if (!location_configured) {
+            recovered = ss_location_metadata_clear();
+        }
         goto done;
     }
     if (!metadata_load_path(path, &staged)) {
@@ -363,6 +391,9 @@ bool ss_location_metadata_recover(
     }
 
     ss_location_metadata_discard_staged();
+    if (!location_configured && !ss_location_metadata_clear()) {
+        recovered = false;
+    }
 
 done:
     ss_location_metadata_transaction_end();

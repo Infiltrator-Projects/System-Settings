@@ -33,6 +33,35 @@ bool ss_linux_date_time_location_coordinate_close(
     return difference < 0.000001;
 }
 
+/*
+ * Snapshot locality metadata only after the caller owns the locality lock.
+ * Missing metadata is a valid empty state; an existing but unreadable file is
+ * an error because replacing it from a stale in-memory copy would lose a
+ * concurrent writer's committed locality.
+ */
+static bool load_authoritative_location_metadata(
+    SsLocationMetadata *metadata,
+    bool *present)
+{
+    g_autofree gchar *path = NULL;
+
+    if (metadata == NULL || present == NULL) {
+        return false;
+    }
+    memset(metadata, 0, sizeof(*metadata));
+    if (ss_location_metadata_load(metadata)) {
+        *present = true;
+        return true;
+    }
+
+    path = ss_location_metadata_path_alloc();
+    if (path == NULL || g_file_test(path, G_FILE_TEST_EXISTS)) {
+        return false;
+    }
+    *present = false;
+    return true;
+}
+
 bool ss_linux_date_time_location_metadata_matches_policy(
     const SsLinuxDateTimePanel *state,
     const InfiltratrTemporalPolicyV3 *policy)
@@ -206,14 +235,25 @@ void on_location_result_activated(
         return;
     }
 
+    if (!load_authoritative_location_metadata(
+            &previous_metadata,
+            &previous_metadata_present)) {
+        ss_location_metadata_transaction_end();
+        ss_linux_date_time_panel_set_status(
+            state,
+            "Could not reload the authoritative locality metadata before saving the selected location.",
+            true);
+        return;
+    }
+    state->location_metadata = previous_metadata;
+    state->location_metadata_present = previous_metadata_present;
+
     policy = ss_date_time_model_policy(&state->model);
     if (policy == NULL) {
         ss_location_metadata_transaction_end();
         return;
     }
     previous_policy = *policy;
-    previous_metadata = state->location_metadata;
-    previous_metadata_present = state->location_metadata_present;
 
     memset(
         &state->location_metadata,
@@ -537,14 +577,26 @@ static gboolean commit_location_coordinates(gpointer user_data)
         return G_SOURCE_REMOVE;
     }
 
+    if (!load_authoritative_location_metadata(
+            &previous_metadata,
+            &previous_metadata_present)) {
+        ss_location_metadata_transaction_end();
+        ss_linux_date_time_panel_set_status(
+            state,
+            "Could not reload the authoritative locality metadata before saving custom coordinates.",
+            true);
+        ss_linux_date_time_panel_sync_controls(state);
+        return G_SOURCE_REMOVE;
+    }
+    state->location_metadata = previous_metadata;
+    state->location_metadata_present = previous_metadata_present;
+
     policy = ss_date_time_model_policy(&state->model);
     if (policy == NULL) {
         ss_location_metadata_transaction_end();
         return G_SOURCE_REMOVE;
     }
     previous_policy = *policy;
-    previous_metadata = state->location_metadata;
-    previous_metadata_present = state->location_metadata_present;
 
     memset(
         &state->location_metadata,

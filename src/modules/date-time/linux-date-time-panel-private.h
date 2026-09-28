@@ -69,6 +69,7 @@ struct SsLinuxDateTimePanel {
     bool updating_controls;
     bool updating_system_controls;
     bool manual_dirty;
+    bool locality_recovery_failed;
 };
 
 GtkWidget *ss_linux_date_time_panel_build_ui(

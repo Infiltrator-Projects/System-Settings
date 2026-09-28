@@ -75,6 +75,13 @@ int main(int argc, char **argv)
     int exit_code = 0;
     bool platform_locked = false;
     bool locality_locked = false;
+    bool location_change_requested = false;
+    bool location_clear_requested = false;
+    InfiltratrTemporalPolicyV3 original_policy;
+#ifndef _WIN32
+    SsLocationMetadata location_candidate = {0};
+    bool location_staged = false;
+#endif
     const SsTemporalPolicyStore *platform =
         ss_platform_temporal_policy_store();
     static const SsTemporalPolicyStore staging = {
@@ -127,6 +134,7 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    original_policy = model.policy;
     model.store = &staging;
     for (index = 1; index < argc; ++index) {
         if (strcmp(argv[index], "--clock") == 0 && index + 1 < argc) {
@@ -177,6 +185,17 @@ int main(int argc, char **argv)
                 exit_code = 2;
                 goto done;
             }
+            location_change_requested = true;
+            location_clear_requested = false;
+#ifndef _WIN32
+            memset(&location_candidate, 0, sizeof(location_candidate));
+            infiltratr_copy_string(
+                location_candidate.display_name,
+                sizeof(location_candidate.display_name),
+                "Custom coordinates");
+            location_candidate.latitude = latitude;
+            location_candidate.longitude = longitude;
+#endif
         } else if (strcmp(argv[index], "--clear-location") == 0) {
             if (!ss_date_time_model_set_location(
                     &model, false,
@@ -185,6 +204,8 @@ int main(int argc, char **argv)
                 exit_code = 2;
                 goto done;
             }
+            location_change_requested = true;
+            location_clear_requested = true;
         } else {
             print_usage(argv[0]);
             exit_code = 2;
@@ -193,13 +214,59 @@ int main(int argc, char **argv)
     }
 
     if (argc > 1) {
+#ifndef _WIN32
+        if (location_change_requested && !location_clear_requested) {
+            if (!ss_location_metadata_stage(&location_candidate)) {
+                fputs("Unable to stage locality metadata.\n", stderr);
+                exit_code = 2;
+                goto done;
+            }
+            location_staged = true;
+        }
+#endif
+
         if (platform == NULL || platform->save == NULL ||
             !platform->save(&model.policy)) {
+#ifndef _WIN32
+            if (location_staged) {
+                ss_location_metadata_discard_staged();
+                location_staged = false;
+            }
+#endif
             fputs("Unable to save temporal presentation policy.\n", stderr);
             exit_code = 2;
             goto done;
         }
         model.persisted_policy_present = true;
+
+#ifndef _WIN32
+        if (location_change_requested) {
+            const bool metadata_ok = location_clear_requested
+                ? ss_location_metadata_clear()
+                : ss_location_metadata_finish_staged();
+            if (!metadata_ok) {
+                const bool rolled_back =
+                    platform->save(&original_policy);
+                if (rolled_back && location_staged) {
+                    ss_location_metadata_discard_staged();
+                }
+                /*
+                 * If rollback failed, retain a staged locality journal so the
+                 * next System Settings process can reconcile it against the
+                 * policy that actually reached disk.
+                 */
+                fputs(
+                    rolled_back
+                        ? "Locality metadata could not be committed; the previous temporal policy was restored.\n"
+                        : "Locality metadata could not be committed and policy rollback failed; recovery is required.\n",
+                    stderr);
+                exit_code = 3;
+                goto done;
+            }
+            location_staged = false;
+        }
+#endif
+
         if (platform->compatibility_matches != NULL &&
             !platform->compatibility_matches(&model.policy)) {
             fputs(
