@@ -335,17 +335,23 @@ bool ss_home_temporal_presenter_format_now(
 guint ss_home_temporal_presenter_refresh_interval_ms(
     const SsHomeTemporalPresenter *presenter)
 {
+    if (presenter == NULL ||
+        !presenter->policy_valid ||
+        !presenter->policy.show_seconds) {
+        return 1000U;
+    }
+
     /*
-     * Seconds-enabled extended clocks can advance displayed units at rates
-     * other than one SI second. Sample at 250 ms so decimal, Internet and
-     * sidereal-style displays cannot skip visible units; seconds-disabled
-     * presentation remains at the low-cost 1 Hz cadence.
+     * Conventional civil clocks change their visible seconds at 1 Hz. Keep
+     * them at that cadence and reserve the 250 ms sampler for extended clocks
+     * whose displayed units may advance faster than one SI second.
      */
-    return presenter != NULL &&
-           presenter->policy_valid &&
-           presenter->policy.show_seconds
-        ? 250U
-        : 1000U;
+    if (strcmp(presenter->policy.clock_mode, "standard") == 0 ||
+        strcmp(presenter->policy.clock_mode, "standard-12") == 0 ||
+        strcmp(presenter->policy.clock_mode, "standard-24") == 0) {
+        return 1000U;
+    }
+    return 250U;
 }
 
 bool ss_home_temporal_presentation_now(
