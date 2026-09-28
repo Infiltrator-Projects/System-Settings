@@ -97,6 +97,29 @@ static void on_navigation_selected(GtkListBox *box,
     }
 }
 
+static void launch_command_finished(
+    GObject *process,
+    GAsyncResult *result,
+    gpointer user_data)
+{
+    GtkWidget *source = GTK_WIDGET(user_data);
+    g_autoptr(GError) error = NULL;
+    const gboolean success = g_subprocess_wait_check_finish(
+        G_SUBPROCESS(process), result, &error);
+
+    if (!success && source != NULL) {
+        gtk_widget_set_tooltip_text(
+            source,
+            error != NULL
+                ? error->message
+                : "The delegated settings tool exited without completing.");
+        gtk_widget_set_sensitive(source, FALSE);
+    }
+    if (source != NULL) {
+        g_object_unref(source);
+    }
+}
+
 static gboolean launch_command(GtkWidget *source,
                                const char *program,
                                const char *argument)
@@ -120,8 +143,23 @@ static gboolean launch_command(GtkWidget *source,
     if (process == NULL) {
         if (source != NULL && error != NULL) {
             gtk_widget_set_tooltip_text(source, error->message);
+            gtk_widget_set_sensitive(source, FALSE);
         }
         return FALSE;
+    }
+
+    if (source != NULL) {
+        /*
+         * Successful exec is not successful delegation. Observe termination so
+         * a missing/renamed Cinnamon module cannot masquerade as a working row.
+         * A failed capability is disabled for the remainder of this session
+         * and exposes the child error through its tooltip.
+         */
+        g_subprocess_wait_check_async(
+            process,
+            NULL,
+            launch_command_finished,
+            g_object_ref(source));
     }
     return TRUE;
 }
