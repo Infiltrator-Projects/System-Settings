@@ -73,6 +73,29 @@ struct SsLinuxDateTimePanel {
 GtkWidget *ss_linux_date_time_panel_build_ui(
     SsLinuxDateTimePanel *state);
 
+/* Internal controller services shared by split Date & Time translation units. */
+void ss_linux_date_time_panel_set_status(
+    SsLinuxDateTimePanel *state,
+    const char *message,
+    bool error);
+void ss_linux_date_time_panel_sync_controls(
+    SsLinuxDateTimePanel *state);
+void ss_linux_date_time_panel_policy_saved(
+    SsLinuxDateTimePanel *state);
+
+bool ss_linux_date_time_location_coordinate_close(
+    double left,
+    double right);
+bool ss_linux_date_time_location_metadata_matches_policy(
+    const SsLinuxDateTimePanel *state,
+    const InfiltratrTemporalPolicyV3 *policy);
+bool ss_linux_date_time_location_policy_matches_reference(
+    const SsLinuxDateTimePanel *state);
+void ss_linux_date_time_location_update_summary(
+    SsLinuxDateTimePanel *state);
+void ss_linux_date_time_location_cancel_coordinate_commit(
+    SsLinuxDateTimePanel *state);
+
 void on_clock_changed(GObject *object, GParamSpec *pspec, gpointer user_data);
 void on_calendar_changed(GObject *object, GParamSpec *pspec, gpointer user_data);
 void on_seconds_changed(GObject *object, GParamSpec *pspec, gpointer user_data);
