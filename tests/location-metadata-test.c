@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include "system-settings/date-time-model.h"
 #include "system-settings/location-metadata.h"
 #include "system-settings/temporal-policy-store.h"
 
@@ -9,6 +10,8 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
+#include <unistd.h>
 
 #define CHECK(expression) \
     do { \
@@ -23,6 +26,47 @@ static double absolute_difference(double left, double right)
 {
     const double difference = left - right;
     return difference < 0.0 ? -difference : difference;
+}
+
+static int locality_writer(const char *name,
+                           double latitude,
+                           double longitude,
+                           guint delay_usec)
+{
+    SsDateTimeModel model;
+    SsLocationMetadata metadata = {0};
+    int result = 1;
+
+    if (!ss_location_metadata_transaction_begin()) {
+        return result;
+    }
+    if (!ss_date_time_model_init(
+            &model, ss_platform_temporal_policy_store())) {
+        goto done;
+    }
+    g_strlcpy(metadata.display_name, name, sizeof(metadata.display_name));
+    g_strlcpy(metadata.country_code, "AU", sizeof(metadata.country_code));
+    metadata.latitude = latitude;
+    metadata.longitude = longitude;
+
+    if (!ss_location_metadata_stage(&metadata)) {
+        goto done;
+    }
+    g_usleep(delay_usec);
+    if (!ss_date_time_model_set_location(
+            &model, true, latitude, longitude)) {
+        (void)ss_location_metadata_discard_staged();
+        goto done;
+    }
+    g_usleep(delay_usec);
+    if (!ss_location_metadata_finish_staged()) {
+        goto done;
+    }
+    result = 0;
+
+done:
+    ss_location_metadata_transaction_end();
+    return result;
 }
 
 int main(void)
@@ -53,7 +97,8 @@ int main(void)
     saved.longitude = 145.3610;
 
     CHECK(ss_location_metadata_save(&saved));
-    CHECK(ss_location_metadata_load(&loaded));
+    CHECK(ss_location_metadata_load_result(&loaded) ==
+          SS_LOCATION_METADATA_LOAD_OK);
     CHECK(strcmp(loaded.display_name, saved.display_name) == 0);
     CHECK(strcmp(loaded.country_code, saved.country_code) == 0);
     CHECK(strcmp(loaded.timezone_id, saved.timezone_id) == 0);
@@ -89,6 +134,53 @@ int main(void)
     ss_location_metadata_transaction_end();
 
     /*
+     * Two real processes must serialize the complete journal -> policy ->
+     * metadata transaction. The final authority may be either writer, but the
+     * policy and metadata must always belong to the same writer.
+     */
+    {
+        pid_t first = fork();
+        CHECK(first >= 0);
+        if (first == 0) {
+            _exit(locality_writer(
+                "Concurrent A", -36.100001, 145.100001, 50000U));
+        }
+
+        pid_t second = fork();
+        CHECK(second >= 0);
+        if (second == 0) {
+            _exit(locality_writer(
+                "Concurrent B", -37.200002, 146.200002, 10000U));
+        }
+
+        int first_status = 0;
+        int second_status = 0;
+        CHECK(waitpid(first, &first_status, 0) == first);
+        CHECK(waitpid(second, &second_status, 0) == second);
+        CHECK(WIFEXITED(first_status) && WEXITSTATUS(first_status) == 0);
+        CHECK(WIFEXITED(second_status) && WEXITSTATUS(second_status) == 0);
+
+        SsDateTimeModel final_model;
+        CHECK(ss_date_time_model_init(
+            &final_model, ss_platform_temporal_policy_store()));
+        CHECK(ss_location_metadata_load_result(&loaded) ==
+              SS_LOCATION_METADATA_LOAD_OK);
+        CHECK(final_model.policy.location_configured);
+        CHECK(absolute_difference(
+                  final_model.policy.latitude, loaded.latitude) < 0.000001);
+        CHECK(absolute_difference(
+                  final_model.policy.longitude, loaded.longitude) < 0.000001);
+        if (strcmp(loaded.display_name, "Concurrent A") == 0) {
+            CHECK(absolute_difference(loaded.latitude, -36.100001) < 0.000001);
+            CHECK(absolute_difference(loaded.longitude, 145.100001) < 0.000001);
+        } else {
+            CHECK(strcmp(loaded.display_name, "Concurrent B") == 0);
+            CHECK(absolute_difference(loaded.latitude, -37.200002) < 0.000001);
+            CHECK(absolute_difference(loaded.longitude, 146.200002) < 0.000001);
+        }
+    }
+
+    /*
      * Interrupted paired locality writes leave a private journal. A matching
      * authoritative policy finalizes it; a non-matching policy discards it.
      */
@@ -104,7 +196,8 @@ int main(void)
         CHECK(ss_location_metadata_stage(&staged));
         CHECK(ss_location_metadata_recover(
             false, staged.latitude, staged.longitude));
-        CHECK(!ss_location_metadata_load(&loaded));
+        CHECK(ss_location_metadata_load_result(&loaded) ==
+              SS_LOCATION_METADATA_LOAD_MISSING);
 
         {
             const SsTemporalPolicyStore *store =
@@ -167,7 +260,8 @@ int main(void)
     };
     for (size_t i = 0; i < G_N_ELEMENTS(malformed); ++i) {
         CHECK(g_file_set_contents(expected_file, malformed[i], -1, NULL));
-        CHECK(!ss_location_metadata_load(&loaded));
+        CHECK(ss_location_metadata_load_result(&loaded) ==
+              SS_LOCATION_METADATA_LOAD_INVALID);
         CHECK(loaded.display_name[0] == '\0');
         CHECK(loaded.latitude == 0.0 && loaded.longitude == 0.0);
     }
