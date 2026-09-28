@@ -15,6 +15,7 @@
 
 #include <glib.h>
 #include <glib-object.h>
+#include <glib/gstdio.h>
 
 #include <stddef.h>
 #include <string.h>
