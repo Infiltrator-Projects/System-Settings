@@ -63,7 +63,9 @@ static bool command_exists(const char *name)
          part != NULL;
          part = strtok_r(NULL, ":", &save)) {
         char candidate[PATH_MAX];
-        if (snprintf(candidate, sizeof(candidate), "%s/%s", part, name) > 0 &&
+        const int count =
+            snprintf(candidate, sizeof(candidate), "%s/%s", part, name);
+        if (count > 0 && (size_t)count < sizeof(candidate) &&
             access(candidate, X_OK) == 0) {
             found = true;
             break;
