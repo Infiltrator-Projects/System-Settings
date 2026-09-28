@@ -201,10 +201,9 @@ static bool write_training_evidence(const char *path)
         }
         offset += (size_t)count;
     }
-    if (fsync(fd) != 0 || close(fd) != 0) {
-        return false;
-    }
-    return true;
+    const int sync_result = fsync(fd);
+    const int close_result = close(fd);
+    return sync_result == 0 && close_result == 0;
 }
 
 static int remove_tree(const char *path)
