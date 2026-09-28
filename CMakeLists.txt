@@ -446,6 +446,16 @@ if(BUILD_TESTING)
             system-settings-platform)
         add_test(NAME location-metadata COMMAND location-metadata-test)
 
+        add_executable(policy-concurrency-test
+            tests/policy-concurrency-test.c)
+        ss_configure(policy-concurrency-test)
+        target_link_libraries(policy-concurrency-test PRIVATE
+            system-settings-core
+            system-settings-platform
+            InfiltratrCommon::Common
+            PkgConfig::GIO2)
+        add_test(NAME policy-concurrency COMMAND policy-concurrency-test)
+
         add_library(calendar-preview-runtime-fixture SHARED
             tests/calendar-preview-runtime-fixture.c)
         ss_configure(calendar-preview-runtime-fixture)
