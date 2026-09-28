@@ -546,7 +546,7 @@ int main(int argc, char **argv)
             snprintf(
                 final_flags,
                 sizeof(final_flags),
-                "-O3 -DNDEBUG -march=native -mtune=native -flto -fprofile-use=%s -fprofile-correction -Werror=missing-profile",
+                "-O3 -DNDEBUG -march=native -mtune=native -flto -fprofile-use=%s -fprofile-correction -Wmissing-profile -Wno-error=missing-profile",
                 pgo) <= 0 ||
             strlen(generate_flags) >= sizeof(generate_flags) - 1U ||
             strlen(final_flags) >= sizeof(final_flags) - 1U) {
@@ -580,6 +580,7 @@ int main(int argc, char **argv)
             "-DCMAKE_BUILD_TYPE=Release",
             build_profile_argument,
             "-DBUILD_TESTING=ON",
+            "-DINFILTRATR_COMMON_BUILD_TESTS=ON",
             c_flags_argument,
             evidence_argument,
             NULL
