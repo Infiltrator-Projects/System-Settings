@@ -87,10 +87,6 @@ jobs:
         shell: bash
         run: echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)" >> "$GITHUB_ENV"
 
-      - name: Set reproducible build epoch
-        shell: bash
-        run: echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)" >> "$GITHUB_ENV"
-
       - name: Install Linux UI dependencies
         if: runner.environment == 'github-hosted'
         run: |
@@ -102,7 +98,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for command_name in curl tar cmake ctest cc pkg-config dpkg-deb git readelf sha256sum; do
+          for command_name in tar cmake ctest cc pkg-config dpkg-deb git readelf sha256sum xvfb-run dbus-daemon; do
             command -v "$command_name" >/dev/null 2>&1
           done
           pkg-config --exists gtk4
