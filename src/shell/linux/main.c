@@ -763,6 +763,7 @@ typedef struct {
     GtkLabel *system_time;
     SsHomeTemporalPresenter *presenter;
     guint source_id;
+    guint interval_ms;
 } HomeTemporalTicker;
 
 typedef struct {
@@ -782,6 +783,7 @@ static gboolean refresh_home_temporal(gpointer user_data)
 {
     HomeTemporalTicker *ticker = user_data;
     SsHomeTemporalPresentation temporal;
+    guint desired_interval;
 
     if (ticker == NULL ||
         ticker->clock == NULL ||
@@ -798,6 +800,22 @@ static gboolean refresh_home_temporal(gpointer user_data)
         gtk_label_set_text(ticker->system_time, temporal.system_time_text);
     }
     ss_home_temporal_presentation_clear(&temporal);
+
+    desired_interval =
+        ss_home_temporal_presenter_refresh_interval_ms(
+            ticker->presenter);
+    if (desired_interval != ticker->interval_ms) {
+        ticker->source_id = 0U;
+        ticker->interval_ms = desired_interval;
+        ticker->source_id = g_timeout_add(
+            desired_interval,
+            refresh_home_temporal,
+            ticker);
+        g_source_set_name_by_id(
+            ticker->source_id,
+            "[system-settings] visible Home temporal presentation");
+        return G_SOURCE_REMOVE;
+    }
     return G_SOURCE_CONTINUE;
 }
 
@@ -814,12 +832,19 @@ static void start_home_temporal_ticker(HomeTemporalTicker *ticker)
     if (ticker == NULL || ticker->source_id != 0U) {
         return;
     }
+    ticker->interval_ms =
+        ss_home_temporal_presenter_refresh_interval_ms(
+            ticker->presenter);
     (void)refresh_home_temporal(ticker);
-    ticker->source_id = g_timeout_add(
-        250U, refresh_home_temporal, ticker);
-    g_source_set_name_by_id(
-        ticker->source_id,
-        "[system-settings] visible Home temporal presentation");
+    if (ticker->source_id == 0U) {
+        ticker->source_id = g_timeout_add(
+            ticker->interval_ms,
+            refresh_home_temporal,
+            ticker);
+        g_source_set_name_by_id(
+            ticker->source_id,
+            "[system-settings] visible Home temporal presentation");
+    }
 }
 
 static void home_temporal_mapped(
