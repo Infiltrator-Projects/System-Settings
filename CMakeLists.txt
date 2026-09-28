@@ -14,6 +14,8 @@ include(GNUInstallDirs)
 option(SYSTEM_SETTINGS_WARNINGS_AS_ERRORS "Treat warnings as errors" ON)
 set(SYSTEM_SETTINGS_BUILD_PROFILE "cmake" CACHE STRING
     "Common build-profile identity for this System Settings build")
+set(SYSTEM_SETTINGS_NATIVE_PGO_EVIDENCE "" CACHE FILEPATH
+    "Installer-created evidence that the native GCC PGO training pass completed")
 set_property(CACHE SYSTEM_SETTINGS_BUILD_PROFILE PROPERTY STRINGS
     cmake generic native development)
 if(NOT SYSTEM_SETTINGS_BUILD_PROFILE MATCHES "^(cmake|generic|native|development)$")
@@ -35,6 +37,17 @@ if(SYSTEM_SETTINGS_BUILD_PROFILE STREQUAL "native")
         message(FATAL_ERROR
             "SYSTEM_SETTINGS_BUILD_PROFILE=native requires -march=native, LTO and a trained -fprofile-use build.")
     endif()
+    if(SYSTEM_SETTINGS_NATIVE_PGO_EVIDENCE STREQUAL "" OR
+       NOT EXISTS "${SYSTEM_SETTINGS_NATIVE_PGO_EVIDENCE}")
+        message(FATAL_ERROR
+            "SYSTEM_SETTINGS_BUILD_PROFILE=native requires installer-created PGO training evidence.")
+    endif()
+    file(READ "${SYSTEM_SETTINGS_NATIVE_PGO_EVIDENCE}" SS_NATIVE_PGO_EVIDENCE_TEXT)
+    string(STRIP "${SS_NATIVE_PGO_EVIDENCE_TEXT}" SS_NATIVE_PGO_EVIDENCE_TEXT)
+    if(NOT SS_NATIVE_PGO_EVIDENCE_TEXT STREQUAL "trained-pgo")
+        message(FATAL_ERROR "Native PGO training evidence is invalid.")
+    endif()
+    unset(SS_NATIVE_PGO_EVIDENCE_TEXT)
     unset(SS_NATIVE_PROFILE_FLAGS)
     unset(SS_BUILD_TYPE_FLAGS_VAR)
     unset(SS_BUILD_TYPE_UPPER)
