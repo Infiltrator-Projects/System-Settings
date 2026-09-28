@@ -141,6 +141,14 @@ int main(void)
      * Recovery of a policy with no configured location removes metadata left
      * by a crash after the policy commit but before metadata cleanup.
      */
+    {
+        const SsTemporalPolicyStore *store =
+            ss_platform_temporal_policy_store();
+        InfiltratrTemporalPolicyV3 authoritative;
+        CHECK(store != NULL && store->save != NULL);
+        CHECK(infiltratr_temporal_policy_v3_default(&authoritative));
+        CHECK(store->save(&authoritative));
+    }
     CHECK(ss_location_metadata_recover(false, 0.0, 0.0));
     CHECK(!g_file_test(expected_file, G_FILE_TEST_EXISTS));
     CHECK(ss_location_metadata_save(&saved));
