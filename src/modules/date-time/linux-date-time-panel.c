@@ -133,20 +133,35 @@ static void location_metadata_file_changed(gpointer user_data)
 {
     SsLinuxDateTimePanel *state = user_data;
     SsLocationMetadata loaded = {0};
+    g_autofree gchar *path = NULL;
 
     if (state == NULL) {
         return;
     }
 
-    state->location_metadata_present =
-        ss_location_metadata_load(&loaded);
-    if (state->location_metadata_present) {
+    if (ss_location_metadata_load(&loaded)) {
         state->location_metadata = loaded;
+        state->location_metadata_present = true;
     } else {
-        memset(
-            &state->location_metadata,
-            0,
-            sizeof(state->location_metadata));
+        path = ss_location_metadata_path_alloc();
+        if (path == NULL ||
+            !g_file_test(path, G_FILE_TEST_EXISTS)) {
+            memset(
+                &state->location_metadata,
+                0,
+                sizeof(state->location_metadata));
+            state->location_metadata_present = false;
+        } else {
+            /*
+             * Permission failures, malformed transient content, or a target
+             * temporarily replaced by a non-regular entry must not erase the
+             * last known-good locality. Keep it and wait for a later event.
+             */
+            set_status(
+                state,
+                "Locality metadata changed externally but could not be read; the last known-good locality remains active.",
+                true);
+        }
     }
 
     refresh_location_authority_state(state);
