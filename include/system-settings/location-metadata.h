@@ -39,6 +39,28 @@ bool ss_location_metadata_load(SsLocationMetadata *metadata);
  */
 bool ss_location_metadata_save(const SsLocationMetadata *metadata);
 
+/** Return the XDG metadata path; caller releases with g_free(). */
+char *ss_location_metadata_path_alloc(void);
+
+/**
+ * Stage locality metadata durably before the paired temporal-policy write.
+ * finish_staged() publishes the staged record to location.ini and removes the
+ * journal. discard_staged() removes an abandoned journal.
+ */
+bool ss_location_metadata_stage(const SsLocationMetadata *metadata);
+bool ss_location_metadata_finish_staged(void);
+void ss_location_metadata_discard_staged(void);
+
+/**
+ * Recover an interrupted two-file locality transaction. If the staged
+ * coordinates match the authoritative temporal policy, finalize metadata;
+ * otherwise discard the abandoned stage. No staged file is also success.
+ */
+bool ss_location_metadata_recover(
+    bool location_configured,
+    double latitude,
+    double longitude);
+
 #ifdef __cplusplus
 }
 #endif
