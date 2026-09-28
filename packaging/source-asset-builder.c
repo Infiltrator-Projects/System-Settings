@@ -201,8 +201,10 @@ static bool write_text(const char *path, const char *text)
     }
     ok = fwrite(text, 1U, length, stream) == length &&
          fflush(stream) == 0 &&
-         fsync(fileno(stream)) == 0 &&
-         fclose(stream) == 0;
+         fsync(fileno(stream)) == 0;
+    if (fclose(stream) != 0) {
+        ok = false;
+    }
     return ok;
 }
 
@@ -351,11 +353,13 @@ static bool collect_files(
         }
 
         if (relative[0] == '\0') {
-            if (snprintf(
-                    child_relative,
-                    sizeof(child_relative),
-                    "%s",
-                    entry->d_name) <= 0) {
+            const int child_length = snprintf(
+                child_relative,
+                sizeof(child_relative),
+                "%s",
+                entry->d_name);
+            if (child_length <= 0 ||
+                (size_t)child_length >= sizeof(child_relative)) {
                 closedir(directory);
                 return false;
             }
@@ -629,11 +633,13 @@ int main(int argc, char **argv)
 
     {
         char revspec[PATH_MAX];
-        if (snprintf(
-                revspec,
-                sizeof(revspec),
-                "HEAD:%s",
-                common_relative) <= 0) {
+        const int revspec_length = snprintf(
+            revspec,
+            sizeof(revspec),
+            "HEAD:%s",
+            common_relative);
+        if (revspec_length <= 0 ||
+            (size_t)revspec_length >= sizeof(revspec)) {
             fail("cannot form Common revision.");
         }
         char *pin_argv[] = {
@@ -699,17 +705,23 @@ int main(int argc, char **argv)
         !path_join(common_tar, sizeof(common_tar), work, "common.tar")) {
         goto cleanup;
     }
-    if (snprintf(
+    {
+        const int root_output_length = snprintf(
             root_output_argument,
             sizeof(root_output_argument),
             "--output=%s",
-            root_tar) <= 0 ||
-        snprintf(
+            root_tar);
+        const int common_output_length = snprintf(
             common_output_argument,
             sizeof(common_output_argument),
             "--output=%s",
-            common_tar) <= 0) {
-        goto cleanup;
+            common_tar);
+        if (root_output_length <= 0 ||
+            (size_t)root_output_length >= sizeof(root_output_argument) ||
+            common_output_length <= 0 ||
+            (size_t)common_output_length >= sizeof(common_output_argument)) {
+            goto cleanup;
+        }
     }
 
     {
@@ -788,12 +800,18 @@ int main(int argc, char **argv)
         }
     }
 
-    if (snprintf(
+    {
+        const int run_name_length = snprintf(
             output_argument,
             sizeof(output_argument),
             "System-Settings-%s-native.run",
-            version) <= 0 ||
-        !path_join(
+            version);
+        if (run_name_length <= 0 ||
+            (size_t)run_name_length >= sizeof(output_argument)) {
+            goto cleanup;
+        }
+    }
+    if (!path_join(
             run_path,
             sizeof(run_path),
             output,
@@ -812,12 +830,15 @@ int main(int argc, char **argv)
             "\nSSPAYLOAD=%020llu\n",
             (unsigned long long)payload_stat.st_size) != 32 ||
         fflush(run) != 0 ||
-        fsync(fileno(run)) != 0 ||
-        fclose(run) != 0) {
+        fsync(fileno(run)) != 0) {
         if (run != NULL) {
             fclose(run);
             run = NULL;
         }
+        goto cleanup;
+    }
+    if (fclose(run) != 0) {
+        run = NULL;
         goto cleanup;
     }
     run = NULL;
@@ -825,12 +846,18 @@ int main(int argc, char **argv)
         goto cleanup;
     }
 
-    if (snprintf(
+    {
+        const int zip_name_length = snprintf(
             output_argument,
             sizeof(output_argument),
             "System-Settings-%s-source.zip",
-            version) <= 0 ||
-        !path_join(
+            version);
+        if (zip_name_length <= 0 ||
+            (size_t)zip_name_length >= sizeof(output_argument)) {
+            goto cleanup;
+        }
+    }
+    if (!path_join(
             zip_path,
             sizeof(zip_path),
             output,
