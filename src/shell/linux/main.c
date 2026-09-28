@@ -32,6 +32,9 @@ typedef struct {
     gchar *query;
 } ShellSearchState;
 
+static GtkCssProvider *common_theme_provider;
+static bool common_theme_watch_installed;
+
 static gchar *rgb_css(uint32_t rgb)
 {
     return g_strdup_printf("#%06x", (unsigned int)(rgb & UINT32_C(0xFFFFFF)));
@@ -68,6 +71,7 @@ static void install_common_theme(void)
     const InfiltratrDesignMetrics *metrics = infiltratr_design_metrics();
     const InfiltratrTypography *type = infiltratr_typography();
     GtkCssProvider *provider;
+    GdkDisplay *display;
     GString *css;
     gchar *background;
     gchar *panel;
@@ -89,7 +93,9 @@ static void install_common_theme(void)
     gchar *status_border;
     gchar *warm;
 
-    if (palette == NULL || metrics == NULL || type == NULL) {
+    display = gdk_display_get_default();
+    if (palette == NULL || metrics == NULL || type == NULL ||
+        display == NULL) {
         return;
     }
 
@@ -575,9 +581,16 @@ static void install_common_theme(void)
 #else
     gtk_css_provider_load_from_data(provider, css->str, -1);
 #endif
+    if (common_theme_provider != NULL) {
+        gtk_style_context_remove_provider_for_display(
+            display,
+            GTK_STYLE_PROVIDER(common_theme_provider));
+        g_clear_object(&common_theme_provider);
+    }
+    common_theme_provider = g_object_ref(provider);
     gtk_style_context_add_provider_for_display(
-        gdk_display_get_default(),
-        GTK_STYLE_PROVIDER(provider),
+        display,
+        GTK_STYLE_PROVIDER(common_theme_provider),
         GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
 
     g_object_unref(provider);
@@ -601,6 +614,38 @@ static void install_common_theme(void)
     g_free(surface_hover);
     g_free(status_border);
     g_free(warm);
+}
+
+static void on_system_theme_changed(
+    GObject *object G_GNUC_UNUSED,
+    GParamSpec *pspec G_GNUC_UNUSED,
+    gpointer user_data G_GNUC_UNUSED)
+{
+    install_common_theme();
+}
+
+static void ensure_common_theme_watch(void)
+{
+    GtkSettings *settings;
+
+    if (common_theme_watch_installed) {
+        return;
+    }
+    settings = gtk_settings_get_default();
+    if (settings == NULL) {
+        return;
+    }
+    g_signal_connect(
+        settings,
+        "notify::gtk-theme-name",
+        G_CALLBACK(on_system_theme_changed),
+        NULL);
+    g_signal_connect(
+        settings,
+        "notify::gtk-application-prefer-dark-theme",
+        G_CALLBACK(on_system_theme_changed),
+        NULL);
+    common_theme_watch_installed = true;
 }
 
 static void show_about(GtkButton *button, gpointer user_data);
@@ -904,7 +949,10 @@ static GtkWidget *build_header(GtkWindow *parent, GtkSearchEntry **search_out)
     gtk_header_bar_pack_start(GTK_HEADER_BAR(header), brand);
 
     gtk_search_entry_set_placeholder_text(
-        GTK_SEARCH_ENTRY(search), "Search settings…");
+        GTK_SEARCH_ENTRY(search), "Filter settings navigation…");
+    gtk_widget_set_tooltip_text(
+        search,
+        "Filter settings categories and their indexed keywords.");
     gtk_widget_add_css_class(search, "settings-search");
     gtk_widget_set_size_request(search, 240, -1);
     gtk_widget_add_css_class(header_end, "header-end");
@@ -990,7 +1038,7 @@ static GtkWidget *build_sidebar(GtkWindow *parent,
         "Date & Time",
         "Clock, calendar & location",
         "date-time",
-        "date time clock calendar location timezone");
+        "date time clock calendar location timezone seconds precision 12 hour 24 hour decimal internet ntp network time unix binary hexadecimal julian sidereal solar roman chinese japanese gregorian hebrew islamic persian mayan french republican first day week");
     gtk_widget_add_css_class(date_row, "nav-gold");
 
     region_row = make_external_navigation_row(
@@ -1202,6 +1250,7 @@ typedef struct {
     GtkLabel *date;
     GtkLabel *system_time;
     SsHomeTemporalPresenter *presenter;
+    guint source_id;
 } HomeTemporalTicker;
 
 typedef struct {
@@ -1214,6 +1263,7 @@ typedef struct {
     GtkLabel *appearance_detail;
     GtkLabel *network_value;
     GtkLabel *network_detail;
+    guint source_id;
 } HomeStatusTicker;
 
 static gboolean refresh_home_temporal(gpointer user_data)
@@ -1227,11 +1277,6 @@ static gboolean refresh_home_temporal(gpointer user_data)
         ticker->system_time == NULL) {
         return G_SOURCE_REMOVE;
     }
-    if (ticker->owner != NULL &&
-        !gtk_widget_get_mapped(ticker->owner)) {
-        return G_SOURCE_CONTINUE;
-    }
-
     ss_home_temporal_presentation_init(&temporal);
     if (ticker->presenter != NULL &&
         ss_home_temporal_presenter_format_now(
@@ -1244,18 +1289,48 @@ static gboolean refresh_home_temporal(gpointer user_data)
     return G_SOURCE_CONTINUE;
 }
 
+static void stop_home_temporal_ticker(HomeTemporalTicker *ticker)
+{
+    if (ticker != NULL && ticker->source_id != 0U) {
+        g_source_remove(ticker->source_id);
+        ticker->source_id = 0U;
+    }
+}
+
+static void start_home_temporal_ticker(HomeTemporalTicker *ticker)
+{
+    if (ticker == NULL || ticker->source_id != 0U) {
+        return;
+    }
+    (void)refresh_home_temporal(ticker);
+    ticker->source_id = g_timeout_add(
+        250U, refresh_home_temporal, ticker);
+    g_source_set_name_by_id(
+        ticker->source_id,
+        "[system-settings] visible Home temporal presentation");
+}
+
+static void home_temporal_mapped(
+    GtkWidget *widget G_GNUC_UNUSED,
+    gpointer user_data)
+{
+    start_home_temporal_ticker(user_data);
+}
+
+static void home_temporal_unmapped(
+    GtkWidget *widget G_GNUC_UNUSED,
+    gpointer user_data)
+{
+    stop_home_temporal_ticker(user_data);
+}
+
 static void home_temporal_ticker_free(gpointer data)
 {
     HomeTemporalTicker *ticker = data;
     if (ticker == NULL) return;
+    stop_home_temporal_ticker(ticker);
     ss_home_temporal_presenter_free(ticker->presenter);
     g_free(ticker);
-}
-
-static void remove_source(gpointer data)
-{
-    const guint source_id = GPOINTER_TO_UINT(data);
-    if (source_id != 0U) g_source_remove(source_id);
 }
 
 static void open_date_time(GtkButton *button, gpointer user_data)
@@ -1569,10 +1644,6 @@ static gboolean refresh_home_status(gpointer user_data)
     g_autoptr(GTimeZone) local_zone = g_time_zone_new_local();
 
     if (ticker == NULL) return G_SOURCE_REMOVE;
-    if (ticker->owner != NULL &&
-        !gtk_widget_get_mapped(ticker->owner)) {
-        return G_SOURCE_CONTINUE;
-    }
     uptime = format_uptime();
     if (ticker->uptime != NULL) gtk_label_set_text(ticker->uptime, uptime);
     if (ticker->date_timezone != NULL && local_zone != NULL) {
@@ -1623,6 +1694,49 @@ static gboolean refresh_home_status(gpointer user_data)
     }
     g_free(theme_name);
     return G_SOURCE_CONTINUE;
+}
+
+static void stop_home_status_ticker(HomeStatusTicker *ticker)
+{
+    if (ticker != NULL && ticker->source_id != 0U) {
+        g_source_remove(ticker->source_id);
+        ticker->source_id = 0U;
+    }
+}
+
+static void start_home_status_ticker(HomeStatusTicker *ticker)
+{
+    if (ticker == NULL || ticker->source_id != 0U) {
+        return;
+    }
+    (void)refresh_home_status(ticker);
+    ticker->source_id = g_timeout_add_seconds(
+        5U, refresh_home_status, ticker);
+    g_source_set_name_by_id(
+        ticker->source_id,
+        "[system-settings] visible Home system status");
+}
+
+static void home_status_mapped(
+    GtkWidget *widget G_GNUC_UNUSED,
+    gpointer user_data)
+{
+    start_home_status_ticker(user_data);
+}
+
+static void home_status_unmapped(
+    GtkWidget *widget G_GNUC_UNUSED,
+    gpointer user_data)
+{
+    stop_home_status_ticker(user_data);
+}
+
+static void home_status_ticker_free(gpointer data)
+{
+    HomeStatusTicker *ticker = data;
+    if (ticker == NULL) return;
+    stop_home_status_ticker(ticker);
+    g_free(ticker);
 }
 
 static GtkWidget *build_home_page(
@@ -2113,20 +2227,17 @@ static GtkWidget *build_home_page(
     ticker->system_time = GTK_LABEL(system_time_label);
     ticker->presenter = home_presenter;
     home_presenter = NULL;
-    const guint temporal_source_id = g_timeout_add_full(
-        G_PRIORITY_DEFAULT,
-        250U,
-        refresh_home_temporal,
-        ticker,
-        home_temporal_ticker_free);
-    g_source_set_name_by_id(
-        temporal_source_id,
-        "[system-settings] live Home temporal presentation");
+    g_signal_connect(
+        scroller, "map",
+        G_CALLBACK(home_temporal_mapped), ticker);
+    g_signal_connect(
+        scroller, "unmap",
+        G_CALLBACK(home_temporal_unmapped), ticker);
     g_object_set_data_full(
         G_OBJECT(scroller),
         "system-settings-home-temporal-source",
-        GUINT_TO_POINTER(temporal_source_id),
-        remove_source);
+        ticker,
+        home_temporal_ticker_free);
 
     HomeStatusTicker *status_ticker = g_new0(HomeStatusTicker, 1);
     status_ticker->owner = scroller;
@@ -2138,18 +2249,17 @@ static GtkWidget *build_home_page(
     status_ticker->appearance_detail = GTK_LABEL(appearance_detail_label);
     status_ticker->network_value = GTK_LABEL(network_value_label);
     status_ticker->network_detail = GTK_LABEL(network_detail_label);
-    (void)refresh_home_status(status_ticker);
-    const guint status_source_id = g_timeout_add_seconds_full(
-        G_PRIORITY_DEFAULT, 5U,
-        refresh_home_status, status_ticker, g_free);
-    g_source_set_name_by_id(
-        status_source_id,
-        "[system-settings] live Home system status");
+    g_signal_connect(
+        scroller, "map",
+        G_CALLBACK(home_status_mapped), status_ticker);
+    g_signal_connect(
+        scroller, "unmap",
+        G_CALLBACK(home_status_unmapped), status_ticker);
     g_object_set_data_full(
         G_OBJECT(scroller),
         "system-settings-home-status-source",
-        GUINT_TO_POINTER(status_source_id),
-        remove_source);
+        status_ticker,
+        home_status_ticker_free);
 
     ss_home_temporal_presenter_free(home_presenter);
     g_free(theme_name);
@@ -2267,6 +2377,7 @@ static void on_activate(GtkApplication *application, gpointer user_data)
         return;
     }
     install_common_theme();
+    ensure_common_theme_watch();
 
     window = GTK_WINDOW(
         gtk_application_window_new(application));
