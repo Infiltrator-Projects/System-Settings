@@ -74,6 +74,38 @@ int main(void)
     CHECK(g_stat(settings_dir, &settings_stat) == 0);
     CHECK((settings_stat.st_mode & 0777) == 0700);
 
+    /*
+     * Interrupted paired locality writes leave a private journal. A matching
+     * authoritative policy finalizes it; a non-matching policy discards it.
+     */
+    {
+        SsLocationMetadata staged = saved;
+        g_strlcpy(
+            staged.display_name,
+            "Staged locality",
+            sizeof(staged.display_name));
+        staged.latitude = -37.1000;
+        staged.longitude = 146.2000;
+
+        CHECK(ss_location_metadata_stage(&staged));
+        CHECK(ss_location_metadata_recover(
+            false, staged.latitude, staged.longitude));
+        CHECK(ss_location_metadata_load(&loaded));
+        CHECK(strcmp(loaded.display_name, saved.display_name) == 0);
+
+        CHECK(ss_location_metadata_stage(&staged));
+        CHECK(ss_location_metadata_recover(
+            true, staged.latitude, staged.longitude));
+        CHECK(ss_location_metadata_load(&loaded));
+        CHECK(strcmp(loaded.display_name, "Staged locality") == 0);
+        CHECK(absolute_difference(
+                  loaded.latitude, staged.latitude) < 0.000001);
+        CHECK(absolute_difference(
+                  loaded.longitude, staged.longitude) < 0.000001);
+
+        saved = staged;
+    }
+
     saved.latitude = NAN;
     CHECK(!ss_location_metadata_save(&saved));
     saved.latitude = -36.3949;
