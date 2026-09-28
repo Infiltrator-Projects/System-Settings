@@ -9,6 +9,65 @@
 #include <infiltratr/core.h>
 #include <infiltratr/temporal_posix.h>
 
+#include <errno.h>
+#include <fcntl.h>
+#include <limits.h>
+#include <sys/file.h>
+#include <unistd.h>
+
+#ifndef PATH_MAX
+#define PATH_MAX 4096
+#endif
+
+static int update_lock_fd = -1;
+
+static bool begin_update(void)
+{
+    char directory[PATH_MAX];
+    char lock_path[PATH_MAX];
+    int fd;
+
+    if (update_lock_fd >= 0 ||
+        !infiltratr_temporal_posix_policy_directory(
+            directory, sizeof(directory))) {
+        return false;
+    }
+    if (g_mkdir_with_parents(directory, 0700) != 0 && errno != EEXIST) {
+        return false;
+    }
+    if (g_chmod(directory, 0700) != 0) {
+        return false;
+    }
+    if (g_snprintf(
+            lock_path, sizeof(lock_path),
+            "%s/presentation.lock", directory) <= 0) {
+        return false;
+    }
+
+    fd = open(lock_path, O_CREAT | O_RDWR | O_CLOEXEC, 0600);
+    if (fd < 0) {
+        return false;
+    }
+    while (flock(fd, LOCK_EX) != 0) {
+        if (errno != EINTR) {
+            close(fd);
+            return false;
+        }
+    }
+    update_lock_fd = fd;
+    return true;
+}
+
+static void end_update(void)
+{
+    if (update_lock_fd < 0) {
+        return;
+    }
+    (void)flock(update_lock_fd, LOCK_UN);
+    (void)close(update_lock_fd);
+    update_lock_fd = -1;
+}
+
 static void load_cinnamon_defaults(InfiltratrTemporalPolicyV3 *policy)
 {
     g_autoptr(GSettings) settings = ss_cinnamon_interface_settings_new();
@@ -103,7 +162,9 @@ const SsTemporalPolicyStore *ss_platform_temporal_policy_store(void)
 {
     static const SsTemporalPolicyStore store = {
         .load = platform_load,
-        .save = platform_save
+        .save = platform_save,
+        .begin_update = begin_update,
+        .end_update = end_update
     };
     return &store;
 }
