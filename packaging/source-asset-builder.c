@@ -24,6 +24,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <time.h>
 #include <unistd.h>
 
 #ifndef PATH_MAX
@@ -411,6 +412,152 @@ static bool collect_files(
     return closedir(directory) == 0;
 }
 
+static bool trees_equal(
+    const char *left_root,
+    const char *right_root)
+{
+    PathList left = {0};
+    PathList right = {0};
+    bool equal = false;
+
+    if (!collect_files(left_root, "", &left) ||
+        !collect_files(right_root, "", &right)) {
+        goto done;
+    }
+    qsort(left.items, left.length, sizeof(*left.items), compare_paths);
+    qsort(right.items, right.length, sizeof(*right.items), compare_paths);
+    if (left.length != right.length) {
+        goto done;
+    }
+
+    for (size_t i = 0U; i < left.length; ++i) {
+        char left_path[PATH_MAX];
+        char right_path[PATH_MAX];
+
+        if (strcmp(left.items[i], right.items[i]) != 0 ||
+            !path_join(
+                left_path, sizeof(left_path),
+                left_root, left.items[i]) ||
+            !path_join(
+                right_path, sizeof(right_path),
+                right_root, right.items[i]) ||
+            !files_equal(left_path, right_path)) {
+            goto done;
+        }
+    }
+    equal = true;
+
+done:
+    path_list_free(&left);
+    path_list_free(&right);
+    return equal;
+}
+
+static bool normalize_tree_times(
+    const char *root,
+    const char *relative,
+    time_t epoch)
+{
+    char directory_path[PATH_MAX];
+    DIR *directory;
+    struct timespec times[2] = {
+        { .tv_sec = epoch, .tv_nsec = 0 },
+        { .tv_sec = epoch, .tv_nsec = 0 }
+    };
+
+    if (relative[0] == '\0') {
+        if (strlen(root) >= sizeof(directory_path)) {
+            return false;
+        }
+        strcpy(directory_path, root);
+    } else if (!path_join(
+                   directory_path,
+                   sizeof(directory_path),
+                   root,
+                   relative)) {
+        return false;
+    }
+
+    directory = opendir(directory_path);
+    if (directory == NULL) {
+        return false;
+    }
+
+    for (;;) {
+        struct dirent *entry = readdir(directory);
+        char child_relative[PATH_MAX];
+        char child_path[PATH_MAX];
+        struct stat st;
+
+        if (entry == NULL) {
+            break;
+        }
+        if (strcmp(entry->d_name, ".") == 0 ||
+            strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+
+        if (relative[0] == '\0') {
+            const int count = snprintf(
+                child_relative,
+                sizeof(child_relative),
+                "%s",
+                entry->d_name);
+            if (count <= 0 ||
+                (size_t)count >= sizeof(child_relative)) {
+                closedir(directory);
+                return false;
+            }
+        } else if (!path_join(
+                       child_relative,
+                       sizeof(child_relative),
+                       relative,
+                       entry->d_name)) {
+            closedir(directory);
+            return false;
+        }
+
+        if (!path_join(
+                child_path,
+                sizeof(child_path),
+                root,
+                child_relative) ||
+            lstat(child_path, &st) != 0) {
+            closedir(directory);
+            return false;
+        }
+
+        if (S_ISDIR(st.st_mode)) {
+            if (!normalize_tree_times(
+                    root, child_relative, epoch)) {
+                closedir(directory);
+                return false;
+            }
+        } else if (!S_ISREG(st.st_mode)) {
+            closedir(directory);
+            return false;
+        }
+
+        if (utimensat(
+                AT_FDCWD,
+                child_path,
+                times,
+                0) != 0) {
+            closedir(directory);
+            return false;
+        }
+    }
+
+    if (closedir(directory) != 0) {
+        return false;
+    }
+    return utimensat(
+        AT_FDCWD,
+        directory_path,
+        times,
+        0) == 0;
+}
+
 static bool sha256_file(
     const char *path,
     char hash[65])
@@ -554,6 +701,8 @@ int main(int argc, char **argv)
     char common[PATH_MAX];
     char pin[80];
     char common_head[80];
+    char epoch_text[32];
+    time_t source_epoch = 0;
     char work_template[] =
         "/tmp/system-settings-source-assets-XXXXXX";
     char *work = NULL;
@@ -602,6 +751,29 @@ int main(int argc, char **argv)
     }
     if (chdir(root) != 0) {
         fail("cannot enter repository root.");
+    }
+
+    {
+        char *epoch_argv[] = {
+            "git", "show", "-s", "--format=%ct", "HEAD", NULL
+        };
+        char *end = NULL;
+        long long parsed;
+
+        if (!capture_command(
+                root,
+                epoch_argv,
+                epoch_text,
+                sizeof(epoch_text))) {
+            fail("cannot read release commit timestamp.");
+        }
+        errno = 0;
+        parsed = strtoll(epoch_text, &end, 10);
+        if (errno != 0 || end == epoch_text ||
+            end == NULL || *end != '\0' || parsed <= 0) {
+            fail("release commit timestamp is invalid.");
+        }
+        source_epoch = (time_t)parsed;
     }
 
     {
@@ -777,13 +949,40 @@ int main(int argc, char **argv)
         }
     }
 
+    /*
+     * Git archives are content-stable but generated provenance files would
+     * otherwise inherit wall-clock mtimes. Normalize the complete exported
+     * tree to the release commit epoch before either archive is created.
+     */
+    if (!normalize_tree_times(source_root, "", source_epoch)) {
+        goto cleanup;
+    }
+
     if (!path_join(payload, sizeof(payload), work, "source.tar.gz")) {
         goto cleanup;
     }
     {
+        char epoch_argument[64];
+        const int epoch_length = snprintf(
+            epoch_argument,
+            sizeof(epoch_argument),
+            "--mtime=@%lld",
+            (long long)source_epoch);
         char *tar_argv[] = {
-            "tar", "-czf", payload, "-C", source_root, ".", NULL
+            "tar",
+            "--sort=name",
+            epoch_argument,
+            "--owner=0",
+            "--group=0",
+            "--numeric-owner",
+            "-czf", payload,
+            "-C", source_root, ".",
+            NULL
         };
+        if (epoch_length <= 0 ||
+            (size_t)epoch_length >= sizeof(epoch_argument)) {
+            goto cleanup;
+        }
         if (run_command(root, tar_argv) != 0) {
             goto cleanup;
         }
@@ -909,6 +1108,10 @@ int main(int argc, char **argv)
         if (run_command(root, extract_argv) != 0) {
             goto cleanup;
         }
+    }
+
+    if (!trees_equal(source_root, verified)) {
+        goto cleanup;
     }
 
     if (!path_join(
