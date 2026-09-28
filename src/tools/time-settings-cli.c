@@ -32,7 +32,12 @@ int main(int argc, char **argv)
     SsDateTimeModel model;
     int index;
     const SsTemporalPolicyStore *platform = ss_platform_temporal_policy_store();
-    static const SsTemporalPolicyStore staging = {stage_load, stage_save};
+    static const SsTemporalPolicyStore staging = {
+        .load = stage_load,
+        .save = stage_save,
+        .begin_update = NULL,
+        .end_update = NULL
+    };
 
     if (!ss_date_time_model_init(&model, ss_platform_temporal_policy_store())) {
         fputs("Unable to load temporal presentation policy.\n", stderr);
