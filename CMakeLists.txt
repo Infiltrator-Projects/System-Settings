@@ -42,6 +42,8 @@ if(NOT SYSTEM_SETTINGS_COMMON_VERSION STREQUAL
         "${SYSTEM_SETTINGS_COMMON_VERSION}")
 endif()
 find_package(Git QUIET)
+set(SYSTEM_SETTINGS_COMMON_PROVENANCE
+    "${SYSTEM_SETTINGS_COMMON_DIR}/.system-settings-common-commit")
 if(GIT_FOUND AND EXISTS "${SYSTEM_SETTINGS_COMMON_DIR}/.git")
     execute_process(
         COMMAND "${GIT_EXECUTABLE}" -C "${SYSTEM_SETTINGS_COMMON_DIR}"
@@ -58,6 +60,22 @@ if(GIT_FOUND AND EXISTS "${SYSTEM_SETTINGS_COMMON_DIR}/.git")
             "${SYSTEM_SETTINGS_COMMON_EXPECTED_COMMIT}; found "
             "${SYSTEM_SETTINGS_COMMON_COMMIT}")
     endif()
+elseif(EXISTS "${SYSTEM_SETTINGS_COMMON_PROVENANCE}")
+    file(READ "${SYSTEM_SETTINGS_COMMON_PROVENANCE}"
+        SYSTEM_SETTINGS_COMMON_COMMIT)
+    string(STRIP "${SYSTEM_SETTINGS_COMMON_COMMIT}"
+        SYSTEM_SETTINGS_COMMON_COMMIT)
+    if(NOT SYSTEM_SETTINGS_COMMON_COMMIT STREQUAL
+       SYSTEM_SETTINGS_COMMON_EXPECTED_COMMIT)
+        message(FATAL_ERROR
+            "Exported Common provenance does not match required commit "
+            "${SYSTEM_SETTINGS_COMMON_EXPECTED_COMMIT}; found "
+            "${SYSTEM_SETTINGS_COMMON_COMMIT}")
+    endif()
+else()
+    message(FATAL_ERROR
+        "Exact Common provenance is required. Use the pinned Git submodule "
+        "or an official System Settings source archive.")
 endif()
 add_subdirectory(src/vendor/infiltratr-common common-build EXCLUDE_FROM_ALL)
 
