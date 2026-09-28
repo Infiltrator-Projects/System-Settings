@@ -102,7 +102,10 @@ These categories are navigation aids, not code boundaries. A module may expose s
 
 ### Search
 
-Global search is a planned interface; it is not implemented in the current shell.
+The current shell implements a lightweight navigation filter. The built-in
+Date & Time row indexes its installed/source module manifest, including
+setting-level target titles and keywords, without constructing the panel.
+Full multi-module result presentation and deep-link activation remain planned.
 
 A module can publish searchable entries down to individual settings:
 
@@ -113,7 +116,7 @@ A module can publish searchable entries down to individual settings:
 "font" → Appearance → Fonts
 ```
 
-Planned search results will deep-link directly to the relevant panel and setting. Search metadata must be available without constructing every panel, so startup remains fast.
+As the dynamic module host lands, search results will deep-link directly to the relevant panel and setting. Search metadata remains available without constructing the panel, so filtering does not initialise Date & Time or future modules.
 
 ### Direct invocation
 
