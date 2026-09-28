@@ -312,10 +312,14 @@ int main(void)
                 panel->location_metadata.display_name,
                 ==,
                 "Previous locality");
-            g_assert_true(coordinate_close(
-                panel->location_metadata.latitude, previous.latitude));
-            g_assert_true(coordinate_close(
-                panel->location_metadata.longitude, previous.longitude));
+            g_assert_cmpfloat_with_epsilon(
+                panel->location_metadata.latitude,
+                previous.latitude,
+                0.000001);
+            g_assert_cmpfloat_with_epsilon(
+                panel->location_metadata.longitude,
+                previous.longitude,
+                0.000001);
 
             g_assert_cmpint(g_rmdir(metadata_file), ==, 0);
             g_assert_cmpint(g_rename(metadata_backup, metadata_file), ==, 0);
