@@ -288,11 +288,14 @@ times; repeated wall times use GLib's documented standard-time occurrence.
 
 For trusted non-release pushes, a hosted routing job checks whether an idle
 labelled BigBedroom runner is online before assigning any work to it. If it is
-offline, busy, or lacks the required compiler/CMake/GTK/geocode/Xvfb environment,
-Linux build/package and sanitizer jobs use hosted Ubuntu without waiting on an
-unavailable home runner. BigBedroom and hosted jobs both use the exact pinned
-Git submodule object for Common rather than manufacturing provenance around a
-downloaded archive. Pull requests never execute repository-controlled code on BigBedroom. Trusted
-pushes, including release commits, prefer an idle qualified BigBedroom runner;
-the release publication job itself remains hosted. Windows continues to use the
-hosted Windows runner.
+offline, busy, or lacks the required compiler/CMake/GTK/geocode/Xvfb environment
+at routing/capability-probe time, Linux build/package and sanitizer jobs use
+hosted Ubuntu. Once a real job has been assigned to BigBedroom, GitHub Actions
+cannot migrate that already-routed job if the runner disappears afterwards;
+that residual queue-time race is a platform limitation rather than a claimed
+fallback guarantee. BigBedroom and hosted jobs both use the exact pinned Git
+submodule object for Common rather than manufacturing provenance around a
+downloaded archive. Pull requests never execute repository-controlled code on
+BigBedroom. Trusted pushes, including release commits, prefer an idle qualified
+BigBedroom runner; the release publication job itself remains hosted. Windows
+continues to use the hosted Windows runner.
