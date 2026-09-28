@@ -231,6 +231,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     add_library(system-settings-date-time-linux STATIC
         src/modules/date-time/calendar-preview-provider.c
         src/modules/date-time/home-temporal-presentation.c
+        src/modules/date-time/policy-file-observer.c
         src/modules/date-time/linux-date-time-panel.c
         src/modules/date-time/linux-date-time-panel-ui.c
         src/platform/linux/location-search.c)
