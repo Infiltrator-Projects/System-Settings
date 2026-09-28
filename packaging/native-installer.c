@@ -101,6 +101,79 @@ static int run_command(const char *cwd, char *const argv[])
     return -1;
 }
 
+static bool capture_command(
+    const char *cwd,
+    char *const argv[],
+    char *out,
+    size_t capacity)
+{
+    int pipefd[2];
+    pid_t child;
+    size_t used = 0U;
+    int status = 0;
+
+    if (out == NULL || capacity < 2U || pipe(pipefd) != 0) {
+        return false;
+    }
+    child = fork();
+    if (child < 0) {
+        close(pipefd[0]);
+        close(pipefd[1]);
+        return false;
+    }
+    if (child == 0) {
+        if (cwd != NULL && chdir(cwd) != 0) {
+            _exit(126);
+        }
+        close(pipefd[0]);
+        if (dup2(pipefd[1], STDOUT_FILENO) < 0) {
+            _exit(126);
+        }
+        close(pipefd[1]);
+        execvp(argv[0], argv);
+        _exit(127);
+    }
+
+    close(pipefd[1]);
+    while (used + 1U < capacity) {
+        ssize_t count = read(
+            pipefd[0], out + used, capacity - used - 1U);
+        if (count > 0) {
+            used += (size_t)count;
+            continue;
+        }
+        if (count < 0 && errno == EINTR) {
+            continue;
+        }
+        break;
+    }
+    close(pipefd[0]);
+    out[used] = '\0';
+
+    while (waitpid(child, &status, 0) < 0) {
+        if (errno != EINTR) {
+            return false;
+        }
+    }
+    return WIFEXITED(status) &&
+           WEXITSTATUS(status) == 0 &&
+           used > 0U;
+}
+
+static bool compiler_supports_gcc_pgo(void)
+{
+    char output[1024];
+    char *argv[] = {"cc", "--version", NULL};
+
+    if (!capture_command(NULL, argv, output, sizeof(output))) {
+        return false;
+    }
+    return strstr(output, "clang") == NULL &&
+           (strstr(output, "gcc") != NULL ||
+            strstr(output, "GCC") != NULL ||
+            strstr(output, "Free Software Foundation") != NULL);
+}
+
 static int remove_tree(const char *path)
 {
     struct stat st;
@@ -323,7 +396,7 @@ static void show_help(void)
 {
     puts("System Settings native installer");
     puts("Usage: ./System-Settings-VERSION-native.run [--extract DIRECTORY]");
-    puts("Default: build for this CPU, test, package, then install through APT.");
+    puts("Default: build for this CPU with LTO and GCC PGO when available, test, package, then install through APT.");
     puts("Build prerequisites: build-essential cmake pkg-config libgtk-4-dev libgeocode-glib-dev xvfb dbus-x11");
 }
 
@@ -338,8 +411,12 @@ int main(int argc, char **argv)
     char *work;
     char build[PATH_MAX];
     char deb[PATH_MAX];
+    char pgo[PATH_MAX];
+    char generate_flags[PATH_MAX + 128U];
+    char final_flags[PATH_MAX + 128U];
     char jobs[32];
     long processors;
+    const bool use_pgo = compiler_supports_gcc_pgo();
 
     if (argc == 2 &&
         (strcmp(argv[1], "--help") == 0 ||
@@ -402,18 +479,36 @@ int main(int argc, char **argv)
         fail("temporary build path is too long.");
     }
 
-    {
-        char *configure_argv[] = {
-            "cmake", "-S", work, "-B", build,
-            "-DCMAKE_BUILD_TYPE=Release",
-            "-DSYSTEM_SETTINGS_BUILD_PROFILE=native",
-            "-DBUILD_TESTING=ON",
-            "-DCMAKE_C_FLAGS_RELEASE=-O3 -DNDEBUG -march=native -mtune=native",
-            NULL
-        };
-        if (run_command(NULL, configure_argv) != 0) {
+    if (snprintf(pgo, sizeof(pgo), "%s/pgo", work) <= 0 ||
+        strlen(pgo) >= sizeof(pgo) - 1U ||
+        mkdir(pgo, 0700) != 0) {
+        (void)remove_tree(work);
+        fail("could not create the PGO training directory.");
+    }
+
+    if (use_pgo) {
+        if (snprintf(
+                generate_flags,
+                sizeof(generate_flags),
+                "-O3 -DNDEBUG -march=native -mtune=native -flto -fprofile-generate=%s",
+                pgo) <= 0 ||
+            snprintf(
+                final_flags,
+                sizeof(final_flags),
+                "-O3 -DNDEBUG -march=native -mtune=native -flto -fprofile-use=%s -fprofile-correction -Wno-missing-profile",
+                pgo) <= 0 ||
+            strlen(generate_flags) >= sizeof(generate_flags) - 1U ||
+            strlen(final_flags) >= sizeof(final_flags) - 1U) {
             (void)remove_tree(work);
-            fail("CMake configuration failed.");
+            fail("native PGO flags are too long.");
+        }
+    } else {
+        if (snprintf(
+                final_flags,
+                sizeof(final_flags),
+                "-O3 -DNDEBUG -march=native -mtune=native -flto") <= 0) {
+            (void)remove_tree(work);
+            fail("native optimization flags are invalid.");
         }
     }
 
@@ -426,6 +521,15 @@ int main(int argc, char **argv)
     snprintf(jobs, sizeof(jobs), "%ld", processors);
 
     {
+        char c_flags_argument[PATH_MAX + 160U];
+        char *configure_argv[] = {
+            "cmake", "-S", work, "-B", build,
+            "-DCMAKE_BUILD_TYPE=Release",
+            "-DSYSTEM_SETTINGS_BUILD_PROFILE=native",
+            "-DBUILD_TESTING=ON",
+            c_flags_argument,
+            NULL
+        };
         char *build_argv[] = {
             "cmake", "--build", build, "--parallel", jobs, NULL
         };
@@ -435,13 +539,34 @@ int main(int argc, char **argv)
         char *cpack_argv[] = {
             "cpack", "-G", "DEB", NULL
         };
-        if (run_command(NULL, build_argv) != 0) {
+
+        if (use_pgo) {
+            if (snprintf(
+                    c_flags_argument,
+                    sizeof(c_flags_argument),
+                    "-DCMAKE_C_FLAGS_RELEASE=%s",
+                    generate_flags) <= 0 ||
+                run_command(NULL, configure_argv) != 0 ||
+                run_command(NULL, build_argv) != 0 ||
+                run_command(NULL, test_argv) != 0) {
+                (void)remove_tree(work);
+                fail("native PGO training build or test suite failed.");
+            }
+        }
+
+        if (snprintf(
+                c_flags_argument,
+                sizeof(c_flags_argument),
+                "-DCMAKE_C_FLAGS_RELEASE=%s",
+                final_flags) <= 0 ||
+            run_command(NULL, configure_argv) != 0 ||
+            run_command(NULL, build_argv) != 0) {
             (void)remove_tree(work);
-            fail("native build failed.");
+            fail("native LTO/PGO build failed.");
         }
         if (run_command(NULL, test_argv) != 0) {
             (void)remove_tree(work);
-            fail("test suite failed; package was not installed.");
+            fail("optimized native test suite failed; package was not installed.");
         }
         if (run_command(build, cpack_argv) != 0 ||
             !find_debian_package(build, deb, sizeof(deb))) {
