@@ -1052,9 +1052,9 @@ static GtkWidget *build_sidebar(GtkWindow *parent,
 
     appearance_row = make_external_navigation_row(
         "preferences-desktop-theme-symbolic",
-        "Display & Appearance",
-        "Theme, scaling & desktop",
-        "display appearance theme scaling desktop",
+        "Appearance",
+        "Cinnamon themes & desktop appearance",
+        "appearance theme themes desktop cinnamon",
         "cinnamon-settings",
         "themes",
         "nav-gold");
@@ -1115,9 +1115,9 @@ static GtkWidget *build_sidebar(GtkWindow *parent,
 
     hardware_row = make_external_navigation_row(
         "computer-symbolic",
-        "Hardware",
-        "Devices, drivers & system info",
-        "hardware devices drivers system info",
+        "System Information",
+        "Hardware and operating-system details",
+        "hardware system information operating system details",
         "cinnamon-settings",
         "info",
         "nav-gold");
