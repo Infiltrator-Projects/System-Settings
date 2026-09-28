@@ -2,6 +2,26 @@
 
 # Changelog
 
+## 0.4.38 — 2026-09-28 — forensic correctness and lifecycle hardening
+
+- Stop treating nearest tzdata reference points as authoritative time-zone boundaries. Named locality selection now saves locality/coordinates and presents any nearest same-country IANA zone as an advisory suggestion; the operating-system zone changes only through the explicit Time zone control.
+- Keep locality metadata bound to the real timedated zone. Inferred zones are never persisted as accepted state, failed metadata reconciliation remains retryable, and successful authoritative changes reconcile metadata explicitly.
+- Make locality/custom-coordinate rollback truthful: rollback persistence is checked, authoritative policy reload is attempted when rollback itself fails, and the UI no longer claims restoration that did not occur.
+- Serialize semantically conflicting protected timezone, NTP and manual-clock mutations while retaining independent cancellables/generations for stale-completion safety.
+- Clear/reseed dirty manual wall-time drafts when clock/calendar/NTP/time-zone context changes, and disable conflicting controls while a protected operation is unresolved.
+- Surface failed Cinnamon-to-Infiltrator reconciliation instead of silently leaving native and shared temporal policy divergent.
+- Run the Date & Time fine-grained preview at 250 ms only while the panel is mapped, eliminating the old one-second under-sampling of decimal/French-style finer units and avoiding hidden-page formatting work.
+- Harden the Home temporal presenter against first-run policy-directory absence with a retrying monitor path, and make temporal presentation output a true output-only API so uninitialised caller storage is never freed.
+- Replace rigid Home card grids plus coordinate/manual control rows with wrapping FlowBoxes, reduce shell padding/search minimums, and add a regression that enforces a 1024-pixel shell minimum-width budget.
+- Restore keyboard accessibility to the custom Minimize, Maximize/Restore and Close controls and give the icon-only Date & Time card action an explicit accessible label.
+- Correct Home regional reporting so interface language and LC_TIME formatting locale are no longer conflated, and stop falsely marking generic Light/Dark previews as the active theme when Follow OS or another theme may be authoritative.
+- Avoid background Home status/temporal formatting work while Home is unmapped, retain source-tree artwork fallback for development builds, and keep missing installed artwork as a neutral deterministic surface.
+- Fix shell construction order so Home is not selected before its GtkStack page exists, and remove invalid GTK CSS declarations that were producing parser warnings.
+- Strengthen the Linux shell regression with navigation/search, advisory locality-zone semantics, timer map/unmap ownership, keyboard focusability, missing-art handling and responsive-width checks.
+- Make BigBedroom the preferred non-release Linux probe/build environment without requiring passwordless sudo; if its compiler/CMake/GTK/geocode prerequisites are absent, CI falls back to hosted Ubuntu. Release validation remains hosted.
+- Require exact Common 1.19.35 provenance even in exported source trees by embedding and validating the pinned commit marker when Git metadata is unavailable.
+- Make release reruns verify every immutable DEB, native installer, source archive and SHA256SUMS asset byte-for-byte instead of checking only the Debian-package filename.
+
 ## 0.4.37 — 2026-09-28 — native C installer
 
 - Replace the distributed Bash self-extracting .run with a compiled C executable.
