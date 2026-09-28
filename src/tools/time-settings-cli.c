@@ -97,9 +97,12 @@ int main(int argc, char **argv)
         }
     }
 
-    if (argc > 1 && !platform->save(&model.policy)) {
-        fputs("Unable to save temporal presentation policy.\n", stderr);
-        return 2;
+    if (argc > 1) {
+        if (!platform->save(&model.policy)) {
+            fputs("Unable to save temporal presentation policy.\n", stderr);
+            return 2;
+        }
+        model.persisted_policy_present = true;
     }
 
     printf("clock-mode=%s\n"
