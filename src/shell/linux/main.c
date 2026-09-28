@@ -303,7 +303,7 @@ static gchar *date_time_search_text(void)
         g_auto(GStrv) groups = NULL;
         gsize group_count = 0U;
         g_autoptr(GError) error = NULL;
-        g_autoptr(GString) search = NULL;
+        GString *search = NULL;
 
         if (directories[directory_index][0] == '\0') {
             continue;
@@ -335,7 +335,7 @@ static gchar *date_time_search_text(void)
             }
         }
 
-        return g_string_free(g_steal_pointer(&search), FALSE);
+        return g_string_free(search, FALSE);
     }
 
     return g_strdup(fallback);
