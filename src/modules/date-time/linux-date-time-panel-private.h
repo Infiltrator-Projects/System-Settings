@@ -47,6 +47,7 @@ struct SsLinuxDateTimePanel {
     SsLocationMetadata location_metadata;
     SsSystemTimeService *system_time_service;
     SsCalendarPreviewProvider *calendar_preview_provider;
+    GFileMonitor *policy_monitor;
     GPtrArray *clock_mode_ids;
     GPtrArray *timezone_ids;
     GCancellable *location_search_cancellable;
@@ -56,6 +57,8 @@ struct SsLinuxDateTimePanel {
     GCancellable *manual_time_cancellable;
     guint timer_id;
     guint preview_idle_id;
+    guint policy_monitor_retry_id;
+    guint coordinate_commit_id;
     guint location_search_generation;
     guint timezone_generation;
     guint ntp_generation;
