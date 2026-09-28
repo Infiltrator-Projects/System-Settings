@@ -123,6 +123,7 @@ static void policy_file_changed(
     case G_FILE_MONITOR_EVENT_DELETED:
     case G_FILE_MONITOR_EVENT_MOVED:
     case G_FILE_MONITOR_EVENT_RENAMED:
+    case G_FILE_MONITOR_EVENT_ATTRIBUTE_CHANGED:
         cancel_coordinate_commit(state);
         if (ss_date_time_model_reload(&state->model)) {
             state->manual_dirty = false;
