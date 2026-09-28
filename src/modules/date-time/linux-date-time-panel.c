@@ -102,91 +102,48 @@ static void cancel_coordinate_commit(SsLinuxDateTimePanel *state)
     }
 }
 
-static gboolean retry_policy_monitor(gpointer user_data);
+static bool temporal_policy_equal(
+    const InfiltratrTemporalPolicyV3 *left,
+    const InfiltratrTemporalPolicyV3 *right)
+{
+    return left != NULL && right != NULL &&
+        g_strcmp0(left->clock_mode, right->clock_mode) == 0 &&
+        g_strcmp0(left->calendar, right->calendar) == 0 &&
+        left->show_seconds == right->show_seconds &&
+        left->location_configured == right->location_configured &&
+        left->latitude == right->latitude &&
+        left->longitude == right->longitude;
+}
 
-static void policy_file_changed(
-    GFileMonitor *monitor G_GNUC_UNUSED,
-    GFile *file G_GNUC_UNUSED,
-    GFile *other_file G_GNUC_UNUSED,
-    GFileMonitorEvent event,
-    gpointer user_data)
+static void policy_file_changed(gpointer user_data)
 {
     SsLinuxDateTimePanel *state = user_data;
+    InfiltratrTemporalPolicyV3 previous;
 
     if (state == NULL) {
         return;
     }
-    switch (event) {
-    case G_FILE_MONITOR_EVENT_CHANGED:
-    case G_FILE_MONITOR_EVENT_CHANGES_DONE_HINT:
-    case G_FILE_MONITOR_EVENT_CREATED:
-    case G_FILE_MONITOR_EVENT_DELETED:
-    case G_FILE_MONITOR_EVENT_MOVED:
-    case G_FILE_MONITOR_EVENT_RENAMED:
-    case G_FILE_MONITOR_EVENT_ATTRIBUTE_CHANGED:
-        cancel_coordinate_commit(state);
-        if (ss_date_time_model_reload(&state->model)) {
-            state->manual_dirty = false;
-            sync_controls(state);
-            (void)refresh_preview(state);
+
+    previous = state->model.policy;
+    cancel_coordinate_commit(state);
+    if (ss_date_time_model_reload(&state->model)) {
+        const bool changed =
+            !temporal_policy_equal(&previous, &state->model.policy);
+        state->manual_dirty = false;
+        sync_controls(state);
+        (void)refresh_preview(state);
+        if (changed) {
             set_status(
                 state,
                 "Temporal policy changed externally and was reloaded.",
                 false);
-        } else {
-            set_status(
-                state,
-                "The temporal policy changed externally but could not be reloaded; the last committed in-memory policy is still active.",
-                true);
         }
-        break;
-    default:
-        break;
+    } else {
+        set_status(
+            state,
+            "The temporal policy changed externally but could not be reloaded; the last committed in-memory policy is still active.",
+            true);
     }
-}
-
-static bool start_policy_monitor(SsLinuxDateTimePanel *state)
-{
-    g_autofree gchar *path = NULL;
-    g_autoptr(GFile) file = NULL;
-
-    if (state == NULL) {
-        return false;
-    }
-    if (state->policy_monitor != NULL) {
-        return true;
-    }
-
-    path = temporal_policy_path();
-    file = g_file_new_for_path(path);
-    state->policy_monitor =
-        g_file_monitor_file(file, G_FILE_MONITOR_NONE, NULL, NULL);
-    if (state->policy_monitor == NULL) {
-        return false;
-    }
-    g_signal_connect(
-        state->policy_monitor,
-        "changed",
-        G_CALLBACK(policy_file_changed),
-        state);
-    if (state->policy_monitor_retry_id != 0U) {
-        g_source_remove(state->policy_monitor_retry_id);
-        state->policy_monitor_retry_id = 0U;
-    }
-    return true;
-}
-
-static gboolean retry_policy_monitor(gpointer user_data)
-{
-    SsLinuxDateTimePanel *state = user_data;
-    if (state == NULL) {
-        return G_SOURCE_REMOVE;
-    }
-    if (start_policy_monitor(state)) {
-        state->policy_monitor_retry_id = 0U;
-        return G_SOURCE_REMOVE;
-    }
-    return G_SOURCE_CONTINUE;
 }
 
 static bool coordinate_close(double left, double right)
@@ -2174,14 +2131,24 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
 
     state->service_cancellable = g_cancellable_new();
 
-    if (!start_policy_monitor(state)) {
-        state->policy_monitor_retry_id = g_timeout_add_seconds(
-            30U,
-            retry_policy_monitor,
+    {
+        g_autofree gchar *policy_path = temporal_policy_path();
+        state->policy_observer = ss_policy_file_observer_new(
+            policy_path,
+            policy_file_changed,
             state);
-        g_source_set_name_by_id(
-            state->policy_monitor_retry_id,
-            "[system-settings] Date & Time policy monitor retry");
+        if (state->policy_observer == NULL) {
+            g_set_error_literal(
+                error,
+                G_IO_ERROR,
+                G_IO_ERROR_FAILED,
+                "Unable to observe the temporal policy.");
+            g_clear_object(&state->service_cancellable);
+            ss_calendar_preview_provider_free(
+                state->calendar_preview_provider);
+            g_free(state);
+            return NULL;
+        }
     }
 
     state->cinnamon_interface_settings =
@@ -2262,11 +2229,8 @@ void ss_linux_date_time_panel_free(gpointer data)
 
     stop_preview_timer(state);
     cancel_coordinate_commit(state);
-    if (state->policy_monitor_retry_id != 0U) {
-        g_source_remove(state->policy_monitor_retry_id);
-        state->policy_monitor_retry_id = 0U;
-    }
-    g_clear_object(&state->policy_monitor);
+    ss_policy_file_observer_free(state->policy_observer);
+    state->policy_observer = NULL;
     if (state->preview_idle_id != 0U) {
         g_source_remove(state->preview_idle_id);
         state->preview_idle_id = 0U;
