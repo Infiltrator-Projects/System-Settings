@@ -371,6 +371,9 @@ bool ss_location_metadata_recover(
     }
     if (!metadata_load_path(path, &staged)) {
         ss_location_metadata_discard_staged();
+        if (!location_configured) {
+            recovered = ss_location_metadata_clear();
+        }
         goto done;
     }
 
