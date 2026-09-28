@@ -1,0 +1,7 @@
+# LeakSanitizer suppressions for process-global third-party caches.
+# Keep this deliberately narrow: project allocations must remain visible.
+leak:FcConfigCreate
+leak:FcConfigSubstitute
+leak:FcFontSetCreate
+leak:pango_cairo_font_map_new
+leak:pango_font_map_load_fontset
