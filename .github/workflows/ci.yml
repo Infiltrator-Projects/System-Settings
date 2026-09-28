@@ -8,9 +8,41 @@ on:
   workflow_dispatch:
 
 jobs:
+  bigbedroom-capability:
+    name: BigBedroom capability probe
+    if: ${{ !startsWith(github.event.head_commit.message, 'Release ') }}
+    runs-on: bigbedroom
+    timeout-minutes: 5
+    outputs:
+      ready: ${{ steps.probe.outputs.ready }}
+    steps:
+      - name: Probe build prerequisites without modifying the runner
+        id: probe
+        shell: bash
+        run: |
+          set -u
+          ready=true
+          for command_name in curl tar cmake ctest cc pkg-config dpkg-deb; do
+            if ! command -v "$command_name" >/dev/null 2>&1; then
+              echo "Missing BigBedroom command: $command_name"
+              ready=false
+            fi
+          done
+          if ! pkg-config --exists gtk4 2>/dev/null; then
+            echo "BigBedroom is missing gtk4 development metadata."
+            ready=false
+          fi
+          if ! pkg-config --exists geocode-glib-2.0 2>/dev/null; then
+            echo "BigBedroom is missing geocode-glib-2.0 development metadata."
+            ready=false
+          fi
+          echo "ready=$ready" >> "$GITHUB_OUTPUT"
+
   linux:
     name: Linux build, test and package
-    runs-on: ${{ startsWith(github.event.head_commit.message, 'Release ') && 'ubuntu-24.04' || 'bigbedroom' }}
+    needs: [bigbedroom-capability]
+    if: ${{ always() }}
+    runs-on: ${{ (startsWith(github.event.head_commit.message, 'Release ') || needs.bigbedroom-capability.outputs.ready != 'true') && 'ubuntu-24.04' || 'bigbedroom' }}
     timeout-minutes: 30
     env:
       PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -41,18 +73,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgtk-4-dev libgeocode-glib-dev pkg-config xvfb dbus-x11
 
-      - name: Prepare self-hosted Linux UI dependencies
+      - name: Verify self-hosted Linux UI dependencies
         if: runner.environment == 'self-hosted'
         shell: bash
         run: |
           set -euo pipefail
-          if ! command -v cmake >/dev/null 2>&1 ||
-             ! command -v pkg-config >/dev/null 2>&1 ||
-             ! pkg-config --exists gtk4 ||
-             ! pkg-config --exists geocode-glib-2.0; then
-            sudo apt-get update
-            sudo apt-get install -y build-essential cmake pkg-config libgtk-4-dev libgeocode-glib-dev xvfb dbus-x11 curl
-          fi
           for command_name in curl tar cmake ctest cc pkg-config dpkg-deb; do
             command -v "$command_name" >/dev/null 2>&1
           done
@@ -130,7 +155,9 @@ jobs:
 
   sanitizers:
     name: Linux ASan and UBSan
-    runs-on: ${{ startsWith(github.event.head_commit.message, 'Release ') && 'ubuntu-24.04' || 'bigbedroom' }}
+    needs: [bigbedroom-capability]
+    if: ${{ always() }}
+    runs-on: ${{ (startsWith(github.event.head_commit.message, 'Release ') || needs.bigbedroom-capability.outputs.ready != 'true') && 'ubuntu-24.04' || 'bigbedroom' }}
     timeout-minutes: 30
     env:
       PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -161,19 +188,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libgtk-4-dev libgeocode-glib-dev pkg-config xvfb dbus-x11
 
-      - name: Prepare self-hosted sanitizer dependencies
+      - name: Verify self-hosted sanitizer dependencies
         if: runner.environment == 'self-hosted'
         shell: bash
         run: |
           set -euo pipefail
-          if ! command -v cc >/dev/null 2>&1 ||
-             ! command -v cmake >/dev/null 2>&1 ||
-             ! command -v pkg-config >/dev/null 2>&1 ||
-             ! pkg-config --exists gtk4 ||
-             ! pkg-config --exists geocode-glib-2.0; then
-            sudo apt-get update
-            sudo apt-get install -y build-essential cmake pkg-config libgtk-4-dev libgeocode-glib-dev xvfb dbus-x11 curl
-          fi
           for command_name in curl tar cmake ctest cc pkg-config; do
             command -v "$command_name" >/dev/null 2>&1
           done
