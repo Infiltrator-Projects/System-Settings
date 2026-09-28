@@ -71,6 +71,57 @@ int main(void)
         g_assert_null(gtk_widget_get_next_sibling(close));
 
         if (i == 0) {
+            /*
+             * Exercise the actual GtkAccessible properties rather than merely
+             * running under an accessibility backend. Removing these labels
+             * must make CI fail.
+             */
+            gtk_test_accessible_assert_property(
+                GTK_ACCESSIBLE(search),
+                GTK_ACCESSIBLE_PROPERTY_LABEL,
+                "Search settings");
+            gtk_test_accessible_assert_property(
+                GTK_ACCESSIBLE(minimize),
+                GTK_ACCESSIBLE_PROPERTY_LABEL,
+                "Minimize");
+            gtk_test_accessible_assert_property(
+                GTK_ACCESSIBLE(maximize),
+                GTK_ACCESSIBLE_PROPERTY_LABEL,
+                "Maximize / Restore");
+            gtk_test_accessible_assert_property(
+                GTK_ACCESSIBLE(close),
+                GTK_ACCESSIBLE_PROPERTY_LABEL,
+                "Close");
+            gtk_test_accessible_assert_property(
+                GTK_ACCESSIBLE(search_state->home_row),
+                GTK_ACCESSIBLE_PROPERTY_LABEL,
+                "Home");
+            gtk_test_accessible_assert_property(
+                GTK_ACCESSIBLE(search_state->home_row),
+                GTK_ACCESSIBLE_PROPERTY_DESCRIPTION,
+                "Overview & quick access");
+            gtk_test_accessible_assert_property(
+                GTK_ACCESSIBLE(search_state->date_row),
+                GTK_ACCESSIBLE_PROPERTY_LABEL,
+                "Date & Time");
+            gtk_test_accessible_assert_property(
+                GTK_ACCESSIBLE(panel->location_search),
+                GTK_ACCESSIBLE_PROPERTY_LABEL,
+                "Locality search");
+            gtk_test_accessible_assert_property(
+                GTK_ACCESSIBLE(panel->latitude),
+                GTK_ACCESSIBLE_PROPERTY_LABEL,
+                "Latitude");
+            gtk_test_accessible_assert_property(
+                GTK_ACCESSIBLE(panel->manual_date),
+                GTK_ACCESSIBLE_PROPERTY_LABEL,
+                "Manual date");
+            gtk_test_accessible_assert_property(
+                GTK_ACCESSIBLE(panel->status_label),
+                GTK_ACCESSIBLE_PROPERTY_LABEL,
+                "Date and time status");
+
+
             GtkSettings *gtk_settings = gtk_settings_get_default();
             gboolean prefer_dark = FALSE;
             const unsigned int generation =
