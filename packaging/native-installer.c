@@ -448,7 +448,7 @@ int main(int argc, char **argv)
         }
         return EXIT_SUCCESS;
     }
-    if (argc != 1) {
+    if (argc != 1 && !build_only) {
         fprintf(stderr, "Unknown option; use --help.\n");
         return 2;
     }
@@ -456,6 +456,9 @@ int main(int argc, char **argv)
         fail("run as your ordinary user; only final package installation uses sudo.");
     }
     for (size_t i = 0U; i < sizeof(required) / sizeof(required[0]); ++i) {
+        if (build_only && strcmp(required[i], "sudo") == 0) {
+            continue;
+        }
         if (!command_exists(required[i])) {
             fprintf(stderr, "Missing prerequisite: %s\n", required[i]);
             return EXIT_FAILURE;
