@@ -47,6 +47,10 @@ bool ss_home_temporal_presenter_format_now(
     SsHomeTemporalPresenter *presenter,
     SsHomeTemporalPresentation *out);
 
+/** Suggested visible refresh cadence for the presenter's current clock mode. */
+guint ss_home_temporal_presenter_refresh_interval_ms(
+    const SsHomeTemporalPresenter *presenter);
+
 void ss_home_temporal_presentation_clear(
     SsHomeTemporalPresentation *presentation);
 
