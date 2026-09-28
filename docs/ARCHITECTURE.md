@@ -111,14 +111,15 @@ Linux shell
           v
 Date & Time module
   linux-date-time-panel.c
-    backend coordination and policy
+    temporal-policy/native-setting/timedated coordination
+    async lifetime/cancellation
+  linux-date-time-location.c
+    locality search and coordinate transactions
+    metadata rollback and advisory zone inference
   linux-date-time-panel-ui.c
     GTK panel construction
-    temporal-policy model
-    locality search
-    native-setting reconciliation
-    timedated operations
-    async lifetime/cancellation
+  policy-file-observer.c
+    atomic-safe external policy observation
           |
           +----> native Linux/Cinnamon authorities
           |
