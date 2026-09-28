@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "system-settings/location-metadata.h"
+#include "system-settings/temporal-policy-store.h"
 
 #include <glib.h>
 #include <glib/gstdio.h>
@@ -39,6 +40,7 @@ int main(void)
         "system-settings-location-test-XXXXXX", &error);
     CHECK(temporary_root != NULL);
     CHECK(g_setenv("XDG_CONFIG_HOME", temporary_root, TRUE));
+    CHECK(g_setenv("GSETTINGS_BACKEND", "memory", TRUE));
 
     g_strlcpy(saved.display_name,
               "Mooroopna, Victoria, Australia",
@@ -102,8 +104,19 @@ int main(void)
         CHECK(ss_location_metadata_stage(&staged));
         CHECK(ss_location_metadata_recover(
             false, staged.latitude, staged.longitude));
-        CHECK(ss_location_metadata_load(&loaded));
-        CHECK(strcmp(loaded.display_name, saved.display_name) == 0);
+        CHECK(!ss_location_metadata_load(&loaded));
+
+        {
+            const SsTemporalPolicyStore *store =
+                ss_platform_temporal_policy_store();
+            InfiltratrTemporalPolicyV3 authoritative;
+            CHECK(store != NULL && store->save != NULL);
+            CHECK(infiltratr_temporal_policy_v3_default(&authoritative));
+            authoritative.location_configured = true;
+            authoritative.latitude = staged.latitude;
+            authoritative.longitude = staged.longitude;
+            CHECK(store->save(&authoritative));
+        }
 
         CHECK(ss_location_metadata_stage(&staged));
         CHECK(ss_location_metadata_recover(
@@ -151,6 +164,11 @@ int main(void)
         CHECK(loaded.latitude == 0.0 && loaded.longitude == 0.0);
     }
     CHECK(g_remove(expected_file) == 0);
+    {
+        g_autofree gchar *policy_file = g_build_filename(
+            temporary_root, "infiltrator", "presentation.conf", NULL);
+        CHECK(g_remove(policy_file) == 0);
+    }
     lock_file = g_build_filename(settings_dir, "location.lock", NULL);
     CHECK(lock_file != NULL);
     CHECK(g_remove(lock_file) == 0);
