@@ -1033,11 +1033,23 @@ static void system_time_changed(
         g_strcmp0(
             state->location_metadata.timezone_id,
             system_state->timezone) != 0) {
+        SsLocationMetadata candidate = state->location_metadata;
         (void)g_strlcpy(
-            state->location_metadata.timezone_id,
+            candidate.timezone_id,
             system_state->timezone,
-            sizeof(state->location_metadata.timezone_id));
-        if (!ss_location_metadata_save(&state->location_metadata)) {
+            sizeof(candidate.timezone_id));
+        if (ss_location_metadata_save(&candidate)) {
+            state->location_metadata = candidate;
+            set_status(
+                state,
+                "Operating-system time zone and locality metadata reconciled.",
+                false);
+        } else {
+            /*
+             * Keep the old in-memory value so the next authoritative change
+             * notification retries persistence instead of falsely believing
+             * metadata is already synchronized.
+             */
             set_status(
                 state,
                 "The operating-system time zone changed, but the locality metadata could not be updated on disk.",
@@ -1194,14 +1206,31 @@ static void system_time_operation_complete(
             g_clear_object(cancellable);
         }
         if (success) {
+            bool metadata_out_of_sync = false;
             state->manual_dirty = false;
             (void)ss_regional_context_detect(&state->regional_context);
             sync_system_time_controls(state);
             update_location_summary(state);
+
+            if (request->operation == SS_SYSTEM_TIME_OPERATION_TIMEZONE &&
+                state->location_metadata_present) {
+                SsSystemTimeState observed;
+                if (ss_system_time_service_read(
+                        state->system_time_service, &observed) &&
+                    observed.timezone[0] != '\0' &&
+                    g_strcmp0(
+                        state->location_metadata.timezone_id,
+                        observed.timezone) != 0) {
+                    metadata_out_of_sync = true;
+                }
+            }
+
             set_status(
                 state,
-                "Operating-system date/time settings updated.",
-                false);
+                metadata_out_of_sync
+                    ? "The operating-system time zone changed, but locality metadata is not yet synchronized."
+                    : "Operating-system date/time settings updated.",
+                metadata_out_of_sync);
         } else {
             sync_system_time_controls(state);
             set_status(
