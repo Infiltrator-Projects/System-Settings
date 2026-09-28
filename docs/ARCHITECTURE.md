@@ -115,16 +115,32 @@ Date & Time module
     async lifetime/cancellation
   linux-date-time-location.c
     locality search and coordinate transactions
+    durable two-file locality journal/recovery
     metadata rollback and advisory zone inference
   linux-date-time-panel-ui.c
     GTK panel construction
   policy-file-observer.c
-    atomic-safe external policy observation
+    atomic-replacement-safe policy and locality observation
           |
           +----> native Linux/Cinnamon authorities
           |
           +----> Common temporal presentation policy
 ```
+
+Temporal policy mutation is serialized at the platform-store boundary. A setter
+takes the per-user update lock, reloads the latest complete policy, applies one
+semantic field mutation, publishes atomically, and then releases the lock.
+Linux uses a private advisory lock file and Windows uses an exclusive
+`LockFileEx` range. The CLI holds the same transaction boundary across
+multi-option staging and final publication.
+
+Locality has two durable representations because the Common temporal policy
+owns coordinates while System Settings owns richer named-place metadata.
+`location.pending` is a private write-ahead journal: metadata is staged first,
+the coordinate policy is committed second, and metadata publication is
+finalized third. Startup either completes a staged record whose coordinates
+match authoritative policy or discards an abandoned stage. Both policy and
+locality files are observed for external atomic replacement.
 
 The private `linux-date-time-panel.h` bridge may mention GTK because it is an
 implementation detail linking today's built-in Linux module to today's Linux
