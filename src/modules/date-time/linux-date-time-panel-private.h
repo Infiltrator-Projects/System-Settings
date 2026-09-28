@@ -49,6 +49,7 @@ struct SsLinuxDateTimePanel {
     SsSystemTimeService *system_time_service;
     SsCalendarPreviewProvider *calendar_preview_provider;
     SsPolicyFileObserver *policy_observer;
+    SsPolicyFileObserver *location_metadata_observer;
     GPtrArray *clock_mode_ids;
     GPtrArray *timezone_ids;
     GCancellable *location_search_cancellable;
