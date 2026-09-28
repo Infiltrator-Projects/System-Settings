@@ -8,6 +8,7 @@ extern "C" {
 
 void ss_linux_theme_install(void);
 void ss_linux_theme_watch(void);
+unsigned int ss_linux_theme_generation(void);
 
 #ifdef __cplusplus
 }
