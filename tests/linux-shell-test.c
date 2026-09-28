@@ -39,7 +39,7 @@ int main(void)
         SsLinuxDateTimePanel *panel = g_object_get_data(
             G_OBJECT(window), "system-settings-date-time-panel");
         g_assert_nonnull(panel);
-        g_assert_nonnull(panel->policy_monitor);
+        g_assert_nonnull(panel->policy_observer);
         GtkStack *stack = g_object_get_data(
             G_OBJECT(window), "system-settings-stack");
         g_assert_true(GTK_IS_STACK(stack));
