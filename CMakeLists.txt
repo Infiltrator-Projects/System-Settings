@@ -397,6 +397,9 @@ if(BUILD_TESTING)
             add_test(NAME linux-shell COMMAND ${SS_XVFB_RUN} -a $<TARGET_FILE:linux-shell-test>)
             set_tests_properties(linux-shell PROPERTIES TIMEOUT 30 ENVIRONMENT
                 "G_DEBUG=fatal-criticals;GTK_A11Y=none;GSK_RENDERER=cairo;GSETTINGS_BACKEND=memory")
+            add_test(NAME linux-shell-scale2 COMMAND ${SS_XVFB_RUN} -a $<TARGET_FILE:linux-shell-test>)
+            set_tests_properties(linux-shell-scale2 PROPERTIES TIMEOUT 30 ENVIRONMENT
+                "G_DEBUG=fatal-criticals;GTK_A11Y=none;GSK_RENDERER=cairo;GSETTINGS_BACKEND=memory;GDK_SCALE=2")
         else()
             message(WARNING "xvfb-run missing: linux-shell regression is not registered")
         endif()
