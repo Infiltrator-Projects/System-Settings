@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#define _POSIX_C_SOURCE 200809L
 /**
  * @file temporal-policy-store.c
  * @brief POSIX temporal-policy persistence plus Cinnamon compatibility seed.
@@ -10,6 +11,7 @@
 #include <infiltratr/temporal_posix.h>
 
 #include <errno.h>
+#include <glib/gstdio.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <sys/file.h>
