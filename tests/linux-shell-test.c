@@ -39,6 +39,7 @@ int main(void)
         SsLinuxDateTimePanel *panel = g_object_get_data(
             G_OBJECT(window), "system-settings-date-time-panel");
         g_assert_nonnull(panel);
+        g_assert_nonnull(panel->policy_monitor);
         GtkStack *stack = g_object_get_data(
             G_OBJECT(window), "system-settings-stack");
         g_assert_true(GTK_IS_STACK(stack));
@@ -104,7 +105,29 @@ int main(void)
             NULL,
             NULL);
         g_assert_cmpint(minimum_width, <=, 1024);
+        int minimum_height = 0;
+        int natural_height = 0;
+        gtk_widget_measure(
+            window_child,
+            GTK_ORIENTATION_VERTICAL,
+            1024,
+            &minimum_height,
+            &natural_height,
+            NULL,
+            NULL);
+        g_assert_cmpint(minimum_height, <=, 768);
         g_assert_cmpuint(panel->timer_id, ==, 0U);
+
+        HomeTemporalTicker *home_temporal = g_object_get_data(
+            G_OBJECT(home_scroller),
+            "system-settings-home-temporal-source");
+        HomeStatusTicker *home_status = g_object_get_data(
+            G_OBJECT(home_scroller),
+            "system-settings-home-status-source");
+        g_assert_nonnull(home_temporal);
+        g_assert_nonnull(home_status);
+        g_assert_cmpuint(home_temporal->source_id, !=, 0U);
+        g_assert_cmpuint(home_status->source_id, !=, 0U);
 
         guint navigation_rows = 0U;
         for (GtkWidget *row = gtk_widget_get_first_child(GTK_WIDGET(navigation));
@@ -133,10 +156,14 @@ int main(void)
             gtk_list_box_get_selected_row(navigation) ==
             search_state->date_row);
         g_assert_cmpuint(panel->timer_id, !=, 0U);
+        g_assert_cmpuint(home_temporal->source_id, ==, 0U);
+        g_assert_cmpuint(home_status->source_id, ==, 0U);
         gtk_stack_set_visible_child_name(stack, "home");
         while (g_main_context_iteration(NULL, FALSE)) {
         }
         g_assert_cmpuint(panel->timer_id, ==, 0U);
+        g_assert_cmpuint(home_temporal->source_id, !=, 0U);
+        g_assert_cmpuint(home_status->source_id, !=, 0U);
         gtk_editable_set_text(GTK_EDITABLE(search), "theme");
         on_search_changed(GTK_SEARCH_ENTRY(search), search_state);
         g_assert_cmpstr(search_state->query, ==, "theme");
@@ -149,8 +176,56 @@ int main(void)
         g_assert_true(navigation_filter(appearance_row, search_state));
         gtk_editable_set_text(GTK_EDITABLE(search), "");
         on_search_changed(GTK_SEARCH_ENTRY(search), search_state);
+        gtk_editable_set_text(GTK_EDITABLE(search), "seconds");
+        on_search_changed(GTK_SEARCH_ENTRY(search), search_state);
+        g_assert_true(navigation_filter(search_state->date_row, search_state));
+        gtk_editable_set_text(GTK_EDITABLE(search), "");
+        on_search_changed(GTK_SEARCH_ENTRY(search), search_state);
 
         if (i == 0) {
+            /*
+             * An external writer such as system-settings-time must become
+             * authoritative in the already-open panel before any later GUI
+             * edit can publish a stale whole-policy snapshot.
+             */
+            const SsTemporalPolicyStore *store =
+                ss_platform_temporal_policy_store();
+            InfiltratrTemporalPolicyV3 external =
+                *ss_date_time_model_policy(&panel->model);
+            const char *original_calendar = external.calendar;
+            const char *replacement_calendar = NULL;
+            for (size_t calendar_index = 0U;
+                 calendar_index < infiltratr_temporal_calendar_count();
+                 ++calendar_index) {
+                const InfiltratrTemporalCalendarInfo *info =
+                    infiltratr_temporal_calendar_at(calendar_index);
+                if (info != NULL &&
+                    g_strcmp0(info->id, original_calendar) != 0) {
+                    replacement_calendar = info->id;
+                    break;
+                }
+            }
+            g_assert_nonnull(replacement_calendar);
+            infiltratr_copy_string(
+                external.calendar,
+                sizeof(external.calendar),
+                replacement_calendar);
+            g_assert_true(store->save(&external));
+            for (unsigned int attempt = 0U; attempt < 2000U; ++attempt) {
+                while (g_main_context_iteration(NULL, FALSE)) {
+                }
+                if (g_strcmp0(
+                        ss_date_time_model_policy(&panel->model)->calendar,
+                        replacement_calendar) == 0) {
+                    break;
+                }
+                g_usleep(1000U);
+            }
+            g_assert_cmpstr(
+                ss_date_time_model_policy(&panel->model)->calendar,
+                ==,
+                replacement_calendar);
+
             /*
              * Locality-to-zone inference is advisory. With the system service
              * deliberately unavailable, selecting Mooroopna must persist the
@@ -192,6 +267,59 @@ int main(void)
                 "location.ini", NULL);
             g_assert_cmpint(g_remove(metadata_file), ==, 0);
             g_object_unref(row);
+
+            /*
+             * A metadata publication failure must restore the in-memory
+             * metadata snapshot as well as the temporal policy.
+             */
+            SsLocationMetadata previous = {0};
+            g_strlcpy(
+                previous.display_name,
+                "Previous locality",
+                sizeof(previous.display_name));
+            g_strlcpy(
+                previous.country_code,
+                "AU",
+                sizeof(previous.country_code));
+            previous.latitude = -36.0;
+            previous.longitude = 145.0;
+            g_assert_true(ss_location_metadata_save(&previous));
+            panel->location_metadata = previous;
+            panel->location_metadata_present = true;
+            g_assert_true(ss_date_time_model_set_location(
+                &panel->model, true, previous.latitude, previous.longitude));
+
+            g_autofree gchar *metadata_backup =
+                g_strconcat(metadata_file, ".saved", NULL);
+            g_assert_cmpint(g_rename(metadata_file, metadata_backup), ==, 0);
+            g_assert_cmpint(g_mkdir(metadata_file, 0700), ==, 0);
+
+            panel->updating_controls = true;
+            gtk_spin_button_set_value(panel->latitude, -37.0);
+            gtk_spin_button_set_value(panel->longitude, 146.0);
+            panel->updating_controls = false;
+            on_location_coordinate_changed(NULL, NULL, panel);
+            for (unsigned int attempt = 0U;
+                 panel->coordinate_commit_id != 0U && attempt < 1000U;
+                 ++attempt) {
+                while (g_main_context_iteration(NULL, FALSE)) {
+                }
+                g_usleep(1000U);
+            }
+            g_assert_cmpuint(panel->coordinate_commit_id, ==, 0U);
+            g_assert_true(panel->location_metadata_present);
+            g_assert_cmpstr(
+                panel->location_metadata.display_name,
+                ==,
+                "Previous locality");
+            g_assert_true(coordinate_close(
+                panel->location_metadata.latitude, previous.latitude));
+            g_assert_true(coordinate_close(
+                panel->location_metadata.longitude, previous.longitude));
+
+            g_assert_cmpint(g_rmdir(metadata_file), ==, 0);
+            g_assert_cmpint(g_rename(metadata_backup, metadata_file), ==, 0);
+            g_assert_cmpint(g_remove(metadata_file), ==, 0);
         }
 
         GtkWidget *missing_visual = make_visual_panel(
