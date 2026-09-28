@@ -258,23 +258,26 @@ A release commit must:
 - include only modules whose advertised read/write contracts meet their evidence requirements;
 - build release assets from the exact tested revision;
 - retain the exact pinned Common commit: Git checkouts verify the submodule HEAD, while official exported source carries the pinned commit marker plus a complete per-file SHA-256 manifest; CMake validates every exported Common byte and rejects uncovered extra files before configuration continues;
-- retain immutable published tags/assets, with reruns requiring the exact expected asset-name set and comparing every published DEB/native/source/checksum asset byte-for-byte against the rebuilt artifacts.
+- retain immutable published tags/assets, with reruns requiring the exact expected asset-name set and comparing every published DEB/native/source/checksum asset byte-for-byte against the rebuilt artifacts;
+- build release archives/packages from the release commit epoch and prove reproducibility by rebuilding the Debian package and source/native assets twice in CI;
+- verify the native installer payload by comparing the complete extracted source tree against the exact exported tree before accepting the asset.
 
 ## Implemented audit regressions (2026-09-25)
 
-CTest contains fifteen System Settings project tests on Linux when Xvfb is
-available. Coverage now includes private-bus timedated success, denial,
-owner-loss/reacquisition and outstanding-call lifetime; CLI transaction rollback
-and first-save provenance; atomic policy-file observation; Home temporal
-read-failure resilience; native installer/source-asset-builder smoke tests; and
-the existing model, parsing, persistence, Calendar-runtime and regional-context
-tests. The Linux shell regression additionally checks keyboard-focusable custom
-window controls, a 1024×768 minimum allocation budget, visible-page timer
-ownership, live desktop-theme following, external temporal-policy reload,
-locality metadata rollback, manifest-derived search terms, advisory-only
-locality/time-zone inference, navigation synchronisation and neutral missing-art
-fallbacks. Tests use isolated files and a memory settings backend where
-appropriate.
+CTest contains seventeen System Settings project tests on Linux when Xvfb is
+available. Coverage includes private-bus timedated success, denial,
+owner-loss/reacquisition and outstanding-call lifetime; transactional CLI
+rollback/provenance; cross-process policy merge races through both the model and
+CLI; atomic policy-file observation; locality crash-journal recovery; Home
+temporal read-failure resilience; native installer/source-asset-builder smoke
+tests; and the existing model, parsing, persistence, Calendar-runtime and
+regional-context tests. The shell is exercised at ordinary and 2× GDK scale,
+including the complete content-plus-custom-titlebar 1024×768 minimum allocation
+budget, visible-page timer ownership, live desktop-theme following, external
+temporal-policy and locality-metadata reload, manual-draft preservation,
+locality rollback, manifest-derived search, advisory-only locality/time-zone
+inference, navigation synchronisation and neutral missing-art fallbacks. Tests
+use isolated files and a memory settings backend where appropriate.
 
 Manual acceptance still includes real Mint polkit cancellation/denial, network
 geocoding, screen-reader interaction and DST fold choice.
@@ -284,8 +287,10 @@ times; repeated wall times use GLib's documented standard-time occurrence.
 
 For trusted non-release pushes, a hosted routing job checks whether an idle
 labelled BigBedroom runner is online before assigning any work to it. If it is
-offline, busy, or lacks the required compiler/CMake/GTK/geocode environment,
+offline, busy, or lacks the required compiler/CMake/GTK/geocode/Xvfb environment,
 Linux build/package and sanitizer jobs use hosted Ubuntu without waiting on an
-unavailable home runner. Pull requests and release commits never execute
+unavailable home runner. BigBedroom and hosted jobs both use the exact pinned
+Git submodule object for Common rather than manufacturing provenance around a
+downloaded archive. Pull requests and release commits never execute
 repository-controlled code on BigBedroom. Release validation remains hosted;
 Windows continues to use the hosted Windows runner.
