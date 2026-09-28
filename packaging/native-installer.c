@@ -174,6 +174,37 @@ static bool compiler_supports_gcc_pgo(void)
             strstr(output, "Free Software Foundation") != NULL);
 }
 
+static bool write_training_evidence(const char *path)
+{
+    static const char evidence[] = "trained-pgo\n";
+    int fd;
+    size_t offset = 0U;
+
+    if (path == NULL || path[0] == '\0') {
+        return false;
+    }
+    fd = open(path, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0600);
+    if (fd < 0) {
+        return false;
+    }
+    while (offset < sizeof(evidence) - 1U) {
+        const ssize_t count = write(
+            fd, evidence + offset, sizeof(evidence) - 1U - offset);
+        if (count < 0 && errno == EINTR) {
+            continue;
+        }
+        if (count <= 0) {
+            (void)close(fd);
+            return false;
+        }
+        offset += (size_t)count;
+    }
+    if (fsync(fd) != 0 || close(fd) != 0) {
+        return false;
+    }
+    return true;
+}
+
 static int remove_tree(const char *path)
 {
     struct stat st;
@@ -395,8 +426,9 @@ static bool find_debian_package(
 static void show_help(void)
 {
     puts("System Settings native installer");
-    puts("Usage: ./System-Settings-VERSION-native.run [--extract DIRECTORY]");
-    puts("Default: build for this CPU with LTO and GCC PGO when available, test, package, then install through APT.");
+    puts("Usage: ./System-Settings-VERSION-native.run [--extract DIRECTORY|--build-only]");
+    puts("Default: build for this CPU with LTO and trained GCC PGO, test, package, then install through APT.");
+    puts("--build-only: execute the complete native build/test/package path without installing.");
     puts("Build prerequisites: build-essential cmake pkg-config libgtk-4-dev libgeocode-glib-dev xvfb dbus-x11");
 }
 
@@ -404,7 +436,7 @@ int main(int argc, char **argv)
 {
     static const char *const required[] = {
         "tar", "cmake", "cc", "make", "ctest", "cpack",
-        "pkg-config", "dpkg-deb", "sudo", "xvfb-run", "dbus-daemon"
+        "pkg-config", "dpkg-deb", "xvfb-run", "dbus-daemon"
     };
     char self[PATH_MAX];
     char work_template[] = "/tmp/system-settings-native-XXXXXX";
@@ -412,10 +444,12 @@ int main(int argc, char **argv)
     char build[PATH_MAX];
     char deb[PATH_MAX];
     char pgo[PATH_MAX];
+    char pgo_evidence[PATH_MAX];
     char generate_flags[PATH_MAX + 128U];
     char final_flags[PATH_MAX + 128U];
     char jobs[32];
     long processors;
+    bool build_only = false;
     const bool use_pgo = compiler_supports_gcc_pgo();
 
     if (argc == 2 &&
@@ -423,6 +457,9 @@ int main(int argc, char **argv)
          strcmp(argv[1], "-h") == 0)) {
         show_help();
         return EXIT_SUCCESS;
+    }
+    if (argc == 2 && strcmp(argv[1], "--build-only") == 0) {
+        build_only = true;
     }
     if (!executable_path(argv[0], self, sizeof(self))) {
         fail("cannot resolve the installer executable path.");
@@ -438,7 +475,7 @@ int main(int argc, char **argv)
         }
         return EXIT_SUCCESS;
     }
-    if (argc != 1) {
+    if (argc != 1 && !build_only) {
         fprintf(stderr, "Unknown option; use --help.\n");
         return 2;
     }
@@ -450,6 +487,10 @@ int main(int argc, char **argv)
             fprintf(stderr, "Missing prerequisite: %s\n", required[i]);
             return EXIT_FAILURE;
         }
+    }
+    if (!build_only && !command_exists("sudo")) {
+        fputs("Missing prerequisite: sudo\n", stderr);
+        return EXIT_FAILURE;
     }
     if (!use_pgo) {
         fail("the native profile requires GCC so LTO and trained PGO are both guaranteed.");
@@ -484,7 +525,13 @@ int main(int argc, char **argv)
 
     if (snprintf(pgo, sizeof(pgo), "%s/pgo", work) <= 0 ||
         strlen(pgo) >= sizeof(pgo) - 1U ||
-        mkdir(pgo, 0700) != 0) {
+        mkdir(pgo, 0700) != 0 ||
+        snprintf(
+            pgo_evidence,
+            sizeof(pgo_evidence),
+            "%s/trained.stamp",
+            pgo) <= 0 ||
+        strlen(pgo_evidence) >= sizeof(pgo_evidence) - 1U) {
         (void)remove_tree(work);
         fail("could not create the PGO training directory.");
     }
@@ -526,12 +573,14 @@ int main(int argc, char **argv)
     {
         char c_flags_argument[PATH_MAX + 160U];
         char build_profile_argument[64];
+        char evidence_argument[PATH_MAX + 64U];
         char *configure_argv[] = {
             "cmake", "-S", work, "-B", build,
             "-DCMAKE_BUILD_TYPE=Release",
             build_profile_argument,
             "-DBUILD_TESTING=ON",
             c_flags_argument,
+            evidence_argument,
             NULL
         };
         char *build_argv[] = {
@@ -546,6 +595,10 @@ int main(int argc, char **argv)
 
         if (use_pgo) {
             if (snprintf(
+                    evidence_argument,
+                    sizeof(evidence_argument),
+                    "-DSYSTEM_SETTINGS_NATIVE_PGO_EVIDENCE=") <= 0 ||
+                snprintf(
                     build_profile_argument,
                     sizeof(build_profile_argument),
                     "-DSYSTEM_SETTINGS_BUILD_PROFILE=development") <= 0 ||
@@ -556,13 +609,20 @@ int main(int argc, char **argv)
                     generate_flags) <= 0 ||
                 run_command(NULL, configure_argv) != 0 ||
                 run_command(NULL, build_argv) != 0 ||
-                run_command(NULL, test_argv) != 0) {
+                run_command(NULL, test_argv) != 0 ||
+                !write_training_evidence(pgo_evidence)) {
                 (void)remove_tree(work);
-                fail("native PGO training build or test suite failed.");
+                fail("native PGO training build, test suite or evidence publication failed.");
             }
         }
 
         if (snprintf(
+                evidence_argument,
+                sizeof(evidence_argument),
+                "-DSYSTEM_SETTINGS_NATIVE_PGO_EVIDENCE=%s",
+                pgo_evidence) <= 0 ||
+            strlen(evidence_argument) >= sizeof(evidence_argument) - 1U ||
+            snprintf(
                 build_profile_argument,
                 sizeof(build_profile_argument),
                 "-DSYSTEM_SETTINGS_BUILD_PROFILE=native") <= 0 ||
@@ -587,7 +647,7 @@ int main(int argc, char **argv)
         }
     }
 
-    {
+    if (!build_only) {
         char *install_argv[] = {
             "sudo", "apt-get", "install", "-y", deb, NULL
         };
@@ -595,6 +655,8 @@ int main(int argc, char **argv)
             (void)remove_tree(work);
             fail("APT installation failed.");
         }
+    } else {
+        puts("Native LTO/PGO build, optimized tests and Debian packaging verified.");
     }
 
     if (remove_tree(work) != 0) {
