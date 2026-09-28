@@ -54,7 +54,7 @@ jobs:
           cpack -G DEB
 
       - name: Build native installer and complete source archive
-        run: bash packaging/build-source-assets.sh build
+        run: ./build/system-settings-source-asset-builder build
 
       - name: Publish immutable release
         env:
