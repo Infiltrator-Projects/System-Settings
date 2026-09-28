@@ -243,6 +243,9 @@ int main(void)
         gtk_editable_set_text(GTK_EDITABLE(search), "seconds");
         on_search_changed(GTK_SEARCH_ENTRY(search), search_state);
         g_assert_true(navigation_filter(search_state->date_row, search_state));
+        gtk_editable_set_text(GTK_EDITABLE(search), "positivist");
+        on_search_changed(GTK_SEARCH_ENTRY(search), search_state);
+        g_assert_true(navigation_filter(search_state->date_row, search_state));
         gtk_editable_set_text(GTK_EDITABLE(search), "");
         on_search_changed(GTK_SEARCH_ENTRY(search), search_state);
 
