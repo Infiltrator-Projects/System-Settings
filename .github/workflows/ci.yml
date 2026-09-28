@@ -83,6 +83,14 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Set reproducible build epoch
+        shell: bash
+        run: echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)" >> "$GITHUB_ENV"
+
+      - name: Set reproducible build epoch
+        shell: bash
+        run: echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)" >> "$GITHUB_ENV"
+
       - name: Install Linux UI dependencies
         if: runner.environment == 'github-hosted'
         run: |
@@ -110,17 +118,31 @@ jobs:
       - name: Test
         run: ctest --test-dir build -C Release --output-on-failure
 
-      - name: Build Debian package
+      - name: Build reproducible Debian package
         run: |
+          set -euo pipefail
           cd build
           cpack -G DEB
+          deb="$(find . -maxdepth 1 -type f -name 'infiltrator-system-settings_*.deb' -print -quit)"
+          test -n "$deb"
+          cp "$deb" /tmp/system-settings-first.deb
+          rm -f "$deb"
+          cpack -G DEB
+          deb="$(find . -maxdepth 1 -type f -name 'infiltrator-system-settings_*.deb' -print -quit)"
+          cmp /tmp/system-settings-first.deb "$deb"
 
-      - name: Validate native release asset builder
+      - name: Validate reproducible native release assets
         run: |
-          rm -rf build/source-assets-check
+          set -euo pipefail
+          rm -rf build/source-assets-check build/source-assets-check-2
           ./build/system-settings-source-asset-builder build/source-assets-check
-          test -s "build/source-assets-check/System-Settings-$(cat VERSION)-native.run"
-          test -s "build/source-assets-check/System-Settings-$(cat VERSION)-source.zip"
+          ./build/system-settings-source-asset-builder build/source-assets-check-2
+          native="System-Settings-$(cat VERSION)-native.run"
+          source="System-Settings-$(cat VERSION)-source.zip"
+          test -s "build/source-assets-check/$native"
+          test -s "build/source-assets-check/$source"
+          cmp "build/source-assets-check/$native" "build/source-assets-check-2/$native"
+          cmp "build/source-assets-check/$source" "build/source-assets-check-2/$source"
 
       - name: Validate Debian integration assets
         run: |
