@@ -660,9 +660,21 @@ int main(int argc, char **argv)
         }
     }
 
-    if (!mkdir_one(argv[1]) ||
-        realpath(argv[1], output) == NULL) {
-        fail("cannot create or resolve output directory.");
+    if (!mkdir_one(argv[1])) {
+        fail("cannot create output directory.");
+    }
+    if (argv[1][0] == '/') {
+        const size_t output_length = strlen(argv[1]);
+        if (output_length >= sizeof(output)) {
+            fail("output directory path is too long.");
+        }
+        memcpy(output, argv[1], output_length + 1U);
+    } else {
+        char current[PATH_MAX];
+        if (getcwd(current, sizeof(current)) == NULL ||
+            !path_join(output, sizeof(output), current, argv[1])) {
+            fail("cannot resolve output directory.");
+        }
     }
 
     work = mkdtemp(work_template);
