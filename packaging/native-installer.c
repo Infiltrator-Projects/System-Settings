@@ -617,12 +617,13 @@ int main(int argc, char **argv)
             }
         }
 
-        if (snprintf(
-                evidence_argument,
-                sizeof(evidence_argument),
-                "-DSYSTEM_SETTINGS_NATIVE_PGO_EVIDENCE=%s",
-                pgo_evidence) <= 0 ||
-            strlen(evidence_argument) >= sizeof(evidence_argument) - 1U ||
+        const int evidence_count = snprintf(
+            evidence_argument,
+            sizeof(evidence_argument),
+            "-DSYSTEM_SETTINGS_NATIVE_PGO_EVIDENCE=%s",
+            pgo_evidence);
+        if (evidence_count <= 0 ||
+            (size_t)evidence_count >= sizeof(evidence_argument) ||
             snprintf(
                 build_profile_argument,
                 sizeof(build_profile_argument),
