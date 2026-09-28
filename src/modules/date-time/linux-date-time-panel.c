@@ -1719,7 +1719,7 @@ static void location_search_complete(
         GTK_WIDGET(state->location_results), TRUE);
     set_status(
         state,
-        "Select the matching locality. Its coordinates will become the system geographic location and the nearest IANA time zone will be applied to the operating system.",
+        "Select the matching locality. Its coordinates will become the system geographic location; any nearest IANA time zone is advisory and must be chosen explicitly.",
         false);
 
     g_ptr_array_unref(results);
