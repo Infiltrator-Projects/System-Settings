@@ -7,6 +7,7 @@ int ss_shell_entry(int argc, char **argv);
 #include "linux-date-time-panel-private.h"
 #include "system-settings/location-search.h"
 #include <glib/gstdio.h>
+#include <string.h>
 
 static gboolean end_wait(gpointer data)
 {
