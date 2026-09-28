@@ -168,7 +168,22 @@ int main(void)
                 "responsive widths: root=%d stack=%d home=%d date=%d",
                 minimum_width, stack_min, home_min, date_min);
         }
-        g_assert_cmpint(minimum_width, <=, 1024);
+        int title_min_width = 0;
+        int title_nat_width = 0;
+        int title_min_height = 0;
+        int title_nat_height = 0;
+        GtkWidget *titlebar = gtk_window_get_titlebar(window);
+        g_assert_nonnull(titlebar);
+        gtk_widget_measure(
+            titlebar,
+            GTK_ORIENTATION_HORIZONTAL,
+            -1,
+            &title_min_width,
+            &title_nat_width,
+            NULL,
+            NULL);
+        g_assert_cmpint(MAX(minimum_width, title_min_width), <=, 1024);
+
         int minimum_height = 0;
         int natural_height = 0;
         gtk_widget_measure(
@@ -179,7 +194,21 @@ int main(void)
             &natural_height,
             NULL,
             NULL);
-        g_assert_cmpint(minimum_height, <=, 768);
+        gtk_widget_measure(
+            titlebar,
+            GTK_ORIENTATION_VERTICAL,
+            1024,
+            &title_min_height,
+            &title_nat_height,
+            NULL,
+            NULL);
+        g_test_message(
+            "responsive full-window minimum: %dx%d (content %d + titlebar %d)",
+            MAX(minimum_width, title_min_width),
+            minimum_height + title_min_height,
+            minimum_height,
+            title_min_height);
+        g_assert_cmpint(minimum_height + title_min_height, <=, 768);
         g_assert_cmpuint(panel->timer_id, ==, 0U);
 
         HomeTemporalTicker *home_temporal = g_object_get_data(
