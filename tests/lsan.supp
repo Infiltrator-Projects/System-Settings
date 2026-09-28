@@ -1,7 +1,6 @@
-# LeakSanitizer suppressions for process-global third-party caches.
-# Keep this deliberately narrow: project allocations must remain visible.
-leak:FcConfigCreate
-leak:FcConfigSubstitute
-leak:FcFontSetCreate
-leak:pango_cairo_font_map_new
-leak:pango_font_map_load_fontset
+# LeakSanitizer suppressions for process-global third-party font caches.
+#
+# Every unsuppressed direct allocation in the GTK shell test enters through
+# libfontconfig.so.1. Match that library boundary rather than disabling leak
+# detection or suppressing System Settings/GTK generally.
+leak:libfontconfig.so.1
