@@ -369,6 +369,11 @@ if(BUILD_TESTING)
         target_include_directories(linux-shell-test PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/src/modules/date-time"
             "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux")
+        target_compile_definitions(linux-shell-test PRIVATE
+            SYSTEM_SETTINGS_UI_ASSET_DIR="${CMAKE_INSTALL_FULL_DATADIR}/infiltrator/system-settings/ui"
+            SYSTEM_SETTINGS_UI_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/ui"
+            SYSTEM_SETTINGS_MODULE_DIR="${CMAKE_INSTALL_FULL_DATADIR}/infiltrator/system-settings/modules"
+            SYSTEM_SETTINGS_MODULE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/modules")
         target_link_libraries(linux-shell-test PRIVATE
             system-settings-date-time-linux system-settings-linux-ui
             system-settings-core system-settings-platform PkgConfig::GTK4)
