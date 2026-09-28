@@ -60,7 +60,7 @@ jobs:
       - name: Build native installer and complete source archive
         run: ./build/system-settings-source-asset-builder build
 
-      - name: Publish immutable release
+      - name: Publish verified release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -89,7 +89,7 @@ jobs:
           fi
 
           if gh release view "$tag" >/dev/null 2>&1; then
-            echo "Release $tag already exists; verifying the exact immutable asset set."
+            echo "Release $tag already exists; verifying the exact published asset set."
             verify="$(mktemp -d)"
             trap 'rm -rf "$verify"' EXIT
             expected_names="$(
