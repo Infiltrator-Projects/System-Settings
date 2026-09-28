@@ -109,6 +109,51 @@ static bool temporal_policy_equal(
         left->longitude == right->longitude;
 }
 
+static void refresh_location_authority_state(
+    SsLinuxDateTimePanel *state)
+{
+    const InfiltratrTemporalPolicyV3 *policy;
+    const bool metadata_matches =
+        state != NULL &&
+        ss_linux_date_time_location_metadata_matches_policy(
+            state, ss_date_time_model_policy(&state->model));
+
+    if (state == NULL) {
+        return;
+    }
+    policy = ss_date_time_model_policy(&state->model);
+    state->location_follows_timezone_reference =
+        !metadata_matches &&
+        (policy == NULL ||
+         !policy->location_configured ||
+         ss_linux_date_time_location_policy_matches_reference(state));
+}
+
+static void location_metadata_file_changed(gpointer user_data)
+{
+    SsLinuxDateTimePanel *state = user_data;
+    SsLocationMetadata loaded = {0};
+
+    if (state == NULL) {
+        return;
+    }
+
+    state->location_metadata_present =
+        ss_location_metadata_load(&loaded);
+    if (state->location_metadata_present) {
+        state->location_metadata = loaded;
+    } else {
+        memset(
+            &state->location_metadata,
+            0,
+            sizeof(state->location_metadata));
+    }
+
+    refresh_location_authority_state(state);
+    sync_controls(state);
+    ss_linux_date_time_location_update_summary(state);
+}
+
 static void policy_file_changed(gpointer user_data)
 {
     SsLinuxDateTimePanel *state = user_data;
@@ -123,7 +168,23 @@ static void policy_file_changed(gpointer user_data)
     if (ss_date_time_model_reload(&state->model)) {
         const bool changed =
             !temporal_policy_equal(&previous, &state->model.policy);
-        state->manual_dirty = false;
+        const bool manual_context_changed =
+            g_strcmp0(
+                previous.clock_mode,
+                state->model.policy.clock_mode) != 0 ||
+            g_strcmp0(
+                previous.calendar,
+                state->model.policy.calendar) != 0;
+
+        /*
+         * Preserve a user's typed wall-time draft across unrelated external
+         * changes. Only a changed clock/calendar representation invalidates
+         * how that draft should be interpreted.
+         */
+        if (manual_context_changed) {
+            state->manual_dirty = false;
+        }
+        refresh_location_authority_state(state);
         sync_controls(state);
         (void)refresh_preview(state);
         if (changed) {
@@ -989,7 +1050,8 @@ static void system_time_changed(
         state->manual_dirty = false;
     }
 
-    if (state->location_metadata_present &&
+    if (ss_linux_date_time_location_metadata_matches_policy(
+            state, ss_date_time_model_policy(&state->model)) &&
         system_state->timezone[0] != '\0' &&
         g_strcmp0(
             state->location_metadata.timezone_id,
@@ -1599,12 +1661,28 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
         ss_calendar_preview_provider_new();
 
     (void)ss_regional_context_detect(&state->regional_context);
+    {
+        const InfiltratrTemporalPolicyV3 *policy =
+            ss_date_time_model_policy(&state->model);
+        if (policy == NULL ||
+            !ss_location_metadata_recover(
+                policy->location_configured,
+                policy->latitude,
+                policy->longitude)) {
+            g_set_error_literal(
+                error,
+                G_IO_ERROR,
+                G_IO_ERROR_FAILED,
+                "Unable to recover an interrupted locality transaction.");
+            ss_calendar_preview_provider_free(
+                state->calendar_preview_provider);
+            g_free(state);
+            return NULL;
+        }
+    }
     state->location_metadata_present =
         ss_location_metadata_load(&state->location_metadata);
-    state->location_follows_timezone_reference =
-        !state->location_metadata_present &&
-        (!ss_date_time_model_policy(&state->model)->location_configured ||
-         ss_linux_date_time_location_policy_matches_reference(state));
+    refresh_location_authority_state(state);
 
     state->service_cancellable = g_cancellable_new();
 
@@ -1620,6 +1698,29 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
                 G_IO_ERROR,
                 G_IO_ERROR_FAILED,
                 "Unable to observe the temporal policy.");
+            g_clear_object(&state->service_cancellable);
+            ss_calendar_preview_provider_free(
+                state->calendar_preview_provider);
+            g_free(state);
+            return NULL;
+        }
+    }
+    {
+        g_autofree gchar *metadata_path =
+            ss_location_metadata_path_alloc();
+        state->location_metadata_observer =
+            ss_policy_file_observer_new(
+                metadata_path,
+                location_metadata_file_changed,
+                state);
+        if (state->location_metadata_observer == NULL) {
+            g_set_error_literal(
+                error,
+                G_IO_ERROR,
+                G_IO_ERROR_FAILED,
+                "Unable to observe locality metadata.");
+            ss_policy_file_observer_free(state->policy_observer);
+            state->policy_observer = NULL;
             g_clear_object(&state->service_cancellable);
             ss_calendar_preview_provider_free(
                 state->calendar_preview_provider);
@@ -1708,6 +1809,8 @@ void ss_linux_date_time_panel_free(gpointer data)
     ss_linux_date_time_location_cancel_coordinate_commit(state);
     ss_policy_file_observer_free(state->policy_observer);
     state->policy_observer = NULL;
+    ss_policy_file_observer_free(state->location_metadata_observer);
+    state->location_metadata_observer = NULL;
     if (state->preview_idle_id != 0U) {
         g_source_remove(state->preview_idle_id);
         state->preview_idle_id = 0U;
