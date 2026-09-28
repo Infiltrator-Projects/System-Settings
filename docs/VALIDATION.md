@@ -257,7 +257,8 @@ A release commit must:
 - have no known mismatch between supported behaviour and documentation;
 - include only modules whose advertised read/write contracts meet their evidence requirements;
 - build release assets from the exact tested revision;
-- retain immutable published tags/assets, with later fixes advancing the version.
+- retain the exact pinned Common commit: Git checkouts verify the submodule HEAD, while official exported source carries a `.system-settings-common-commit` provenance marker that CMake validates before configuration continues;
+- retain immutable published tags/assets, with reruns comparing every published DEB/native/source/checksum asset byte-for-byte against the rebuilt artifacts.
 
 ## Implemented audit regressions (2026-09-25)
 
