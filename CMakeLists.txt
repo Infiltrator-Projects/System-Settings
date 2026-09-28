@@ -219,12 +219,14 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         PUBLIC InfiltratrCommon::Common PkgConfig::GIO2)
 
     add_library(system-settings-linux-ui STATIC
-        src/shell/linux/linux-ui-helpers.c)
+        src/shell/linux/linux-ui-helpers.c
+        src/shell/linux/linux-theme.c)
     ss_configure(system-settings-linux-ui)
     target_include_directories(system-settings-linux-ui PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux")
     target_link_libraries(system-settings-linux-ui PUBLIC
-        PkgConfig::GTK4)
+        PkgConfig::GTK4
+        InfiltratrCommon::Portable)
 
     add_library(system-settings-date-time-linux STATIC
         src/modules/date-time/calendar-preview-provider.c
