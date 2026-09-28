@@ -332,6 +332,22 @@ bool ss_home_temporal_presenter_format_now(
         presenter->calendar_provider, out);
 }
 
+guint ss_home_temporal_presenter_refresh_interval_ms(
+    const SsHomeTemporalPresenter *presenter)
+{
+    if (presenter != NULL &&
+        presenter->policy_valid &&
+        presenter->policy.show_seconds &&
+        g_strcmp0(presenter->policy.clock_mode, "decimal") == 0) {
+        /*
+         * A French decimal second is 0.864 SI seconds. Four samples per SI
+         * second prevents visible skips without penalising ordinary clocks.
+         */
+        return 250U;
+    }
+    return 1000U;
+}
+
 bool ss_home_temporal_presentation_now(
     SsHomeTemporalPresentation *out)
 {
