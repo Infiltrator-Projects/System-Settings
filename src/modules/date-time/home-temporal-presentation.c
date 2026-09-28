@@ -25,7 +25,8 @@ struct SsHomeTemporalPresenter {
     gulong settings_changed_id;
     GFileMonitor *policy_monitor;
     guint policy_monitor_retry_id;
-    gchar *policy_directory;
+    guint policy_reload_retry_id;
+    gchar *policy_path;
     SsCalendarPreviewProvider *calendar_provider;
 };
 
@@ -175,7 +176,12 @@ static bool presenter_reload_policy(SsHomeTemporalPresenter *presenter)
     store = ss_platform_temporal_policy_store();
     if (store == NULL || store->load == NULL ||
         !store->load(&loaded, &found)) {
-        presenter->policy_valid = false;
+        /*
+         * A transient read/permission error must not turn a live Home clock
+         * into a frozen value that still looks authoritative. Keep the last
+         * successfully loaded policy and retry; only a presenter that has
+         * never loaded any valid policy remains unavailable.
+         */
         return false;
     }
     presenter->policy = loaded;
@@ -194,6 +200,21 @@ static void on_presenter_settings_changed(
     }
 }
 
+static gboolean retry_policy_reload(gpointer user_data);
+
+static void schedule_policy_reload_retry(
+    SsHomeTemporalPresenter *presenter)
+{
+    if (presenter == NULL || presenter->policy_reload_retry_id != 0U) {
+        return;
+    }
+    presenter->policy_reload_retry_id = g_timeout_add_seconds(
+        2U, retry_policy_reload, presenter);
+    g_source_set_name_by_id(
+        presenter->policy_reload_retry_id,
+        "[system-settings] Home temporal policy reload retry");
+}
+
 static void on_policy_directory_changed(
     GFileMonitor *monitor G_GNUC_UNUSED,
     GFile *file G_GNUC_UNUSED,
@@ -209,7 +230,9 @@ static void on_policy_directory_changed(
     case G_FILE_MONITOR_EVENT_DELETED:
     case G_FILE_MONITOR_EVENT_MOVED:
     case G_FILE_MONITOR_EVENT_RENAMED:
-        (void)presenter_reload_policy(presenter);
+        if (!presenter_reload_policy(presenter)) {
+            schedule_policy_reload_retry(presenter);
+        }
         break;
     default:
         break;
@@ -226,14 +249,14 @@ static bool ensure_policy_monitor(SsHomeTemporalPresenter *presenter)
     if (presenter->policy_monitor != NULL) {
         return true;
     }
-    if (presenter->policy_directory == NULL ||
-        presenter->policy_directory[0] == '\0') {
+    if (presenter->policy_path == NULL ||
+        presenter->policy_path[0] == '\0') {
         return false;
     }
 
-    directory = g_file_new_for_path(presenter->policy_directory);
+    directory = g_file_new_for_path(presenter->policy_path);
     presenter->policy_monitor =
-        g_file_monitor_directory(
+        g_file_monitor_file(
             directory, G_FILE_MONITOR_NONE, NULL, NULL);
     if (presenter->policy_monitor == NULL) {
         return false;
@@ -244,6 +267,20 @@ static bool ensure_policy_monitor(SsHomeTemporalPresenter *presenter)
     return true;
 }
 
+static gboolean retry_policy_reload(gpointer user_data)
+{
+    SsHomeTemporalPresenter *presenter = user_data;
+
+    if (presenter == NULL) {
+        return G_SOURCE_REMOVE;
+    }
+    if (presenter_reload_policy(presenter)) {
+        presenter->policy_reload_retry_id = 0U;
+        return G_SOURCE_REMOVE;
+    }
+    return G_SOURCE_CONTINUE;
+}
+
 static gboolean retry_policy_monitor(gpointer user_data)
 {
     SsHomeTemporalPresenter *presenter = user_data;
@@ -252,11 +289,6 @@ static gboolean retry_policy_monitor(gpointer user_data)
         return G_SOURCE_REMOVE;
     }
 
-    /*
-     * The policy directory may not exist on first run. Retry without creating
-     * configuration state merely by opening Settings. Reloading here also
-     * closes the small first-save window before the monitor can attach.
-     */
     (void)presenter_reload_policy(presenter);
     if (ensure_policy_monitor(presenter)) {
         presenter->policy_monitor_retry_id = 0U;
@@ -270,7 +302,6 @@ SsHomeTemporalPresenter *ss_home_temporal_presenter_new(void)
     SsHomeTemporalPresenter *presenter =
         g_new0(SsHomeTemporalPresenter, 1);
     g_autofree gchar *policy_path = NULL;
-    g_autofree gchar *policy_dir = NULL;
 
     presenter->settings = ss_cinnamon_interface_settings_new();
     presenter->use_24h =
@@ -286,11 +317,13 @@ SsHomeTemporalPresenter *ss_home_temporal_presenter_new(void)
     policy_path = g_build_filename(
         g_get_user_config_dir(), "infiltrator",
         "presentation.conf", NULL);
-    policy_dir = g_path_get_dirname(policy_path);
-    presenter->policy_directory = g_steal_pointer(&policy_dir);
+    presenter->policy_path = g_steal_pointer(&policy_path);
+    if (!presenter->policy_valid) {
+        schedule_policy_reload_retry(presenter);
+    }
     if (!ensure_policy_monitor(presenter)) {
         presenter->policy_monitor_retry_id = g_timeout_add_seconds(
-            1U, retry_policy_monitor, presenter);
+            30U, retry_policy_monitor, presenter);
         g_source_set_name_by_id(
             presenter->policy_monitor_retry_id,
             "[system-settings] Home temporal policy monitor retry");
@@ -311,9 +344,13 @@ void ss_home_temporal_presenter_free(
         g_source_remove(presenter->policy_monitor_retry_id);
         presenter->policy_monitor_retry_id = 0U;
     }
+    if (presenter->policy_reload_retry_id != 0U) {
+        g_source_remove(presenter->policy_reload_retry_id);
+        presenter->policy_reload_retry_id = 0U;
+    }
     g_clear_object(&presenter->policy_monitor);
     g_clear_object(&presenter->settings);
-    g_clear_pointer(&presenter->policy_directory, g_free);
+    g_clear_pointer(&presenter->policy_path, g_free);
     ss_calendar_preview_provider_free(presenter->calendar_provider);
     g_free(presenter);
 }
