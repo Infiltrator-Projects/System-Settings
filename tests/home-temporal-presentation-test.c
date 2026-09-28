@@ -91,7 +91,7 @@ int main(void)
         g_assert_cmpuint(
             ss_home_temporal_presenter_refresh_interval_ms(presenter),
             ==,
-            250U);
+            1000U);
         ss_home_temporal_presentation_init(&first);
         ss_home_temporal_presentation_init(&second);
         g_assert_true(ss_home_temporal_presenter_format_now(
@@ -111,6 +111,18 @@ int main(void)
 
         ss_home_temporal_presentation_clear(&first);
         ss_home_temporal_presentation_clear(&second);
+        ss_home_temporal_presenter_free(presenter);
+
+        infiltratr_copy_string(
+            policy.clock_mode, sizeof(policy.clock_mode), "decimal");
+        policy.show_seconds = true;
+        g_assert_true(store->save(&policy));
+        presenter = ss_home_temporal_presenter_new();
+        g_assert_nonnull(presenter);
+        g_assert_cmpuint(
+            ss_home_temporal_presenter_refresh_interval_ms(presenter),
+            ==,
+            250U);
         ss_home_temporal_presenter_free(presenter);
 
         policy.show_seconds = false;

@@ -154,10 +154,10 @@ static gboolean launch_command(GtkWidget *source,
 
     if (source != NULL) {
         /*
-         * Successful exec is not successful delegation. Observe termination so
-         * a missing/renamed Cinnamon module cannot masquerade as a working row.
-         * A failed capability is disabled for the remainder of this session
-         * and exposes the child error through its tooltip.
+         * Successful exec is not successful delegation. Observe termination
+         * and expose a child failure through the tooltip, but keep the action
+         * enabled because authorization, D-Bus and backend failures may be
+         * transient. Only an actual launch failure disables the control.
          */
         g_subprocess_wait_check_async(
             process,

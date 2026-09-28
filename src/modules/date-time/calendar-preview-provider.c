@@ -18,6 +18,7 @@
 
 #include <stddef.h>
 #include <string.h>
+#include <sys/stat.h>
 
 #define CALENDAR_RUNTIME_SONAME "libcalendar-plus.so.0"
 #define CALENDAR_RUNTIME_REALNAME "libcalendar-plus.so.0.0.0"
@@ -176,6 +177,18 @@ static bool open_runtime(
     return true;
 }
 
+static bool runtime_candidate_trusted(const char *path)
+{
+    struct stat status;
+
+    if (path == NULL || stat(path, &status) != 0 ||
+        !S_ISREG(status.st_mode)) {
+        return false;
+    }
+    return status.st_uid == 0 &&
+           (status.st_mode & (S_IWGRP | S_IWOTH)) == 0;
+}
+
 static bool try_directory(
     SsCalendarPreviewProvider *provider,
     const char *directory)
@@ -195,7 +208,10 @@ static bool try_directory(
         g_autofree gchar *candidate =
             g_build_filename(directory, names[index], NULL);
 
-        if (g_file_test(candidate, G_FILE_TEST_EXISTS) &&
+        const bool trust_required =
+            provider->discovery_root_override == NULL;
+        if (g_file_test(candidate, G_FILE_TEST_IS_REGULAR) &&
+            (!trust_required || runtime_candidate_trusted(candidate)) &&
             open_runtime(provider, candidate)) {
             return true;
         }
@@ -245,11 +261,13 @@ static bool discover_runtime(SsCalendarPreviewProvider *provider)
     }
 
     /*
-     * Standard multiarch directories are already represented by the
-     * compile-time architecture and the dynamic loader's configured search
-     * path. Do not recursively walk library roots from the GTK thread.
+     * Do not fall back to an unconstrained bare soname. Calendar executes
+     * in-process with System Settings authority, so automatic discovery is
+     * restricted to the fixed system roots above and to regular files that
+     * are root-owned and not group/other writable. Test-only root overrides
+     * deliberately bypass that ownership rule for fixture libraries.
      */
-    return open_runtime(provider, CALENDAR_RUNTIME_SONAME);
+    return false;
 }
 
 /*

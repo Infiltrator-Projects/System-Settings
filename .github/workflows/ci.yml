@@ -137,6 +137,7 @@ jobs:
           test -s "build/source-assets-check/$source"
           cmp "build/source-assets-check/$native" "build/source-assets-check-2/$native"
           cmp "build/source-assets-check/$source" "build/source-assets-check-2/$source"
+          "build/source-assets-check/$native" --build-only
 
       - name: Validate Debian integration assets
         run: |

@@ -70,7 +70,72 @@ int main(void)
         g_assert_true(gtk_widget_get_next_sibling(maximize) == close);
         g_assert_null(gtk_widget_get_next_sibling(close));
 
-        if (i == 0) {
+        if (i == 0 &&
+            g_strcmp0(g_getenv("GTK_A11Y"), "none") != 0) {
+            /*
+             * Exercise the actual GtkAccessible properties in the dedicated
+             * accessibility run. The ordinary shell/scale tests deliberately
+             * disable the AT context, so querying properties there would itself
+             * be a GTK critical.
+             */
+            GtkWidget *home_nav_row =
+                gtk_widget_get_first_child(GTK_WIDGET(navigation));
+            GtkWidget *date_nav_row =
+                home_nav_row != NULL
+                    ? gtk_widget_get_next_sibling(home_nav_row)
+                    : NULL;
+            g_assert_nonnull(home_nav_row);
+            g_assert_nonnull(date_nav_row);
+            gtk_test_accessible_assert_property(
+                GTK_ACCESSIBLE(search),
+                GTK_ACCESSIBLE_PROPERTY_LABEL,
+                "Search settings");
+            gtk_test_accessible_assert_property(
+                GTK_ACCESSIBLE(minimize),
+                GTK_ACCESSIBLE_PROPERTY_LABEL,
+                "Minimize");
+            gtk_test_accessible_assert_property(
+                GTK_ACCESSIBLE(maximize),
+                GTK_ACCESSIBLE_PROPERTY_LABEL,
+                "Maximize / Restore");
+            gtk_test_accessible_assert_property(
+                GTK_ACCESSIBLE(close),
+                GTK_ACCESSIBLE_PROPERTY_LABEL,
+                "Close");
+            gtk_test_accessible_assert_property(
+                GTK_ACCESSIBLE(home_nav_row),
+                GTK_ACCESSIBLE_PROPERTY_LABEL,
+                "Home");
+            gtk_test_accessible_assert_property(
+                GTK_ACCESSIBLE(home_nav_row),
+                GTK_ACCESSIBLE_PROPERTY_DESCRIPTION,
+                "Overview & quick access");
+            gtk_test_accessible_assert_property(
+                GTK_ACCESSIBLE(date_nav_row),
+                GTK_ACCESSIBLE_PROPERTY_LABEL,
+                "Date & Time");
+            gtk_test_accessible_assert_property(
+                GTK_ACCESSIBLE(panel->location_search),
+                GTK_ACCESSIBLE_PROPERTY_LABEL,
+                "Locality search");
+            gtk_test_accessible_assert_property(
+                GTK_ACCESSIBLE(panel->latitude),
+                GTK_ACCESSIBLE_PROPERTY_LABEL,
+                "Latitude");
+            gtk_test_accessible_assert_property(
+                GTK_ACCESSIBLE(panel->manual_date),
+                GTK_ACCESSIBLE_PROPERTY_LABEL,
+                "Manual date");
+            gtk_test_accessible_assert_property(
+                GTK_ACCESSIBLE(panel->location_search_button),
+                GTK_ACCESSIBLE_PROPERTY_LABEL,
+                "Search for locality");
+            gtk_test_accessible_assert_property(
+                GTK_ACCESSIBLE(panel->manual_set_time),
+                GTK_ACCESSIBLE_PROPERTY_LABEL,
+                "Set operating-system date and time");
+
+
             GtkSettings *gtk_settings = gtk_settings_get_default();
             gboolean prefer_dark = FALSE;
             const unsigned int generation =

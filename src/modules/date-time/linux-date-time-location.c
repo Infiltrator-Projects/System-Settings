@@ -43,23 +43,21 @@ static bool load_authoritative_location_metadata(
     SsLocationMetadata *metadata,
     bool *present)
 {
-    g_autofree gchar *path = NULL;
+    SsLocationMetadataLoadResult result;
 
     if (metadata == NULL || present == NULL) {
         return false;
     }
-    memset(metadata, 0, sizeof(*metadata));
-    if (ss_location_metadata_load(metadata)) {
+    result = ss_location_metadata_load_result(metadata);
+    if (result == SS_LOCATION_METADATA_LOAD_OK) {
         *present = true;
         return true;
     }
-
-    path = ss_location_metadata_path_alloc();
-    if (path == NULL || g_file_test(path, G_FILE_TEST_EXISTS)) {
-        return false;
+    if (result == SS_LOCATION_METADATA_LOAD_MISSING) {
+        *present = false;
+        return true;
     }
-    *present = false;
-    return true;
+    return false;
 }
 
 bool ss_linux_date_time_location_metadata_matches_policy(
