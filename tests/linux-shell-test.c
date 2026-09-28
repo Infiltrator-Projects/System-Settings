@@ -69,6 +69,35 @@ int main(void)
         g_assert_true(gtk_widget_get_next_sibling(minimize) == maximize);
         g_assert_true(gtk_widget_get_next_sibling(maximize) == close);
         g_assert_null(gtk_widget_get_next_sibling(close));
+
+        if (i == 0) {
+            GtkSettings *gtk_settings = gtk_settings_get_default();
+            gboolean prefer_dark = FALSE;
+            const unsigned int generation =
+                ss_linux_theme_generation();
+            g_assert_nonnull(gtk_settings);
+            g_object_get(
+                gtk_settings,
+                "gtk-application-prefer-dark-theme",
+                &prefer_dark,
+                NULL);
+            g_object_set(
+                gtk_settings,
+                "gtk-application-prefer-dark-theme",
+                prefer_dark ? FALSE : TRUE,
+                NULL);
+            while (g_main_context_iteration(NULL, FALSE)) {
+            }
+            g_assert_cmpuint(
+                ss_linux_theme_generation(), >, generation);
+            g_object_set(
+                gtk_settings,
+                "gtk-application-prefer-dark-theme",
+                prefer_dark,
+                NULL);
+            while (g_main_context_iteration(NULL, FALSE)) {
+            }
+        }
         GtkScrolledWindow *nav_scroller = g_object_get_data(
             G_OBJECT(window), "system-settings-navigation-scroller");
         GtkScrolledWindow *date_scroller = g_object_get_data(
