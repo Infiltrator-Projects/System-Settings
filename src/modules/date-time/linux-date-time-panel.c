@@ -933,11 +933,53 @@ static void on_cinnamon_interface_changed(
     (void)refresh_preview(state);
 }
 
+static bool native_compatibility_matches(
+    const SsLinuxDateTimePanel *state)
+{
+    const InfiltratrTemporalPolicyV3 *policy;
+    bool value = false;
+
+    if (state == NULL || state->cinnamon_interface_settings == NULL) {
+        return true;
+    }
+    policy = ss_date_time_model_policy(&state->model);
+    if (policy == NULL) {
+        return false;
+    }
+
+    if (ss_native_clock_mode_is_conventional(policy->clock_mode)) {
+        const bool expected_24h =
+            g_strcmp0(policy->clock_mode, "standard-24") == 0;
+        if (!ss_cinnamon_interface_get_boolean(
+                state->cinnamon_interface_settings,
+                "clock-use-24h",
+                &value) ||
+            value != expected_24h) {
+            return false;
+        }
+    }
+
+    if (!ss_cinnamon_interface_get_boolean(
+            state->cinnamon_interface_settings,
+            "clock-show-seconds",
+            &value) ||
+        value != policy->show_seconds) {
+        return false;
+    }
+    return true;
+}
+
 static void policy_saved(SsLinuxDateTimePanel *state)
 {
-    set_status(state,
-               "System temporal policy saved. Calendar and other Common-aware applications use this setting.",
-               false);
+    const bool compatibility_ok =
+        native_compatibility_matches(state);
+
+    set_status(
+        state,
+        compatibility_ok
+            ? "System temporal policy saved. Calendar and other Common-aware applications use this setting."
+            : "System temporal policy saved, but Mint/Cinnamon compatibility settings did not fully synchronize.",
+        !compatibility_ok);
     update_control_capabilities(state);
     (void)refresh_preview(state);
 }
