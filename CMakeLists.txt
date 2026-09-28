@@ -487,6 +487,7 @@ if(BUILD_TESTING)
             tests/location-metadata-test.c)
         ss_configure(location-metadata-test)
         target_link_libraries(location-metadata-test PRIVATE
+            system-settings-core
             system-settings-platform)
         add_test(NAME location-metadata COMMAND location-metadata-test)
 
