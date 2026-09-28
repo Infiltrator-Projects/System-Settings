@@ -7,10 +7,41 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+  actions: read
+
 jobs:
+  runner-routing:
+    name: Runner routing
+    runs-on: ubuntu-24.04
+    outputs:
+      bigbedroom_online: ${{ steps.route.outputs.bigbedroom_online }}
+    steps:
+      - name: Prefer an online trusted BigBedroom runner
+        id: route
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          HEAD_MESSAGE: ${{ github.event.head_commit.message }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          online=false
+          if [[ "$EVENT_NAME" != "pull_request" &&
+                "$HEAD_MESSAGE" != Release\ * ]]; then
+            if gh api "repos/${{ github.repository }}/actions/runners" \
+              --jq '[.runners[] | select(.status == "online" and .busy == false) | .labels[].name] | any(. == "bigbedroom")' |
+              grep -qx true; then
+              online=true
+            fi
+          fi
+          echo "bigbedroom_online=$online" >> "$GITHUB_OUTPUT"
+
   bigbedroom-capability:
     name: BigBedroom capability probe
-    if: ${{ !startsWith(github.event.head_commit.message, 'Release ') }}
+    needs: [runner-routing]
+    if: ${{ needs.runner-routing.outputs.bigbedroom_online == 'true' }}
     runs-on: bigbedroom
     timeout-minutes: 5
     outputs:
@@ -40,9 +71,9 @@ jobs:
 
   linux:
     name: Linux build, test and package
-    needs: [bigbedroom-capability]
-    if: ${{ always() }}
-    runs-on: ${{ (startsWith(github.event.head_commit.message, 'Release ') || needs.bigbedroom-capability.outputs.ready != 'true') && 'ubuntu-24.04' || 'bigbedroom' }}
+    needs: [runner-routing, bigbedroom-capability]
+    if: ${{ always() && !cancelled() }}
+    runs-on: ${{ needs.bigbedroom-capability.outputs.ready == 'true' && 'bigbedroom' || 'ubuntu-24.04' }}
     timeout-minutes: 30
     env:
       PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -61,6 +92,18 @@ jobs:
           curl -fsSL https://github.com/Infiltrator-Projects/Infiltrator-Libraries/archive/7cc5de3de0e94ed2cfcff0840bbb5346eb5c9c9f.tar.gz |
             tar -xz --strip-components=1 -C src/vendor/infiltratr-common
           printf '%s\n' 7cc5de3de0e94ed2cfcff0840bbb5346eb5c9c9f > src/vendor/infiltratr-common/.system-settings-common-commit
+          (
+            cd src/vendor/infiltratr-common
+            find . -type f \
+              ! -name '.system-settings-common-commit' \
+              ! -name '.system-settings-common-sha256' \
+              -print0 |
+              sort -z |
+              while IFS= read -r -d '' file; do
+                hash=$(sha256sum "$file" | awk '{print $1}')
+                printf '%s  %s\n' "$hash" "${file#./}"
+              done
+          ) > src/vendor/infiltratr-common/.system-settings-common-sha256
 
       - name: Check out source and Common on hosted Linux
         if: runner.environment == 'github-hosted'
@@ -156,9 +199,9 @@ jobs:
 
   sanitizers:
     name: Linux ASan and UBSan
-    needs: [bigbedroom-capability]
-    if: ${{ always() }}
-    runs-on: ${{ (startsWith(github.event.head_commit.message, 'Release ') || needs.bigbedroom-capability.outputs.ready != 'true') && 'ubuntu-24.04' || 'bigbedroom' }}
+    needs: [runner-routing, bigbedroom-capability]
+    if: ${{ always() && !cancelled() }}
+    runs-on: ${{ needs.bigbedroom-capability.outputs.ready == 'true' && 'bigbedroom' || 'ubuntu-24.04' }}
     timeout-minutes: 30
     env:
       PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -177,6 +220,18 @@ jobs:
           curl -fsSL https://github.com/Infiltrator-Projects/Infiltrator-Libraries/archive/7cc5de3de0e94ed2cfcff0840bbb5346eb5c9c9f.tar.gz |
             tar -xz --strip-components=1 -C src/vendor/infiltratr-common
           printf '%s\n' 7cc5de3de0e94ed2cfcff0840bbb5346eb5c9c9f > src/vendor/infiltratr-common/.system-settings-common-commit
+          (
+            cd src/vendor/infiltratr-common
+            find . -type f \
+              ! -name '.system-settings-common-commit' \
+              ! -name '.system-settings-common-sha256' \
+              -print0 |
+              sort -z |
+              while IFS= read -r -d '' file; do
+                hash=$(sha256sum "$file" | awk '{print $1}')
+                printf '%s  %s\n' "$hash" "${file#./}"
+              done
+          ) > src/vendor/infiltratr-common/.system-settings-common-sha256
 
       - name: Check out source and Common on hosted Linux
         if: runner.environment == 'github-hosted'
