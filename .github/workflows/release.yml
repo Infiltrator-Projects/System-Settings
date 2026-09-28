@@ -85,9 +85,20 @@ jobs:
           fi
 
           if gh release view "$tag" >/dev/null 2>&1; then
-            echo "Release $tag already exists; verifying every immutable asset."
+            echo "Release $tag already exists; verifying the exact immutable asset set."
             verify="$(mktemp -d)"
             trap 'rm -rf "$verify"' EXIT
+            expected_names="$(
+              printf '%s\n' \
+                "$(basename "$deb")" \
+                "$(basename "$native")" \
+                "$(basename "$source")" \
+                "SHA256SUMS" | sort
+            )"
+            actual_names="$(
+              gh release view "$tag" --json assets --jq '.assets[].name' | sort
+            )"
+            test "$actual_names" = "$expected_names"
             gh release download "$tag" --dir "$verify"
             for asset in "$deb" "$native" "$source" build/SHA256SUMS; do
               name="$(basename "$asset")"
