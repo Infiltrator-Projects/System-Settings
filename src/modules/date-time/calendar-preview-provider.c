@@ -15,7 +15,6 @@
 
 #include <glib.h>
 #include <glib-object.h>
-#include <glib/gstdio.h>
 
 #include <stddef.h>
 #include <string.h>
@@ -180,9 +179,9 @@ static bool open_runtime(
 
 static bool runtime_candidate_trusted(const char *path)
 {
-    GStatBuf status;
+    struct stat status;
 
-    if (path == NULL || g_stat(path, &status) != 0 ||
+    if (path == NULL || stat(path, &status) != 0 ||
         !S_ISREG(status.st_mode)) {
         return false;
     }
