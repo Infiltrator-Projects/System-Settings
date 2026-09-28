@@ -220,11 +220,11 @@ jobs:
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
         run: ctest --test-dir build-sanitized --output-on-failure -E linux-shell
 
-      - name: Test GTK shell with ASan and UBSan
+      - name: Test GTK shell with ASan, UBSan and leak detection
         env:
-          # GTK/Pango/fontconfig retain process-global caches at exit. Keep
-          # address/undefined checks active while excluding those third-party
-          # lifetime caches from the project leak gate.
-          ASAN_OPTIONS: detect_leaks=0:halt_on_error=1
+          # GTK/Pango/fontconfig retain a few documented process-global
+          # caches. Suppress those exact external stacks instead of disabling
+          # LeakSanitizer for the entire application shell.
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1:suppressions=${{ github.workspace }}/tests/lsan.supp
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
         run: ctest --test-dir build-sanitized --output-on-failure -R linux-shell
