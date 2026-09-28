@@ -3,9 +3,10 @@
 # Module Contract
 
 > Implementation scope: the current product has one built-in Linux GTK4 Date &
-> Time panel and a portable policy CLI/store. Multi-module navigation, global
-> search, deep links, the public dynamic ABI and a Windows GUI remain design
-> requirements, not implemented capabilities. See [Roadmap](ROADMAP.md).
+> Time panel and a portable policy CLI/store. The shell already consumes the
+> Date & Time manifest for navigation-filter keywords without constructing the
+> panel. Multi-module discovery, result/deep-link search, the public dynamic ABI
+> and a Windows GUI remain design requirements. See [Roadmap](ROADMAP.md).
 
 
 This document owns the first-party System Settings module model.
