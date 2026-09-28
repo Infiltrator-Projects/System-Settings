@@ -427,8 +427,8 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         GTK_ACCESSIBLE_PROPERTY_LABEL,
         "Longitude",
         -1);
-    gtk_widget_set_size_request(GTK_WIDGET(state->latitude), 130, -1);
-    gtk_widget_set_size_request(GTK_WIDGET(state->longitude), 130, -1);
+    gtk_widget_set_size_request(GTK_WIDGET(state->latitude), 116, -1);
+    gtk_widget_set_size_request(GTK_WIDGET(state->longitude), 116, -1);
 
     coordinate_box = gtk_flow_box_new();
     gtk_flow_box_set_selection_mode(
@@ -484,7 +484,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     /* gtk_drop_down_new() consumes the model reference (transfer full). */
     gtk_widget_add_css_class(
         GTK_WIDGET(state->clock_mode), "setting-dropdown");
-    gtk_widget_set_size_request(GTK_WIDGET(state->clock_mode), 190, -1);
+    gtk_widget_set_size_request(GTK_WIDGET(state->clock_mode), 170, -1);
     gtk_box_append(
         GTK_BOX(presentation_card),
         ss_linux_ui_make_setting_tile(
@@ -499,7 +499,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     /* gtk_drop_down_new() consumes the model reference (transfer full). */
     gtk_widget_add_css_class(
         GTK_WIDGET(state->calendar), "setting-dropdown");
-    gtk_widget_set_size_request(GTK_WIDGET(state->calendar), 190, -1);
+    gtk_widget_set_size_request(GTK_WIDGET(state->calendar), 170, -1);
     gtk_box_append(
         GTK_BOX(presentation_card),
         ss_linux_ui_make_setting_tile(
@@ -536,7 +536,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     /* gtk_drop_down_new() consumes the model reference (transfer full). */
     gtk_widget_add_css_class(
         GTK_WIDGET(state->first_day), "setting-dropdown");
-    gtk_widget_set_size_request(GTK_WIDGET(state->first_day), 180, -1);
+    gtk_widget_set_size_request(GTK_WIDGET(state->first_day), 160, -1);
     gtk_box_append(
         GTK_BOX(presentation_card),
         ss_linux_ui_make_setting_tile(
@@ -598,8 +598,8 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         GTK_ACCESSIBLE_PROPERTY_LABEL,
         "Set operating-system date and time",
         -1);
-    gtk_widget_set_size_request(GTK_WIDGET(state->manual_date), 108, -1);
-    gtk_widget_set_size_request(GTK_WIDGET(state->manual_time), 128, -1);
+    gtk_widget_set_size_request(GTK_WIDGET(state->manual_date), 100, -1);
+    gtk_widget_set_size_request(GTK_WIDGET(state->manual_time), 112, -1);
     gtk_widget_add_css_class(GTK_WIDGET(state->manual_date), "setting-entry");
     gtk_widget_add_css_class(GTK_WIDGET(state->manual_time), "setting-entry");
     gtk_widget_add_css_class(
@@ -625,6 +625,11 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
 
     state->status_label = ss_linux_ui_make_label("", "status-ok");
     gtk_label_set_wrap(GTK_LABEL(state->status_label), TRUE);
+    gtk_accessible_update_property(
+        GTK_ACCESSIBLE(state->status_label),
+        GTK_ACCESSIBLE_PROPERTY_LABEL,
+        "Date and time status",
+        -1);
     gtk_widget_add_css_class(state->status_label, "page-status");
 
     gtk_flow_box_insert(GTK_FLOW_BOX(lower), presentation_card, -1);

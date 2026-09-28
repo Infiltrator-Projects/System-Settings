@@ -251,6 +251,13 @@ static GtkWidget *make_navigation_row(const char *icon_name,
     gtk_box_append(GTK_BOX(box), copy);
     gtk_widget_add_css_class(row, "nav-row");
     gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), box);
+    gtk_accessible_update_property(
+        GTK_ACCESSIBLE(row),
+        GTK_ACCESSIBLE_PROPERTY_LABEL,
+        title,
+        GTK_ACCESSIBLE_PROPERTY_DESCRIPTION,
+        subtitle,
+        -1);
     g_object_set_data_full(
         G_OBJECT(row), "page-name", g_strdup(page_name), g_free);
     g_object_set_data_full(
@@ -480,8 +487,15 @@ static GtkWidget *build_header(GtkWindow *parent, GtkSearchEntry **search_out)
     gtk_widget_set_tooltip_text(
         search,
         "Filter settings categories and their indexed keywords.");
+    gtk_accessible_update_property(
+        GTK_ACCESSIBLE(search),
+        GTK_ACCESSIBLE_PROPERTY_LABEL,
+        "Search settings",
+        GTK_ACCESSIBLE_PROPERTY_DESCRIPTION,
+        "Filter settings categories and their indexed keywords.",
+        -1);
     gtk_widget_add_css_class(search, "settings-search");
-    gtk_widget_set_size_request(search, 240, -1);
+    gtk_widget_set_size_request(search, 200, -1);
     gtk_widget_add_css_class(header_end, "header-end");
 
     g_signal_connect(
@@ -546,7 +560,7 @@ static GtkWidget *build_sidebar(GtkWindow *parent,
         g_strdup_printf("Version %s", info->version);
     g_autofree gchar *date_search = date_time_search_text();
 
-    gtk_widget_set_size_request(sidebar, 230, -1);
+    gtk_widget_set_size_request(sidebar, 205, -1);
     gtk_widget_add_css_class(sidebar, "settings-sidebar");
 
     gtk_box_append(
@@ -793,6 +807,13 @@ typedef struct {
     GtkLabel *network_value;
     GtkLabel *network_detail;
     guint source_id;
+    GtkSettings *settings;
+    GNetworkMonitor *network;
+    gulong theme_name_id;
+    gulong theme_dark_id;
+    gulong network_available_id;
+    gulong network_metered_id;
+    gulong network_connectivity_id;
 } HomeStatusTicker;
 
 static gboolean refresh_home_temporal(gpointer user_data)
@@ -1182,10 +1203,10 @@ static gboolean refresh_home_status(gpointer user_data)
 {
     HomeStatusTicker *ticker = user_data;
     g_autofree gchar *uptime = NULL;
-    GtkSettings *settings = gtk_settings_get_default();
+    GtkSettings *settings;
     gchar *theme_name = NULL;
     gboolean prefer_dark = FALSE;
-    GNetworkMonitor *network = g_network_monitor_get_default();
+    GNetworkMonitor *network;
     gboolean online = FALSE;
     gboolean metered = FALSE;
     GNetworkConnectivity connectivity = G_NETWORK_CONNECTIVITY_LOCAL;
@@ -1197,6 +1218,12 @@ static gboolean refresh_home_status(gpointer user_data)
     g_autoptr(GTimeZone) local_zone = g_time_zone_new_local();
 
     if (ticker == NULL) return G_SOURCE_REMOVE;
+    settings = ticker->settings != NULL
+        ? ticker->settings
+        : gtk_settings_get_default();
+    network = ticker->network != NULL
+        ? ticker->network
+        : g_network_monitor_get_default();
     uptime = format_uptime();
     if (ticker->uptime != NULL) gtk_label_set_text(ticker->uptime, uptime);
     if (ticker->date_timezone != NULL && local_zone != NULL) {
@@ -1249,12 +1276,49 @@ static gboolean refresh_home_status(gpointer user_data)
     return G_SOURCE_CONTINUE;
 }
 
+static void home_status_source_changed(
+    GObject *object G_GNUC_UNUSED,
+    GParamSpec *pspec G_GNUC_UNUSED,
+    gpointer user_data)
+{
+    (void)refresh_home_status(user_data);
+}
+
 static void stop_home_status_ticker(HomeStatusTicker *ticker)
 {
-    if (ticker != NULL && ticker->source_id != 0U) {
+    if (ticker == NULL) {
+        return;
+    }
+    if (ticker->source_id != 0U) {
         g_source_remove(ticker->source_id);
         ticker->source_id = 0U;
     }
+    if (ticker->settings != NULL) {
+        if (ticker->theme_name_id != 0U) {
+            g_signal_handler_disconnect(ticker->settings, ticker->theme_name_id);
+        }
+        if (ticker->theme_dark_id != 0U) {
+            g_signal_handler_disconnect(ticker->settings, ticker->theme_dark_id);
+        }
+    }
+    if (ticker->network != NULL) {
+        if (ticker->network_available_id != 0U) {
+            g_signal_handler_disconnect(ticker->network, ticker->network_available_id);
+        }
+        if (ticker->network_metered_id != 0U) {
+            g_signal_handler_disconnect(ticker->network, ticker->network_metered_id);
+        }
+        if (ticker->network_connectivity_id != 0U) {
+            g_signal_handler_disconnect(ticker->network, ticker->network_connectivity_id);
+        }
+    }
+    ticker->theme_name_id = 0U;
+    ticker->theme_dark_id = 0U;
+    ticker->network_available_id = 0U;
+    ticker->network_metered_id = 0U;
+    ticker->network_connectivity_id = 0U;
+    ticker->settings = NULL;
+    ticker->network = NULL;
 }
 
 static void start_home_status_ticker(HomeStatusTicker *ticker)
@@ -1262,9 +1326,32 @@ static void start_home_status_ticker(HomeStatusTicker *ticker)
     if (ticker == NULL || ticker->source_id != 0U) {
         return;
     }
+
+    ticker->settings = gtk_settings_get_default();
+    ticker->network = g_network_monitor_get_default();
+    if (ticker->settings != NULL) {
+        ticker->theme_name_id = g_signal_connect(
+            ticker->settings, "notify::gtk-theme-name",
+            G_CALLBACK(home_status_source_changed), ticker);
+        ticker->theme_dark_id = g_signal_connect(
+            ticker->settings, "notify::gtk-application-prefer-dark-theme",
+            G_CALLBACK(home_status_source_changed), ticker);
+    }
+    if (ticker->network != NULL) {
+        ticker->network_available_id = g_signal_connect(
+            ticker->network, "notify::network-available",
+            G_CALLBACK(home_status_source_changed), ticker);
+        ticker->network_metered_id = g_signal_connect(
+            ticker->network, "notify::network-metered",
+            G_CALLBACK(home_status_source_changed), ticker);
+        ticker->network_connectivity_id = g_signal_connect(
+            ticker->network, "notify::connectivity",
+            G_CALLBACK(home_status_source_changed), ticker);
+    }
+
     (void)refresh_home_status(ticker);
     ticker->source_id = g_timeout_add_seconds(
-        5U, refresh_home_status, ticker);
+        60U, refresh_home_status, ticker);
     g_source_set_name_by_id(
         ticker->source_id,
         "[system-settings] visible Home system status");

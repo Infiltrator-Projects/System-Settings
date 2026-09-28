@@ -264,7 +264,7 @@ A release commit must:
 
 ## Implemented audit regressions (2026-09-25)
 
-CTest contains seventeen System Settings project tests on Linux when Xvfb is
+CTest contains eighteen System Settings project tests on Linux when Xvfb is
 available. Coverage includes private-bus timedated success, denial,
 owner-loss/reacquisition and outstanding-call lifetime; transactional CLI
 rollback/provenance; cross-process policy merge races through both the model and
@@ -273,7 +273,8 @@ temporal read-failure resilience; native installer/source-asset-builder smoke
 tests; and the existing model, parsing, persistence, Calendar-runtime and
 regional-context tests. The shell is exercised at ordinary and 2× GDK scale,
 including the complete content-plus-custom-titlebar 1024×768 minimum allocation
-budget, visible-page timer ownership, live desktop-theme following, external
+budget, a 2× logical-desktop budget, an accessibility-enabled GTK run,
+visible-page timer ownership, live desktop-theme following, external
 temporal-policy and locality-metadata reload, manual-draft preservation,
 locality rollback, manifest-derived search, advisory-only locality/time-zone
 inference, navigation synchronisation and neutral missing-art fallbacks. Tests
