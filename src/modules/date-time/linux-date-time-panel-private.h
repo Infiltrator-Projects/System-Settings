@@ -60,6 +60,7 @@ struct SsLinuxDateTimePanel {
     guint timer_id;
     guint preview_idle_id;
     guint coordinate_commit_id;
+    guint locality_recovery_retry_id;
     guint location_search_generation;
     guint timezone_generation;
     guint ntp_generation;
