@@ -372,6 +372,17 @@ if(BUILD_TESTING)
         else()
             message(WARNING "xvfb-run missing: linux-shell regression is not registered")
         endif()
+        add_executable(policy-file-observer-test
+            tests/policy-file-observer-test.c
+            src/modules/date-time/policy-file-observer.c)
+        ss_configure(policy-file-observer-test)
+        target_include_directories(policy-file-observer-test PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/modules/date-time")
+        target_link_libraries(policy-file-observer-test PRIVATE
+            PkgConfig::GIO2)
+        add_test(NAME policy-file-observer
+            COMMAND policy-file-observer-test)
+
         add_executable(home-temporal-presentation-test
             tests/home-temporal-presentation-test.c)
         ss_configure(home-temporal-presentation-test)
