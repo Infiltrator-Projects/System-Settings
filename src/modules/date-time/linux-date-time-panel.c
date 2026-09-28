@@ -201,6 +201,7 @@ static void policy_file_changed(gpointer user_data)
         }
         refresh_location_authority_state(state);
         sync_controls(state);
+        restart_preview_timer(state);
         (void)refresh_preview(state);
         if (changed) {
             set_status(
@@ -798,6 +799,38 @@ static void stop_preview_timer(SsLinuxDateTimePanel *state)
     }
 }
 
+static guint preview_refresh_interval_ms(
+    const SsLinuxDateTimePanel *state)
+{
+    const InfiltratrTemporalPolicyV3 *policy =
+        state != NULL
+            ? ss_date_time_model_policy(&state->model)
+            : NULL;
+
+    if (policy != NULL &&
+        policy->show_seconds &&
+        g_strcmp0(policy->clock_mode, "decimal") == 0) {
+        return 250U;
+    }
+    return 1000U;
+}
+
+static void restart_preview_timer(SsLinuxDateTimePanel *state)
+{
+    if (state == NULL || state->root == NULL ||
+        !gtk_widget_get_mapped(state->root)) {
+        return;
+    }
+    stop_preview_timer(state);
+    state->timer_id = g_timeout_add(
+        preview_refresh_interval_ms(state),
+        refresh_preview,
+        state);
+    g_source_set_name_by_id(
+        state->timer_id,
+        "[system-settings] visible Date & Time preview");
+}
+
 static void on_panel_mapped(
     GtkWidget *widget G_GNUC_UNUSED,
     gpointer user_data)
@@ -810,7 +843,9 @@ static void on_panel_mapped(
     (void)refresh_preview(state);
     if (state->timer_id == 0U) {
         state->timer_id = g_timeout_add(
-            250U, refresh_preview, state);
+            preview_refresh_interval_ms(state),
+            refresh_preview,
+            state);
         g_source_set_name_by_id(
             state->timer_id,
             "[system-settings] visible Date & Time preview");
@@ -938,6 +973,7 @@ static void on_cinnamon_interface_changed(
 
     if (changed) {
         sync_controls(state);
+        restart_preview_timer(state);
         set_status(
             state,
             "An external Mint/Cinnamon time preference changed and System Settings reconciled the matching setting.",
@@ -996,6 +1032,7 @@ static void policy_saved(SsLinuxDateTimePanel *state)
             : "System temporal policy saved, but Mint/Cinnamon compatibility settings did not fully synchronize.",
         !compatibility_ok);
     update_control_capabilities(state);
+    restart_preview_timer(state);
     (void)refresh_preview(state);
 }
 
