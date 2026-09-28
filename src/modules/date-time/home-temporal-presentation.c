@@ -9,6 +9,7 @@
  */
 #include "home-temporal-presentation.h"
 #include "calendar-preview-provider.h"
+#include "policy-file-observer.h"
 
 #include "system-settings/cinnamon-interface.h"
 #include "system-settings/native-clock-policy.h"
@@ -23,8 +24,7 @@ struct SsHomeTemporalPresenter {
     bool use_24h;
     GSettings *settings;
     gulong settings_changed_id;
-    GFileMonitor *policy_monitor;
-    guint policy_monitor_retry_id;
+    SsPolicyFileObserver *policy_observer;
     guint policy_reload_retry_id;
     gchar *policy_path;
     SsCalendarPreviewProvider *calendar_provider;
@@ -215,57 +215,16 @@ static void schedule_policy_reload_retry(
         "[system-settings] Home temporal policy reload retry");
 }
 
-static void on_policy_directory_changed(
-    GFileMonitor *monitor G_GNUC_UNUSED,
-    GFile *file G_GNUC_UNUSED,
-    GFile *other_file G_GNUC_UNUSED,
-    GFileMonitorEvent event,
-    gpointer user_data)
+static void on_policy_file_changed(gpointer user_data)
 {
     SsHomeTemporalPresenter *presenter = user_data;
-    switch (event) {
-    case G_FILE_MONITOR_EVENT_CHANGED:
-    case G_FILE_MONITOR_EVENT_CHANGES_DONE_HINT:
-    case G_FILE_MONITOR_EVENT_CREATED:
-    case G_FILE_MONITOR_EVENT_DELETED:
-    case G_FILE_MONITOR_EVENT_MOVED:
-    case G_FILE_MONITOR_EVENT_RENAMED:
-    case G_FILE_MONITOR_EVENT_ATTRIBUTE_CHANGED:
-        if (!presenter_reload_policy(presenter)) {
-            schedule_policy_reload_retry(presenter);
-        }
-        break;
-    default:
-        break;
-    }
-}
-
-static bool ensure_policy_monitor(SsHomeTemporalPresenter *presenter)
-{
-    g_autoptr(GFile) directory = NULL;
 
     if (presenter == NULL) {
-        return false;
+        return;
     }
-    if (presenter->policy_monitor != NULL) {
-        return true;
+    if (!presenter_reload_policy(presenter)) {
+        schedule_policy_reload_retry(presenter);
     }
-    if (presenter->policy_path == NULL ||
-        presenter->policy_path[0] == '\0') {
-        return false;
-    }
-
-    directory = g_file_new_for_path(presenter->policy_path);
-    presenter->policy_monitor =
-        g_file_monitor_file(
-            directory, G_FILE_MONITOR_NONE, NULL, NULL);
-    if (presenter->policy_monitor == NULL) {
-        return false;
-    }
-    g_signal_connect(
-        presenter->policy_monitor, "changed",
-        G_CALLBACK(on_policy_directory_changed), presenter);
-    return true;
 }
 
 static gboolean retry_policy_reload(gpointer user_data)
@@ -277,22 +236,6 @@ static gboolean retry_policy_reload(gpointer user_data)
     }
     if (presenter_reload_policy(presenter)) {
         presenter->policy_reload_retry_id = 0U;
-        return G_SOURCE_REMOVE;
-    }
-    return G_SOURCE_CONTINUE;
-}
-
-static gboolean retry_policy_monitor(gpointer user_data)
-{
-    SsHomeTemporalPresenter *presenter = user_data;
-
-    if (presenter == NULL) {
-        return G_SOURCE_REMOVE;
-    }
-
-    (void)presenter_reload_policy(presenter);
-    if (ensure_policy_monitor(presenter)) {
-        presenter->policy_monitor_retry_id = 0U;
         return G_SOURCE_REMOVE;
     }
     return G_SOURCE_CONTINUE;
@@ -322,12 +265,13 @@ SsHomeTemporalPresenter *ss_home_temporal_presenter_new(void)
     if (!presenter->policy_valid) {
         schedule_policy_reload_retry(presenter);
     }
-    if (!ensure_policy_monitor(presenter)) {
-        presenter->policy_monitor_retry_id = g_timeout_add_seconds(
-            30U, retry_policy_monitor, presenter);
-        g_source_set_name_by_id(
-            presenter->policy_monitor_retry_id,
-            "[system-settings] Home temporal policy monitor retry");
+    presenter->policy_observer = ss_policy_file_observer_new(
+        presenter->policy_path,
+        on_policy_file_changed,
+        presenter);
+    if (presenter->policy_observer == NULL) {
+        ss_home_temporal_presenter_free(presenter);
+        return NULL;
     }
     return presenter;
 }
@@ -341,15 +285,12 @@ void ss_home_temporal_presenter_free(
         g_signal_handler_disconnect(
             presenter->settings, presenter->settings_changed_id);
     }
-    if (presenter->policy_monitor_retry_id != 0U) {
-        g_source_remove(presenter->policy_monitor_retry_id);
-        presenter->policy_monitor_retry_id = 0U;
-    }
+    ss_policy_file_observer_free(presenter->policy_observer);
+    presenter->policy_observer = NULL;
     if (presenter->policy_reload_retry_id != 0U) {
         g_source_remove(presenter->policy_reload_retry_id);
         presenter->policy_reload_retry_id = 0U;
     }
-    g_clear_object(&presenter->policy_monitor);
     g_clear_object(&presenter->settings);
     g_clear_pointer(&presenter->policy_path, g_free);
     ss_calendar_preview_provider_free(presenter->calendar_provider);
