@@ -6,6 +6,7 @@
 #include "policy-file-observer.h"
 
 #include <gio/gio.h>
+#include <stdbool.h>
 
 struct SsPolicyFileObserver {
     GFile *target_file;
