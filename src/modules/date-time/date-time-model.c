@@ -79,6 +79,7 @@ bool ss_date_time_model_init(SsDateTimeModel *model,
 {
     if (model == NULL || store == NULL || store->load == NULL ||
         store->save == NULL ||
+        ((store->begin_update == NULL) != (store->end_update == NULL)) ||
         !infiltratr_temporal_policy_v3_default(&model->policy)) {
         return false;
     }
