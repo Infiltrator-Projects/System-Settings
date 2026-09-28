@@ -241,14 +241,33 @@ int main(int argc, char **argv)
 
 #ifndef _WIN32
         if (location_change_requested) {
-            const bool metadata_ok = location_clear_requested
-                ? ss_location_metadata_clear()
-                : ss_location_metadata_finish_staged();
-            if (!metadata_ok) {
+            if (location_clear_requested) {
+                const SsLocationMetadataClearResult clear_result =
+                    ss_location_metadata_clear_result();
+
+                if (clear_result != SS_LOCATION_METADATA_CLEAR_OK) {
+                    /*
+                     * The cleared temporal policy is already authoritative.
+                     * Never roll it back after a metadata-clear failure:
+                     * unlink may already have happened, and restoring stale
+                     * coordinates would recreate the two-file mismatch.
+                     * Startup recovery follows the cleared policy and retries
+                     * metadata removal/durability confirmation.
+                     */
+                    fputs(
+                        clear_result ==
+                                SS_LOCATION_METADATA_CLEAR_COMMIT_UNCERTAIN
+                            ? "Geographic location was cleared, but metadata durability could not yet be confirmed; recovery will retry.\n"
+                            : "Geographic location was cleared, but stale locality metadata could not yet be removed; recovery will retry.\n",
+                        stderr);
+                    exit_code = 3;
+                    goto done;
+                }
+            } else if (!ss_location_metadata_finish_staged()) {
                 const bool rolled_back =
                     platform->save(&original_policy);
                 if (rolled_back && location_staged) {
-                    ss_location_metadata_discard_staged();
+                    (void)ss_location_metadata_discard_staged();
                 }
                 /*
                  * If rollback failed, retain a staged locality journal so the
