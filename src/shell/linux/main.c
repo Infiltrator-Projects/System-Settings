@@ -22,6 +22,13 @@
 #include <locale.h>
 #include <sys/utsname.h>
 
+#ifndef SYSTEM_SETTINGS_MODULE_DIR
+#define SYSTEM_SETTINGS_MODULE_DIR "/usr/share/infiltrator/system-settings/modules"
+#endif
+#ifndef SYSTEM_SETTINGS_MODULE_SOURCE_DIR
+#define SYSTEM_SETTINGS_MODULE_SOURCE_DIR ""
+#endif
+
 typedef struct {
     GtkListBox *list;
     GtkWindow *parent;
@@ -251,6 +258,89 @@ static GtkWidget *make_about_navigation_row(void)
     return row;
 }
 
+
+static void append_manifest_value(
+    GString *search,
+    GKeyFile *key_file,
+    const char *group,
+    const char *key)
+{
+    g_autofree gchar *value = NULL;
+
+    if (search == NULL || key_file == NULL ||
+        group == NULL || key == NULL) {
+        return;
+    }
+    value = g_key_file_get_string(key_file, group, key, NULL);
+    if (value != NULL && value[0] != '\0') {
+        g_string_append_c(search, ' ');
+        g_string_append(search, value);
+    }
+}
+
+static gchar *date_time_search_text(void)
+{
+    static const char fallback[] =
+        "date time clock calendar location timezone seconds precision "
+        "12 hour 24 hour decimal internet ntp network time unix binary "
+        "hexadecimal julian sidereal solar roman chinese japanese gregorian "
+        "hebrew islamic persian mayan french republican first day week";
+    const char *override_dir =
+        g_getenv("SYSTEM_SETTINGS_MODULE_DIR_OVERRIDE");
+    const bool override_active =
+        override_dir != NULL && override_dir[0] != '\0';
+    const char *directories[] = {
+        override_active ? override_dir : SYSTEM_SETTINGS_MODULE_DIR,
+        override_active ? NULL : SYSTEM_SETTINGS_MODULE_SOURCE_DIR,
+        NULL
+    };
+
+    for (size_t directory_index = 0U;
+         directories[directory_index] != NULL;
+         ++directory_index) {
+        g_autofree gchar *path = NULL;
+        g_autoptr(GKeyFile) key_file = NULL;
+        g_auto(GStrv) groups = NULL;
+        gsize group_count = 0U;
+        g_autoptr(GError) error = NULL;
+        g_autoptr(GString) search = NULL;
+
+        if (directories[directory_index][0] == '\0') {
+            continue;
+        }
+        path = g_build_filename(
+            directories[directory_index],
+            "date-time.settings-module",
+            NULL);
+        key_file = g_key_file_new();
+        if (!g_key_file_load_from_file(
+                key_file, path, G_KEY_FILE_NONE, &error)) {
+            continue;
+        }
+
+        search = g_string_new("date time");
+        append_manifest_value(search, key_file, "Module", "Title");
+        append_manifest_value(search, key_file, "Module", "Summary");
+        append_manifest_value(search, key_file, "Search", "Keywords");
+
+        groups = g_key_file_get_groups(key_file, &group_count);
+        for (gsize group_index = 0U;
+             group_index < group_count;
+             ++group_index) {
+            if (g_str_has_prefix(groups[group_index], "Target ")) {
+                append_manifest_value(
+                    search, key_file, groups[group_index], "Title");
+                append_manifest_value(
+                    search, key_file, groups[group_index], "Keywords");
+            }
+        }
+
+        return g_string_free(g_steal_pointer(&search), FALSE);
+    }
+
+    return g_strdup(fallback);
+}
+
 static void minimize_window(GtkButton *button, gpointer user_data)
 {
     (void)button;
@@ -400,6 +490,7 @@ static GtkWidget *build_sidebar(GtkWindow *parent,
     GtkWidget *footer = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
     g_autofree gchar *version =
         g_strdup_printf("Version %s", info->version);
+    g_autofree gchar *date_search = date_time_search_text();
 
     gtk_widget_set_size_request(sidebar, 230, -1);
     gtk_widget_add_css_class(sidebar, "settings-sidebar");
@@ -421,7 +512,7 @@ static GtkWidget *build_sidebar(GtkWindow *parent,
         "Date & Time",
         "Clock, calendar & location",
         "date-time",
-        "date time clock calendar location timezone seconds precision 12 hour 24 hour decimal internet ntp network time unix binary hexadecimal julian sidereal solar roman chinese japanese gregorian hebrew islamic persian mayan french republican first day week");
+        date_search);
     gtk_widget_add_css_class(date_row, "nav-gold");
 
     region_row = make_external_navigation_row(
