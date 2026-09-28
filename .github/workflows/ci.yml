@@ -247,6 +247,7 @@ jobs:
           # GTK/Pango/fontconfig retain a few documented process-global
           # caches. Suppress those exact external stacks instead of disabling
           # LeakSanitizer for the entire application shell.
-          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1:suppressions=${{ github.workspace }}/tests/lsan.supp
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          LSAN_OPTIONS: suppressions=${{ github.workspace }}/tests/lsan.supp:print_suppressions=1
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
         run: ctest --test-dir build-sanitized --output-on-failure -R linux-shell
