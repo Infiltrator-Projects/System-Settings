@@ -692,6 +692,11 @@ static void show_help(void)
 
 int main(int argc, char **argv)
 {
+    static const char trusted_path[] =
+        "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
+    if (setenv("PATH", trusted_path, 1) != 0) {
+        fail("could not establish the trusted build-tool search path.");
+    }
     static const char common_relative[] =
         "src/vendor/infiltratr-common";
     char root[PATH_MAX];

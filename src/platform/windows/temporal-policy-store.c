@@ -264,7 +264,8 @@ static bool begin_update(void)
         goto done;
     }
 
-    for (unsigned int attempt = 0U; attempt < 200U; ++attempt) {
+    /* Match the POSIX bounded wait: fail quickly instead of freezing UI. */
+    for (unsigned int attempt = 0U; attempt < 25U; ++attempt) {
         if (LockFileEx(
                 update_lock_file,
                 LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY,

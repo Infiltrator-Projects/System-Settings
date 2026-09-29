@@ -116,5 +116,37 @@ int main(void)
         root, "infiltrator", "system-settings", "location.pending", NULL);
     CHECK(!g_file_test(pending, G_FILE_TEST_EXISTS));
 
+    /*
+     * A stalled peer must not freeze the caller for seconds. The production
+     * lock gives ordinary short transactions time to finish, then fails fast.
+     */
+    {
+        int ready_pipe[2];
+        CHECK(pipe(ready_pipe) == 0);
+        pid_t holder = fork();
+        CHECK(holder >= 0);
+        if (holder == 0) {
+            char ready = '1';
+            close(ready_pipe[0]);
+            if (!ss_location_metadata_transaction_begin()) _exit(20);
+            if (write(ready_pipe[1], &ready, 1U) != 1) _exit(21);
+            close(ready_pipe[1]);
+            g_usleep(600000U);
+            ss_location_metadata_transaction_end();
+            _exit(0);
+        }
+        close(ready_pipe[1]);
+        char ready = 0;
+        CHECK(read(ready_pipe[0], &ready, 1U) == 1);
+        close(ready_pipe[0]);
+        const gint64 start = g_get_monotonic_time();
+        CHECK(!ss_location_metadata_transaction_begin());
+        const gint64 elapsed = g_get_monotonic_time() - start;
+        CHECK(elapsed < 500000);
+        CHECK(wait_ok(holder) == 0);
+        CHECK(ss_location_metadata_transaction_begin());
+        ss_location_metadata_transaction_end();
+    }
+
     return 0;
 }

@@ -1,3 +1,15 @@
+## 0.4.44 — 2026-09-29
+
+- Preserve the distinction between missing and unreadable locality metadata during Date & Time startup, and prevent uncertain metadata authority from being silently replaced by a time-zone reference approximation.
+- Re-read both timedated state and regional time-zone context after taking the locality lock before publishing automatic reference coordinates, closing the remaining stale-zone race.
+- Make transaction-journal deletion parent-directory durable while retaining the rule that cleanup failure after metadata publication never rolls committed policy back.
+- Reduce Linux and Windows cross-process lock contention waits from multi-second UI stalls to a bounded quarter-second retry window, with explicit contention regressions.
+- Use the same 1 Hz cadence for conventional seconds clocks on Date & Time as Home while retaining 250 ms sampling for extended temporal systems.
+- Validate geocoder coordinates, country-code capacity, UTF-8 and locality-query length before search results enter the settings UI.
+- Resolve delegated Linux settings tools only from fixed system executable roots and sanitize the native/source packaging tool search path.
+- Add regressions for locality I/O classification, preservation of unreadable recovery journals, lock timeout behaviour and Date & Time preview cadence.
+- Update current documentation to the pinned Infiltratr Common 1.19.38 and the hardened Calendar runtime-discovery contract.
+
 ## 0.4.43 — 2026-09-29
 
 - Distinguish missing, invalid and I/O-failed locality metadata so transient filesystem and permission failures cannot masquerade as deletion or corruption.

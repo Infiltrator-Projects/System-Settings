@@ -18,6 +18,9 @@
 
 static int update_lock_fd = -1;
 
+#define SS_POLICY_LOCK_WAIT_USEC (250 * 1000)
+#define SS_LOCK_RETRY_USEC 5000
+
 static bool begin_update(void)
 {
     g_autofree gchar *directory = NULL;
@@ -54,7 +57,7 @@ static bool begin_update(void)
     }
     {
         const gint64 deadline =
-            g_get_monotonic_time() + (2 * G_USEC_PER_SEC);
+            g_get_monotonic_time() + SS_POLICY_LOCK_WAIT_USEC;
         for (;;) {
             if (flock(fd, LOCK_EX | LOCK_NB) == 0) {
                 break;
@@ -67,7 +70,7 @@ static bool begin_update(void)
                 close(fd);
                 return false;
             }
-            g_usleep(10000U);
+            g_usleep(SS_LOCK_RETRY_USEC);
         }
     }
     update_lock_fd = fd;

@@ -153,7 +153,7 @@ prematurely freezing an ABI around GTK widgets.
 
 ### Specialised temporal preview provider
 
-System Settings owns the temporal selection. Common 1.19.35 renders every
+System Settings owns the temporal selection. Common 1.19.38 renders every
 clock mode through `infiltratr_temporal_format_clock_mode()`. Gregorian dates
 use GLib's local date formatter. Non-Gregorian chronology previews use the
 optional `libcalendar-plus.so.0` runtime ABI.
@@ -163,11 +163,11 @@ its fixture tests that ABI, but the current panel's clock preview uses Common.
 Without Calendar, non-Gregorian dates explicitly report preview unavailable;
 clock selection, clock rendering and persistence remain available.
 
-Discovery checks fixed library roots and their compile-time multiarch child,
-then normal loader soname resolution. It does not recursively scan directories
-or verify ownership of files reached through the dynamic loader. This optional
-runtime executes with ordinary user authority; it is not the future trusted
-module loader. Missing-runtime retries are throttled to five seconds. Accepted Linux runtimes
+Discovery checks fixed system library roots and their compile-time multiarch
+child only. It does not recursively scan directories and does not fall back to
+bare-soname loader resolution through environment-controlled search paths. This
+optional runtime executes with ordinary user authority; it is not the future
+trusted module loader. Missing-runtime retries are throttled to five seconds. Accepted Linux runtimes
 remain resident because GLib retains registered static GType callbacks after
 provider teardown; replacing an already loaded runtime requires restarting the
 process. Each provider still releases its objects and loader reference.

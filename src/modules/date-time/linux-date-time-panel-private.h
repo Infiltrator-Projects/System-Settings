@@ -67,6 +67,7 @@ struct SsLinuxDateTimePanel {
     guint ntp_generation;
     guint manual_time_generation;
     bool location_metadata_present;
+    bool location_metadata_uncertain;
     bool location_follows_timezone_reference;
     bool updating_controls;
     bool updating_system_controls;
@@ -86,6 +87,8 @@ void ss_linux_date_time_panel_sync_controls(
     SsLinuxDateTimePanel *state);
 void ss_linux_date_time_panel_policy_saved(
     SsLinuxDateTimePanel *state);
+guint ss_linux_date_time_panel_preview_interval_ms(
+    const SsLinuxDateTimePanel *state);
 
 bool ss_linux_date_time_location_coordinate_close(
     double left,

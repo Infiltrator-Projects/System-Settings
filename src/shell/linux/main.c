@@ -265,6 +265,31 @@ static GtkWidget *make_navigation_row(const char *icon_name,
     return row;
 }
 
+static gchar *find_trusted_system_program(const char *program)
+{
+    static const char *const directories[] = {
+        "/usr/bin",
+        "/usr/sbin",
+        "/bin",
+        "/sbin",
+        "/usr/local/bin",
+        "/usr/local/sbin"
+    };
+
+    if (program == NULL || program[0] == '\0' ||
+        strchr(program, '/') != NULL) {
+        return NULL;
+    }
+    for (size_t index = 0U; index < G_N_ELEMENTS(directories); ++index) {
+        g_autofree gchar *candidate =
+            g_build_filename(directories[index], program, NULL);
+        if (g_file_test(candidate, G_FILE_TEST_IS_EXECUTABLE)) {
+            return g_steal_pointer(&candidate);
+        }
+    }
+    return NULL;
+}
+
 static GtkWidget *make_external_navigation_row(const char *icon_name,
                                                const char *title,
                                                const char *subtitle,
@@ -280,7 +305,7 @@ static GtkWidget *make_external_navigation_row(const char *icon_name,
         NULL,
         search_text);
     g_autofree gchar *path =
-        program != NULL ? g_find_program_in_path(program) : NULL;
+        find_trusted_system_program(program);
 
     if (accent_class != NULL) {
         gtk_widget_add_css_class(row, accent_class);
@@ -288,7 +313,7 @@ static GtkWidget *make_external_navigation_row(const char *icon_name,
     g_object_set_data_full(
         G_OBJECT(row),
         "action-program",
-        g_strdup(program),
+        g_strdup(path),
         g_free);
     g_object_set_data_full(
         G_OBJECT(row),

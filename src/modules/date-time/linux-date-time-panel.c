@@ -127,6 +127,15 @@ static void refresh_location_authority_state(
         return;
     }
     policy = ss_date_time_model_policy(&state->model);
+    if (state->location_metadata_uncertain) {
+        /*
+         * An unreadable locality file is not evidence that the user has no
+         * explicit locality. Never replace uncertain authority with a tzdata
+         * reference approximation.
+         */
+        state->location_follows_timezone_reference = false;
+        return;
+    }
     state->location_follows_timezone_reference =
         !metadata_matches &&
         (policy == NULL ||
@@ -148,10 +157,13 @@ static void location_metadata_file_changed(gpointer user_data)
     if (status == SS_LOCATION_METADATA_LOAD_OK) {
         state->location_metadata = loaded;
         state->location_metadata_present = true;
+        state->location_metadata_uncertain = false;
     } else if (status == SS_LOCATION_METADATA_LOAD_MISSING) {
         memset(&state->location_metadata, 0, sizeof(state->location_metadata));
         state->location_metadata_present = false;
+        state->location_metadata_uncertain = false;
     } else {
+        state->location_metadata_uncertain = true;
         set_status(
             state,
             "Locality metadata changed externally but could not be read; the last known-good locality remains active.",
@@ -273,11 +285,15 @@ static void policy_file_changed(gpointer user_data)
         if (recovered_metadata_present) {
             state->location_metadata = recovered_metadata;
             state->location_metadata_present = true;
+            state->location_metadata_uncertain = false;
         } else if (locality_recovery_ok &&
                    recovered_metadata_status ==
                        SS_LOCATION_METADATA_LOAD_MISSING) {
             memset(&state->location_metadata, 0, sizeof(state->location_metadata));
             state->location_metadata_present = false;
+            state->location_metadata_uncertain = false;
+        } else if (locality_recovery_ok) {
+            state->location_metadata_uncertain = true;
         }
         refresh_location_authority_state(state);
         sync_controls(state);
@@ -884,7 +900,7 @@ static void stop_preview_timer(SsLinuxDateTimePanel *state)
     }
 }
 
-static guint preview_refresh_interval_ms(
+guint ss_linux_date_time_panel_preview_interval_ms(
     const SsLinuxDateTimePanel *state)
 {
     const InfiltratrTemporalPolicyV3 *policy =
@@ -892,14 +908,20 @@ static guint preview_refresh_interval_ms(
             ? ss_date_time_model_policy(&state->model)
             : NULL;
 
+    if (policy == NULL || !policy->show_seconds) {
+        return 1000U;
+    }
+    if (g_strcmp0(policy->clock_mode, "standard") == 0 ||
+        g_strcmp0(policy->clock_mode, "standard-12") == 0 ||
+        g_strcmp0(policy->clock_mode, "standard-24") == 0) {
+        return 1000U;
+    }
     /*
-     * Common clock modes can advance displayed sub-second-equivalent units at
-     * different rates (for example decimal seconds, Internet centibeats and
-     * sidereal seconds). Until Common exposes a per-mode cadence capability,
-     * sample all visible seconds-enabled clocks at 250 ms so no displayed unit
-     * can be skipped. Seconds-disabled clocks remain at the low-cost 1 Hz rate.
+     * Extended clocks may advance displayed units faster than one SI second.
+     * Until Common exposes a per-mode cadence capability, 250 ms remains the
+     * conservative sampling interval for those modes only.
      */
-    return policy != NULL && policy->show_seconds ? 250U : 1000U;
+    return 250U;
 }
 
 static void restart_preview_timer(SsLinuxDateTimePanel *state)
@@ -910,7 +932,7 @@ static void restart_preview_timer(SsLinuxDateTimePanel *state)
     }
     stop_preview_timer(state);
     state->timer_id = g_timeout_add(
-        preview_refresh_interval_ms(state),
+        ss_linux_date_time_panel_preview_interval_ms(state),
         refresh_preview,
         state);
     g_source_set_name_by_id(
@@ -930,7 +952,7 @@ static void on_panel_mapped(
     (void)refresh_preview(state);
     if (state->timer_id == 0U) {
         state->timer_id = g_timeout_add(
-            preview_refresh_interval_ms(state),
+            ss_linux_date_time_panel_preview_interval_ms(state),
             refresh_preview,
             state);
         g_source_set_name_by_id(
@@ -1223,6 +1245,20 @@ static void system_time_changed(
     if ((timezone_changed || state->location_follows_timezone_reference) &&
         ss_location_metadata_transaction_begin()) {
         SsLocationMetadata authoritative_metadata = {0};
+        SsSystemTimeState locked_system = {0};
+        const bool locked_system_ok =
+            state->system_time_service != NULL &&
+            ss_system_time_service_read(
+                state->system_time_service, &locked_system);
+        const bool regional_reloaded =
+            ss_regional_context_detect(&state->regional_context);
+        const bool regional_matches_system =
+            locked_system_ok &&
+            regional_reloaded &&
+            locked_system.timezone[0] != '\0' &&
+            g_strcmp0(
+                state->regional_context.timezone_id,
+                locked_system.timezone) == 0;
         const bool policy_reloaded =
             ss_date_time_model_reload(&state->model);
         const SsLocationMetadataLoadStatus metadata_status =
@@ -1242,14 +1278,15 @@ static void system_time_changed(
         if (policy_reloaded &&
             ss_linux_date_time_location_metadata_matches_policy(
                 state, ss_date_time_model_policy(&state->model)) &&
-            system_state->timezone[0] != '\0' &&
+            locked_system_ok &&
+            locked_system.timezone[0] != '\0' &&
             g_strcmp0(
                 state->location_metadata.timezone_id,
-                system_state->timezone) != 0) {
+                locked_system.timezone) != 0) {
             SsLocationMetadata candidate = state->location_metadata;
             (void)g_strlcpy(
                 candidate.timezone_id,
-                system_state->timezone,
+                locked_system.timezone,
                 sizeof(candidate.timezone_id));
             if (ss_location_metadata_save(&candidate)) {
                 state->location_metadata = candidate;
@@ -1267,6 +1304,7 @@ static void system_time_changed(
 
         if (policy_reloaded &&
             state->location_follows_timezone_reference &&
+            regional_matches_system &&
             state->regional_context.has_reference_coordinates) {
             const InfiltratrTemporalPolicyV3 *policy =
                 ss_date_time_model_policy(&state->model);
@@ -1883,8 +1921,15 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
                 policy->latitude,
                 policy->longitude);
     }
-    state->location_metadata_present =
-        ss_location_metadata_load(&state->location_metadata);
+    {
+        const SsLocationMetadataLoadStatus metadata_status =
+            ss_location_metadata_load_status(&state->location_metadata);
+        state->location_metadata_present =
+            metadata_status == SS_LOCATION_METADATA_LOAD_OK;
+        state->location_metadata_uncertain =
+            metadata_status == SS_LOCATION_METADATA_LOAD_INVALID ||
+            metadata_status == SS_LOCATION_METADATA_LOAD_IO_ERROR;
+    }
     refresh_location_authority_state(state);
 
     state->service_cancellable = g_cancellable_new();

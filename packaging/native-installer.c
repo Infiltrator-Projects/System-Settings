@@ -404,6 +404,11 @@ static void show_help(void)
 
 int main(int argc, char **argv)
 {
+    static const char trusted_path[] =
+        "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
+    if (setenv("PATH", trusted_path, 1) != 0) {
+        fail("could not establish the trusted build-tool search path.");
+    }
     static const char *const required[] = {
         "tar", "cmake", "cc", "make", "ctest", "cpack",
         "pkg-config", "dpkg-deb", "sudo", "xvfb-run", "dbus-daemon"

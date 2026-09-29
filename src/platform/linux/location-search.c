@@ -7,7 +7,10 @@
 
 #include <geocode-glib/geocode-glib.h>
 
+#include <math.h>
 #include <string.h>
+
+#define SS_LOCATION_QUERY_MAX_BYTES 512U
 
 typedef struct SsLocationSearchRequest {
     SsLocationSearchCompletion callback;
@@ -91,6 +94,17 @@ static void search_finished(GObject *source,
                 continue;
             }
 
+            const double latitude =
+                geocode_location_get_latitude(location);
+            const double longitude =
+                geocode_location_get_longitude(location);
+
+            if (!isfinite(latitude) || !isfinite(longitude) ||
+                latitude < -90.0 || latitude > 90.0 ||
+                longitude < -180.0 || longitude > 180.0) {
+                continue;
+            }
+
             item = g_new0(SsLocationSearchResult, 1);
             description = best_description(place, location);
             if (description == NULL ||
@@ -103,14 +117,17 @@ static void search_finished(GObject *source,
             }
 
             country_code = geocode_place_get_country_code(place);
-            if (country_code != NULL) {
-                (void)g_strlcpy(item->country_code,
-                                country_code,
-                                sizeof(item->country_code));
+            if (country_code != NULL &&
+                g_strlcpy(item->country_code,
+                          country_code,
+                          sizeof(item->country_code)) >=
+                    sizeof(item->country_code)) {
+                g_free(item);
+                continue;
             }
 
-            item->latitude = geocode_location_get_latitude(location);
-            item->longitude = geocode_location_get_longitude(location);
+            item->latitude = latitude;
+            item->longitude = longitude;
             g_ptr_array_add(results, item);
         }
         g_list_free_full(places, g_object_unref);
@@ -138,11 +155,18 @@ void ss_location_search_async(
     SsLocationSearchRequest *request;
     GeocodeForward *forward;
 
-    if (query == NULL || query[0] == '\0') {
+    if (query == NULL || query[0] == '\0' ||
+        !g_utf8_validate(query, -1, NULL) ||
+        strlen(query) > SS_LOCATION_QUERY_MAX_BYTES) {
         if (callback != NULL) {
             GPtrArray *empty =
                 g_ptr_array_new_with_free_func(result_free);
-            callback(empty, "Enter a locality or place name.", user_data);
+            callback(
+                empty,
+                query != NULL && query[0] != '\0'
+                    ? "The locality search text is invalid or too long."
+                    : "Enter a locality or place name.",
+                user_data);
         }
         return;
     }

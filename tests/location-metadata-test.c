@@ -170,10 +170,30 @@ int main(void)
     for (size_t i = 0; i < G_N_ELEMENTS(malformed); ++i) {
         CHECK(g_file_set_contents(expected_file, malformed[i], -1, NULL));
         CHECK(!ss_location_metadata_load(&loaded));
+        CHECK(ss_location_metadata_load_status(&loaded) ==
+              SS_LOCATION_METADATA_LOAD_INVALID);
         CHECK(loaded.display_name[0] == '\0');
         CHECK(loaded.latitude == 0.0 && loaded.longitude == 0.0);
     }
     CHECK(g_remove(expected_file) == 0);
+
+    /*
+     * A path that exists but cannot be read as a regular key file is an I/O
+     * failure, never "missing". Recovery must preserve an unreadable pending
+     * journal rather than deleting evidence it cannot classify.
+     */
+    CHECK(g_mkdir(expected_file, 0700) == 0);
+    CHECK(ss_location_metadata_load_status(&loaded) ==
+          SS_LOCATION_METADATA_LOAD_IO_ERROR);
+    CHECK(g_rmdir(expected_file) == 0);
+    {
+        g_autofree gchar *pending_file = g_build_filename(
+            settings_dir, "location.pending", NULL);
+        CHECK(g_mkdir(pending_file, 0700) == 0);
+        CHECK(!ss_location_metadata_recover(false, 0.0, 0.0));
+        CHECK(g_file_test(pending_file, G_FILE_TEST_IS_DIR));
+        CHECK(g_rmdir(pending_file) == 0);
+    }
     {
         g_autofree gchar *policy_file = g_build_filename(
             temporary_root, "infiltrator", "presentation.conf", NULL);

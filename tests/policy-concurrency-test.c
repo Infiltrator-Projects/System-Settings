@@ -138,6 +138,43 @@ int main(int argc, char **argv)
     CHECK(!final.policy.show_seconds);
     CHECK(strcmp(final.policy.clock_mode, "standard-24") == 0);
 
+    /*
+     * Policy lock contention is bounded too. A wedged peer must result in a
+     * retryable failure rather than seconds of unresponsive UI.
+     */
+    {
+        const SsTemporalPolicyStore *store =
+            ss_platform_temporal_policy_store();
+        int ready_pipe[2];
+        CHECK(store != NULL && store->begin_update != NULL &&
+              store->end_update != NULL);
+        CHECK(pipe(ready_pipe) == 0);
+        pid_t holder = fork();
+        CHECK(holder >= 0);
+        if (holder == 0) {
+            char ready = '1';
+            close(ready_pipe[0]);
+            if (!store->begin_update()) _exit(20);
+            if (write(ready_pipe[1], &ready, 1U) != 1) _exit(21);
+            close(ready_pipe[1]);
+            g_usleep(600000U);
+            store->end_update();
+            _exit(0);
+        }
+        close(ready_pipe[1]);
+        char ready = 0;
+        CHECK(read(ready_pipe[0], &ready, 1U) == 1);
+        close(ready_pipe[0]);
+        const gint64 start = g_get_monotonic_time();
+        CHECK(!store->begin_update());
+        const gint64 elapsed = g_get_monotonic_time() - start;
+        CHECK(elapsed < 500000);
+        CHECK(waitpid(holder, &status, 0) == holder);
+        CHECK(WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS);
+        CHECK(store->begin_update());
+        store->end_update();
+    }
+
     policy_path = g_build_filename(
         root, "infiltrator", "presentation.conf", NULL);
     policy_dir = g_path_get_dirname(policy_path);

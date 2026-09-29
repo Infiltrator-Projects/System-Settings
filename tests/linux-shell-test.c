@@ -42,6 +42,27 @@ int main(void)
             G_OBJECT(window), "system-settings-date-time-panel");
         g_assert_nonnull(panel);
         g_assert_nonnull(panel->policy_observer);
+        if (i == 0) {
+            InfiltratrTemporalPolicyV3 saved_policy = panel->model.policy;
+            infiltratr_copy_string(
+                panel->model.policy.clock_mode,
+                sizeof(panel->model.policy.clock_mode),
+                "standard-24");
+            panel->model.policy.show_seconds = true;
+            g_assert_cmpuint(
+                ss_linux_date_time_panel_preview_interval_ms(panel),
+                ==,
+                1000U);
+            infiltratr_copy_string(
+                panel->model.policy.clock_mode,
+                sizeof(panel->model.policy.clock_mode),
+                "decimal");
+            g_assert_cmpuint(
+                ss_linux_date_time_panel_preview_interval_ms(panel),
+                ==,
+                250U);
+            panel->model.policy = saved_policy;
+        }
         GtkStack *stack = g_object_get_data(
             G_OBJECT(window), "system-settings-stack");
         g_assert_true(GTK_IS_STACK(stack));

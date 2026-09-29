@@ -25,6 +25,9 @@
 
 static int locality_transaction_lock_fd = -1;
 
+#define SS_LOCALITY_LOCK_WAIT_USEC (250 * 1000)
+#define SS_LOCK_RETRY_USEC 5000
+
 /* Resolve through GLib's XDG configuration directory contract. */
 char *ss_location_metadata_path_alloc(void)
 {
@@ -88,7 +91,7 @@ bool ss_location_metadata_transaction_begin(void)
     }
     {
         const gint64 deadline =
-            g_get_monotonic_time() + (2 * G_USEC_PER_SEC);
+            g_get_monotonic_time() + SS_LOCALITY_LOCK_WAIT_USEC;
         for (;;) {
             if (flock(fd, LOCK_EX | LOCK_NB) == 0) {
                 break;
@@ -101,7 +104,7 @@ bool ss_location_metadata_transaction_begin(void)
                 (void)close(fd);
                 return false;
             }
-            g_usleep(10000U);
+            g_usleep(SS_LOCK_RETRY_USEC);
         }
     }
 
@@ -270,37 +273,54 @@ bool ss_location_metadata_save(const SsLocationMetadata *metadata)
     return metadata_save_path(path, metadata);
 }
 
-bool ss_location_metadata_clear(void)
+static bool remove_metadata_path(
+    const char *path,
+    const char *durability_warning)
 {
-    g_autofree gchar *path = ss_location_metadata_path_alloc();
     g_autofree gchar *directory = NULL;
     int directory_fd;
 
-    if (path == NULL) return false;
+    if (path == NULL || path[0] == '\0') {
+        return false;
+    }
     directory = g_path_get_dirname(path);
-    if (directory == NULL) return false;
+    if (directory == NULL) {
+        return false;
+    }
 
     directory_fd = open(directory, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
-    if (directory_fd < 0) return errno == ENOENT;
+    if (directory_fd < 0) {
+        return errno == ENOENT;
+    }
 
     if (unlink(path) != 0) {
         const int saved_errno = errno;
         (void)close(directory_fd);
-        if (saved_errno == ENOENT) return true;
+        if (saved_errno == ENOENT) {
+            return true;
+        }
         errno = saved_errno;
         return false;
     }
 
     /*
-     * unlink() has committed the namespace change. A failed directory fsync
-     * is durability debt, not grounds to roll policy back against metadata
-     * that has already disappeared from this running system.
+     * Once unlink succeeds the running system has committed the namespace
+     * change. Sync the parent for crash durability, but do not turn a
+     * post-unlink fsync failure into a request to roll policy back.
      */
-    if (fsync(directory_fd) != 0) {
-        g_warning("Locality metadata was removed, but its parent directory could not be synchronized.");
+    if (fsync(directory_fd) != 0 && durability_warning != NULL) {
+        g_warning("%s", durability_warning);
     }
     (void)close(directory_fd);
     return true;
+}
+
+bool ss_location_metadata_clear(void)
+{
+    g_autofree gchar *path = ss_location_metadata_path_alloc();
+    return remove_metadata_path(
+        path,
+        "Locality metadata was removed, but its parent directory could not be synchronized.");
 }
 
 bool ss_location_metadata_stage(const SsLocationMetadata *metadata)
@@ -313,10 +333,9 @@ bool ss_location_metadata_discard_staged(void)
 {
     g_autofree gchar *path = metadata_pending_path();
 
-    if (path == NULL) return false;
-    if (g_remove(path) == 0 || errno == ENOENT) return true;
-    g_warning("Unable to remove stale locality transaction journal.");
-    return false;
+    return remove_metadata_path(
+        path,
+        "The locality transaction journal was removed, but its parent directory could not be synchronized.");
 }
 
 bool ss_location_metadata_finish_staged(void)
@@ -331,11 +350,13 @@ bool ss_location_metadata_finish_staged(void)
     if (!ss_location_metadata_save(&staged)) {
         return false;
     }
-    if (g_remove(path) != 0 && errno != ENOENT) {
+    if (!remove_metadata_path(
+            path,
+            "The committed locality journal was removed, but its parent directory could not be synchronized.")) {
         /*
-         * location.ini is already the durable committed metadata at this
-         * point. A stale journal is cleanup debt, not transaction failure:
-         * rolling the policy back now would recreate policy/metadata skew.
+         * location.ini is already the durable committed metadata. Retaining a
+         * stale matching journal is cleanup debt and recovery is idempotent;
+         * never roll the policy back after metadata publication succeeded.
          */
         g_warning("Unable to remove committed locality transaction journal; cleanup will be retried.");
     }
