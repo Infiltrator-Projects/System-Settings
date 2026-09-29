@@ -1457,7 +1457,7 @@ static void home_layout_apply_width(HomeAdaptiveLayout *layout, int width)
          * card. Wide desktops keep the original 270 px hero proportion.
          */
         gtk_widget_set_size_request(
-            layout->hero, -1, columns == 2U ? 270 : 480);
+            layout->hero, -1, columns == 2U ? 270 : 520);
     }
     if (layout->features != NULL) {
         gtk_flow_box_set_min_children_per_line(

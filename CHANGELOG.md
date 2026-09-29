@@ -1,5 +1,6 @@
 ## 0.4.49 — 2026-09-29
 
+- Raise compact Home hero containment from 480 to 520 logical pixels after the allocation regression measured the wrapped feature row ending 21 px beyond the 480 px hero; wide desktop mode remains 270 px.
 - Increase the compact Home hero allocation to 480 logical pixels so the wrapped feature row has a conservative containment margin on GTK/X11 test desktops; wide desktop mode remains at the original 270 px height.
 - Fix the allocation regression test itself after exercising the wide breakpoint: restore compact mode and drain GTK's pending relayout before checking feature/card bounds, so the assertion inspects the 390 px compact hero rather than the stale 270 px wide allocation.
 - Fix the CI-only GTK4 API mistake in the new hero-height regression by querying the size request through gtk_widget_get_size_request(), allowing warnings-as-errors builds to compile the test on GTK 4.14.
