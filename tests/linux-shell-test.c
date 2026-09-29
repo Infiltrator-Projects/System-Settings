@@ -237,7 +237,7 @@ int main(void)
             int request_height = 0;
             gtk_widget_get_size_request(
                 home_hero_geometry, &request_width, &request_height);
-            g_assert_cmpint(request_height, ==, 390);
+            g_assert_cmpint(request_height, ==, 480);
         }
         g_assert_cmpuint(
             gtk_flow_box_get_min_children_per_line(
@@ -446,6 +446,11 @@ int main(void)
                 home_grid_geometry,
                 GTK_WIDGET(home_scroller),
                 &grid_bounds));
+            g_test_message(
+                "Home bounds: feature bottom=%.1f grid top=%.1f hero request=%d",
+                feature_bounds.origin.y + feature_bounds.size.height,
+                grid_bounds.origin.y,
+                480);
             g_assert_true(
                 feature_bounds.origin.y + feature_bounds.size.height
                 <= grid_bounds.origin.y);
