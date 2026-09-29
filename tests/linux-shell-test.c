@@ -230,6 +230,8 @@ int main(void)
             gtk_flow_box_get_min_children_per_line(
                 GTK_FLOW_BOX(home_appearance_previews)), ==, 4U);
         home_layout_apply_width(adaptive_layout, 900);
+        while (g_main_context_iteration(NULL, FALSE)) {
+        }
         {
             int request_width = 0;
             int request_height = 0;

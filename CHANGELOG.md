@@ -1,5 +1,6 @@
 ## 0.4.49 — 2026-09-29
 
+- Fix the allocation regression test itself after exercising the wide breakpoint: restore compact mode and drain GTK's pending relayout before checking feature/card bounds, so the assertion inspects the 390 px compact hero rather than the stale 270 px wide allocation.
 - Fix the CI-only GTK4 API mistake in the new hero-height regression by querying the size request through gtk_widget_get_size_request(), allowing warnings-as-errors builds to compile the test on GTK 4.14.
 - Correct the fourth failed 0.4.49 attempt: the shell width budget now passes, but the compact hero could still be too short once its three feature tiles wrapped. The hero now grows to 390 logical pixels in compact mode and returns to the original 270 px proportion on wide desktops, preventing the feature row from painting into System Overview.
 - Correct the third failed 0.4.49 attempt: the adaptive outer rows reduced the shell minimum to roughly 1100 px, but the permanently horizontal hero feature row still kept the Home page wider than the 960/1024 logical desktop budget.
