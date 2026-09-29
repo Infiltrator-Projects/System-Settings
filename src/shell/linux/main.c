@@ -586,6 +586,16 @@ static GtkWidget *build_sidebar(GtkWindow *parent,
     g_autofree gchar *date_search = date_time_search_text();
 
     gtk_widget_set_size_request(sidebar, 205, -1);
+    /*
+     * Navigation-row copy expands inside each row so ellipsising gets the
+     * remaining row width. Without an explicit expansion boundary here that
+     * request propagates through the list/scroller and makes the whole sidebar
+     * a horizontal GtkBox expander. On wide/maximised windows it then steals a
+     * large share of the content area, forcing Home cards to wrap into the
+     * oversized layout seen on 1920x1080 desktops. The sidebar is deliberately
+     * fixed to its compact natural width; only the main stack owns spare width.
+     */
+    gtk_widget_set_hexpand(sidebar, FALSE);
     gtk_widget_add_css_class(sidebar, "settings-sidebar");
 
     gtk_box_append(

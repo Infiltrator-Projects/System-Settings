@@ -1,3 +1,9 @@
+## 0.4.47 — 2026-09-29
+
+- Fix the shell allocation regression that let navigation-row label expansion propagate through the sidebar, causing the left pane to consume a large share of maximised-window width.
+- Make the sidebar an explicit non-expanding boundary so spare horizontal space belongs to the main settings stack; this restores the intended Home proportions and prevents System Overview / Quick Actions from wrapping simply because the sidebar grew.
+- Add a permanent shell regression proving the sidebar does not horizontally expand while the main stack does, including the existing 2× display-scale run.
+
 ## 0.4.46 — 2026-09-29
 
 - Fix the packaged Home artwork regression by making the Linux runtime asset path and Debian package installation prefix identical.

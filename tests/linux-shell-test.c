@@ -194,6 +194,21 @@ int main(void)
         int minimum_width = 0;
         int natural_width = 0;
         GtkWidget *window_child = gtk_window_get_child(window);
+        GtkWidget *sidebar =
+            gtk_widget_get_first_child(window_child);
+        g_assert_nonnull(sidebar);
+        /*
+         * A descendant in each navigation row expands so its labels can
+         * ellipsise cleanly. That expansion must stop at the sidebar boundary;
+         * otherwise GtkBox divides spare window width between the sidebar and
+         * the content stack and the dashboard becomes dramatically too narrow.
+         */
+        g_assert_false(
+            gtk_widget_compute_expand(
+                sidebar, GTK_ORIENTATION_HORIZONTAL));
+        g_assert_true(
+            gtk_widget_compute_expand(
+                GTK_WIDGET(stack), GTK_ORIENTATION_HORIZONTAL));
         gtk_widget_measure(
             window_child,
             GTK_ORIENTATION_HORIZONTAL,
