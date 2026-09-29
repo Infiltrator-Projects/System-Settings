@@ -1457,7 +1457,7 @@ static void home_layout_apply_width(HomeAdaptiveLayout *layout, int width)
          * card. Wide desktops keep the original 270 px hero proportion.
          */
         gtk_widget_set_size_request(
-            layout->hero, -1, columns == 2U ? 270 : 520);
+            layout->hero, -1, columns == 2U ? 270 : 390);
     }
     if (layout->features != NULL) {
         gtk_flow_box_set_min_children_per_line(
@@ -1608,6 +1608,13 @@ static GtkWidget *build_home_page(
 
     gtk_widget_add_css_class(page, "home-page");
     gtk_widget_add_css_class(hero, "home-hero");
+    /*
+     * The foreground intentionally floats a little below the bitmap edge.
+     * Reserve that space in normal layout rather than letting the following
+     * dashboard card paint over the feature tiles. This fixes the persistent
+     * ~21 px overlap without distorting the hero image itself.
+     */
+    gtk_widget_set_margin_bottom(hero, 28);
     /*
      * The hero foreground is deliberately richer than the bitmap itself:
      * title copy plus the three feature tiles must remain fully contained

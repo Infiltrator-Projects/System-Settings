@@ -1,5 +1,6 @@
 ## 0.4.49 — 2026-09-29
 
+- Fix the persistent 21 px hero/card overlap at its real source: the hero foreground intentionally paints slightly below the bitmap edge, so the hero now reserves a 28 px bottom layout margin. Compact hero height returns to 390 px and wide mode stays 270 px instead of growing the image to chase an invariant overflow.
 - Raise compact Home hero containment from 480 to 520 logical pixels after the allocation regression measured the wrapped feature row ending 21 px beyond the 480 px hero; wide desktop mode remains 270 px.
 - Increase the compact Home hero allocation to 480 logical pixels so the wrapped feature row has a conservative containment margin on GTK/X11 test desktops; wide desktop mode remains at the original 270 px height.
 - Fix the allocation regression test itself after exercising the wide breakpoint: restore compact mode and drain GTK's pending relayout before checking feature/card bounds, so the assertion inspects the 390 px compact hero rather than the stale 270 px wide allocation.

@@ -201,6 +201,8 @@ int main(void)
             G_OBJECT(home_scroller), "system-settings-home-adaptive-layout");
         g_assert_nonnull(adaptive_layout);
         g_assert_true(adaptive_layout->hero == home_hero_geometry);
+        g_assert_cmpint(
+            gtk_widget_get_margin_bottom(home_hero_geometry), ==, 28);
         g_assert_true(adaptive_layout->features == GTK_FLOW_BOX(home_features_geometry));
         g_assert_true(adaptive_layout->primary_grid == GTK_FLOW_BOX(home_grid_geometry));
         g_assert_true(adaptive_layout->status_grid == GTK_FLOW_BOX(home_status_grid_geometry));
@@ -237,7 +239,7 @@ int main(void)
             int request_height = 0;
             gtk_widget_get_size_request(
                 home_hero_geometry, &request_width, &request_height);
-            g_assert_cmpint(request_height, ==, 520);
+            g_assert_cmpint(request_height, ==, 390);
         }
         g_assert_cmpuint(
             gtk_flow_box_get_min_children_per_line(
@@ -450,7 +452,7 @@ int main(void)
                 "Home bounds: feature bottom=%.1f grid top=%.1f hero request=%d",
                 feature_bounds.origin.y + feature_bounds.size.height,
                 grid_bounds.origin.y,
-                520);
+                390);
             g_assert_true(
                 feature_bounds.origin.y + feature_bounds.size.height
                 <= grid_bounds.origin.y);
