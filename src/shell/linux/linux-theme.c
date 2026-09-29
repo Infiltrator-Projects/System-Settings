@@ -305,8 +305,8 @@ void ss_linux_theme_install(void)
     g_string_append_printf(
         css,
         ".home-page { padding: 22px 26px 28px 26px; }\n"
-        ".home-hero { min-height: 210px; padding: 0; border: 0; border-radius: 20px; box-shadow: none; }\n"
-        ".hero-scene { min-width: 190px; min-height: 210px; }\n"
+        ".home-hero { min-height: 270px; padding: 0; border: 0; border-radius: 20px; box-shadow: none; }\n"
+        ".hero-scene { min-width: 190px; min-height: 270px; }\n"
         ".hero-copy-overlay { min-width: 0; padding: 14px 18px; margin: 12px; border-radius: 15px; background: rgba(0,0,0,0.56); }\n"
         ".hero-brand-overlay { margin: 14px; padding: 12px 14px; background: rgba(0,0,0,0.46); border: 1px solid %s; border-radius: 13px; box-shadow: none; }\n"
         ".hero-brand-overlay image { color: %s; }\n"

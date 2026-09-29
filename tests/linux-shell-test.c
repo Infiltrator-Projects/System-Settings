@@ -170,6 +170,15 @@ int main(void)
         g_assert_true(GTK_IS_SCROLLED_WINDOW(nav_scroller));
         g_assert_true(GTK_IS_SCROLLED_WINDOW(date_scroller));
         g_assert_true(GTK_IS_SCROLLED_WINDOW(home_scroller));
+        GtkWidget *home_hero_geometry = g_object_get_data(
+            G_OBJECT(home_scroller), "system-settings-home-hero");
+        GtkWidget *home_features_geometry = g_object_get_data(
+            G_OBJECT(home_scroller), "system-settings-home-features");
+        GtkWidget *home_grid_geometry = g_object_get_data(
+            G_OBJECT(home_scroller), "system-settings-home-grid");
+        g_assert_true(GTK_IS_OVERLAY(home_hero_geometry));
+        g_assert_true(GTK_IS_FLOW_BOX(home_features_geometry));
+        g_assert_true(GTK_IS_FLOW_BOX(home_grid_geometry));
         g_assert_false(gtk_scrolled_window_get_overlay_scrolling(nav_scroller));
         g_assert_false(gtk_scrolled_window_get_overlay_scrolling(date_scroller));
         g_assert_false(gtk_scrolled_window_get_overlay_scrolling(home_scroller));
@@ -340,6 +349,29 @@ int main(void)
             minimum_height + title_min_height,
             <=,
             desktop_budget_height);
+
+        /*
+         * Regress the actual failure visible at the compact default window:
+         * all three feature tiles must finish before the System Overview /
+         * Quick Actions flow box begins. Preferred-size checks alone missed
+         * this because GtkOverlay can report a sufficient request yet still
+         * allocate an overlay descendant beyond the main child's lower edge.
+         */
+        {
+            graphene_rect_t feature_bounds = GRAPHENE_RECT_INIT(0, 0, 0, 0);
+            graphene_rect_t grid_bounds = GRAPHENE_RECT_INIT(0, 0, 0, 0);
+            g_assert_true(gtk_widget_compute_bounds(
+                home_features_geometry,
+                GTK_WIDGET(home_scroller),
+                &feature_bounds));
+            g_assert_true(gtk_widget_compute_bounds(
+                home_grid_geometry,
+                GTK_WIDGET(home_scroller),
+                &grid_bounds));
+            g_assert_true(
+                feature_bounds.origin.y + feature_bounds.size.height
+                <= grid_bounds.origin.y);
+        }
         g_assert_cmpuint(panel->timer_id, ==, 0U);
 
         HomeTemporalTicker *home_temporal = g_object_get_data(

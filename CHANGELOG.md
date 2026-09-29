@@ -1,3 +1,9 @@
+## 0.4.48 — 2026-09-29
+
+- Fix the remaining Home hero allocation regression visible at the compact default window: the Simple / Secure / Beautiful feature tiles no longer paint underneath the System Overview card.
+- Raise the hero scene and overlay allocation floor to 270 logical pixels so the complete foreground remains inside the mountain artwork at ordinary and 2× display scale.
+- Replace the previous preferred-size-only overlap regression with an actual allocated-geometry assertion proving the feature row finishes before the Home card grid begins.
+
 ## 0.4.47 — 2026-09-29
 
 - Fix the shell allocation regression that let navigation-row label expansion propagate through the sidebar, causing the left pane to consume a large share of maximised-window width.

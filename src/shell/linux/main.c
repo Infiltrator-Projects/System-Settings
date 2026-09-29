@@ -1429,7 +1429,7 @@ static GtkWidget *build_home_page(
     GtkWidget *page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     GtkWidget *hero = gtk_overlay_new();
     GtkWidget *hero_scene = make_visual_panel(
-        "hero-asset.png", -1, 212, "hero-scene");
+        "hero-asset.png", -1, 270, "hero-scene");
     GtkWidget *hero_foreground = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 20);
     GtkWidget *hero_copy = gtk_box_new(GTK_ORIENTATION_VERTICAL, 3);
     GtkWidget *hero_spacer = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
@@ -1532,6 +1532,14 @@ static GtkWidget *build_home_page(
 
     gtk_widget_add_css_class(page, "home-page");
     gtk_widget_add_css_class(hero, "home-hero");
+    /*
+     * The hero foreground is deliberately richer than the bitmap itself:
+     * title copy plus the three feature tiles must remain fully contained
+     * above the following dashboard cards at compact desktop widths.
+     * Give the overlay a real allocation floor rather than depending on
+     * GtkOverlay's width-for-height negotiation alone.
+     */
+    gtk_widget_set_size_request(hero, -1, 270);
     gtk_overlay_set_child(GTK_OVERLAY(hero), hero_scene);
 
     gtk_widget_add_css_class(hero_copy, "hero-copy-overlay");
@@ -1946,6 +1954,17 @@ static GtkWidget *build_home_page(
         G_OBJECT(stack),
         "system-settings-home-scroller",
         scroller);
+    /*
+     * Expose the concrete Home geometry to the shell regression. These are
+     * non-owning pointers into the scroller's widget tree and remain valid for
+     * exactly the lifetime of the scroller.
+     */
+    g_object_set_data(
+        G_OBJECT(scroller), "system-settings-home-hero", hero);
+    g_object_set_data(
+        G_OBJECT(scroller), "system-settings-home-features", features);
+    g_object_set_data(
+        G_OBJECT(scroller), "system-settings-home-grid", grid);
 
     /*
      * Home is a live status surface, not a construction-time snapshot.
