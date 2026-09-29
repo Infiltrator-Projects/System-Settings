@@ -1573,6 +1573,16 @@ static GtkWidget *build_home_page(
     gtk_box_append(GTK_BOX(hero_foreground), hero_spacer);
     gtk_box_append(GTK_BOX(hero_foreground), hero_brand);
     gtk_overlay_add_overlay(GTK_OVERLAY(hero), hero_foreground);
+    /*
+     * GtkOverlay normally measures only its main child. The foreground is
+     * taller than the decorative scene at normal desktop widths, so excluding
+     * it from measurement lets the following cards be allocated on top of the
+     * hero copy. Make the overlay content participate in preferred-size
+     * calculation; the hero then grows to contain its title, subtitle and
+     * feature row instead of painting over the next section.
+     */
+    gtk_overlay_set_measure_overlay(
+        GTK_OVERLAY(hero), hero_foreground, TRUE);
     gtk_box_append(GTK_BOX(page), hero);
 
     gtk_widget_add_css_class(grid, "home-grid");

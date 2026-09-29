@@ -1,3 +1,9 @@
+## 0.4.45 — 2026-09-29
+
+- Fix the Home dashboard hero measurement so the System Overview and Quick Actions cards cannot be allocated over the Welcome/System Settings banner.
+- Make the hero foreground participate in GtkOverlay preferred-size calculation instead of relying on the decorative image's fixed minimum height.
+- Add a permanent shell regression that proves the hero measures at least as tall as its foreground content at normal and 2× GTK scale.
+
 ## 0.4.44 — 2026-09-29
 
 - Preserve the distinction between missing and unreadable locality metadata during Date & Time startup, and prevent uncertain metadata authority from being silently replaced by a time-zone reference approximation.

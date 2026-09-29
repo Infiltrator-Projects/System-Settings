@@ -350,6 +350,60 @@ int main(void)
         g_assert_true(GTK_IS_SCROLLED_WINDOW(home));
         g_assert_cmpstr(
             gtk_stack_get_visible_child_name(stack), ==, "home");
+
+        /*
+         * Regression for the 1920x1080 Home screenshot where System Overview
+         * and Quick Actions were painted over the hero. GtkOverlay excludes
+         * overlay children from measurement unless explicitly requested.
+         */
+        GtkWidget *home_page =
+            gtk_scrolled_window_get_child(GTK_SCROLLED_WINDOW(home));
+        GtkWidget *home_hero =
+            home_page != NULL
+                ? gtk_widget_get_first_child(home_page)
+                : NULL;
+        g_assert_true(GTK_IS_OVERLAY(home_hero));
+        GtkWidget *hero_scene =
+            gtk_overlay_get_child(GTK_OVERLAY(home_hero));
+        GtkWidget *hero_foreground = NULL;
+        for (GtkWidget *child = gtk_widget_get_first_child(home_hero);
+             child != NULL;
+             child = gtk_widget_get_next_sibling(child)) {
+            if (child != hero_scene) {
+                hero_foreground = child;
+                break;
+            }
+        }
+        g_assert_nonnull(hero_foreground);
+        g_assert_true(
+            gtk_overlay_get_measure_overlay(
+                GTK_OVERLAY(home_hero), hero_foreground));
+        {
+            int hero_min_height = 0;
+            int hero_nat_height = 0;
+            int foreground_min_height = 0;
+            int foreground_nat_height = 0;
+            gtk_widget_measure(
+                hero_foreground,
+                GTK_ORIENTATION_VERTICAL,
+                900,
+                &foreground_min_height,
+                &foreground_nat_height,
+                NULL,
+                NULL);
+            gtk_widget_measure(
+                home_hero,
+                GTK_ORIENTATION_VERTICAL,
+                900,
+                &hero_min_height,
+                &hero_nat_height,
+                NULL,
+                NULL);
+            g_assert_cmpint(
+                hero_min_height, >=, foreground_min_height);
+            g_assert_cmpint(
+                hero_nat_height, >=, foreground_nat_height);
+        }
         ShellSearchState *search_state = g_object_get_data(
             G_OBJECT(window), "system-settings-search-state");
         g_assert_nonnull(search_state);
