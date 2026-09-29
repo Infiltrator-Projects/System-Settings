@@ -1,5 +1,6 @@
 ## 0.4.49 — 2026-09-29
 
+- Fix the CI-only GTK4 API mistake in the new hero-height regression by querying the size request through gtk_widget_get_size_request(), allowing warnings-as-errors builds to compile the test on GTK 4.14.
 - Correct the fourth failed 0.4.49 attempt: the shell width budget now passes, but the compact hero could still be too short once its three feature tiles wrapped. The hero now grows to 390 logical pixels in compact mode and returns to the original 270 px proportion on wide desktops, preventing the feature row from painting into System Overview.
 - Correct the third failed 0.4.49 attempt: the adaptive outer rows reduced the shell minimum to roughly 1100 px, but the permanently horizontal hero feature row still kept the Home page wider than the 960/1024 logical desktop budget.
 - Put the three hero features and four appearance previews under the same wide-desktop breakpoint as the dashboard rows: compact windows may wrap them, while wide desktops explicitly restore the intended 3-up and 4-up presentation.

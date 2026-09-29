@@ -210,8 +210,13 @@ int main(void)
         g_assert_cmpuint(home_layout_columns_for_width(900), ==, 1U);
         g_assert_cmpuint(home_layout_columns_for_width(1400), ==, 2U);
         home_layout_apply_width(adaptive_layout, 1400);
-        g_assert_cmpint(
-            gtk_widget_get_height_request(home_hero_geometry), ==, 270);
+        {
+            int request_width = 0;
+            int request_height = 0;
+            gtk_widget_get_size_request(
+                home_hero_geometry, &request_width, &request_height);
+            g_assert_cmpint(request_height, ==, 270);
+        }
         g_assert_cmpuint(
             gtk_flow_box_get_min_children_per_line(
                 GTK_FLOW_BOX(home_features_geometry)), ==, 3U);
@@ -225,8 +230,13 @@ int main(void)
             gtk_flow_box_get_min_children_per_line(
                 GTK_FLOW_BOX(home_appearance_previews)), ==, 4U);
         home_layout_apply_width(adaptive_layout, 900);
-        g_assert_cmpint(
-            gtk_widget_get_height_request(home_hero_geometry), ==, 390);
+        {
+            int request_width = 0;
+            int request_height = 0;
+            gtk_widget_get_size_request(
+                home_hero_geometry, &request_width, &request_height);
+            g_assert_cmpint(request_height, ==, 390);
+        }
         g_assert_cmpuint(
             gtk_flow_box_get_min_children_per_line(
                 GTK_FLOW_BOX(home_features_geometry)), ==, 1U);
