@@ -358,6 +358,9 @@ int main(void)
          */
         GtkWidget *home_page =
             gtk_scrolled_window_get_child(GTK_SCROLLED_WINDOW(home));
+        if (GTK_IS_VIEWPORT(home_page)) {
+            home_page = gtk_viewport_get_child(GTK_VIEWPORT(home_page));
+        }
         GtkWidget *home_hero =
             home_page != NULL
                 ? gtk_widget_get_first_child(home_page)
