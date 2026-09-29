@@ -6,6 +6,7 @@
 #include "system-settings/temporal-policy-store.h"
 
 #include <glib.h>
+#include <errno.h>
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -19,11 +20,50 @@
     } \
 } while (0)
 
+static bool write_signal(int fd)
+{
+    const char value = '1';
+
+    if (fd < 0) {
+        return true;
+    }
+    for (;;) {
+        const ssize_t count = write(fd, &value, 1U);
+        if (count == 1) {
+            return true;
+        }
+        if (count < 0 && errno == EINTR) {
+            continue;
+        }
+        return false;
+    }
+}
+
+static bool wait_signal(int fd)
+{
+    char value = 0;
+
+    if (fd < 0) {
+        return true;
+    }
+    for (;;) {
+        const ssize_t count = read(fd, &value, 1U);
+        if (count == 1) {
+            return value == '1';
+        }
+        if (count < 0 && errno == EINTR) {
+            continue;
+        }
+        return false;
+    }
+}
+
 static int publish_locality(
     const char *name,
     double latitude,
     double longitude,
-    guint hold_after_policy_us)
+    int committed_fd,
+    int release_fd)
 {
     SsDateTimeModel model;
     SsLocationMetadata metadata = {0};
@@ -50,11 +90,19 @@ static int publish_locality(
         (void)ss_location_metadata_discard_staged();
         goto done;
     }
-
-    if (hold_after_policy_us != 0U) {
-        g_usleep(hold_after_policy_us);
-    }
     if (!ss_location_metadata_finish_staged()) {
+        goto done;
+    }
+
+    /*
+     * For the concurrency regression the first writer announces only after
+     * its durable publication is complete, while it still owns the advisory
+     * transaction lock. The parent can then start Writer B and release A
+     * immediately when B is ready to contend. This tests the serialization
+     * contract without assuming that fsync/PGO work completes inside an
+     * arbitrary sleep window on a loaded CI runner.
+     */
+    if (!write_signal(committed_fd) || !wait_signal(release_fd)) {
         goto done;
     }
     result = 0;
@@ -83,20 +131,55 @@ int main(void)
     CHECK(g_setenv("XDG_CONFIG_HOME", root, TRUE));
     CHECK(g_setenv("GSETTINGS_BACKEND", "memory", TRUE));
 
+    int first_committed[2];
+    int first_release[2];
+    CHECK(pipe(first_committed) == 0);
+    CHECK(pipe(first_release) == 0);
+
     pid_t first = fork();
     CHECK(first >= 0);
     if (first == 0) {
-        _exit(publish_locality(
-            "Writer A", -36.3949, 145.3610, 150000U));
+        close(first_committed[0]);
+        close(first_release[1]);
+        const int result = publish_locality(
+            "Writer A", -36.3949, 145.3610,
+            first_committed[1], first_release[0]);
+        close(first_committed[1]);
+        close(first_release[0]);
+        _exit(result);
     }
 
-    g_usleep(20000U);
+    close(first_committed[1]);
+    close(first_release[0]);
+    CHECK(wait_signal(first_committed[0]));
+    close(first_committed[0]);
+
+    /*
+     * Start Writer B only once A has completed its durable publication but
+     * still owns the transaction lock. B signals immediately before attempting
+     * that lock; the parent then releases A without a scheduler-dependent
+     * fixed delay.
+     */
+    int second_ready[2];
+    CHECK(pipe(second_ready) == 0);
     pid_t second = fork();
     CHECK(second >= 0);
     if (second == 0) {
+        close(second_ready[0]);
+        close(first_release[1]);
+        if (!write_signal(second_ready[1])) {
+            _exit(30);
+        }
+        close(second_ready[1]);
         _exit(publish_locality(
-            "Writer B", -37.8136, 144.9631, 0U));
+            "Writer B", -37.8136, 144.9631, -1, -1));
     }
+
+    close(second_ready[1]);
+    CHECK(wait_signal(second_ready[0]));
+    close(second_ready[0]);
+    CHECK(write_signal(first_release[1]));
+    close(first_release[1]);
 
     CHECK(wait_ok(first) == 0);
     CHECK(wait_ok(second) == 0);
