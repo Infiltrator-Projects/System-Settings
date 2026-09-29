@@ -1423,6 +1423,7 @@ static void home_status_ticker_free(gpointer data)
 }
 
 typedef struct {
+    GtkWidget *hero;
     GtkFlowBox *features;
     GtkFlowBox *primary_grid;
     GtkFlowBox *status_grid;
@@ -1447,6 +1448,16 @@ static void home_layout_apply_width(HomeAdaptiveLayout *layout, int width)
 
     if (layout == NULL) {
         return;
+    }
+    if (layout->hero != NULL) {
+        /*
+         * At compact widths the three feature tiles may occupy several rows.
+         * Give the measured overlay enough vertical allocation for that
+         * foreground rather than letting it paint into the first dashboard
+         * card. Wide desktops keep the original 270 px hero proportion.
+         */
+        gtk_widget_set_size_request(
+            layout->hero, -1, columns == 2U ? 270 : 390);
     }
     if (layout->features != NULL) {
         gtk_flow_box_set_min_children_per_line(
@@ -2050,6 +2061,7 @@ static GtkWidget *build_home_page(
 
     HomeAdaptiveLayout *adaptive_layout =
         g_new0(HomeAdaptiveLayout, 1);
+    adaptive_layout->hero = hero;
     adaptive_layout->features = GTK_FLOW_BOX(features);
     adaptive_layout->primary_grid = GTK_FLOW_BOX(grid);
     adaptive_layout->status_grid = GTK_FLOW_BOX(status_grid);

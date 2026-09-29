@@ -200,6 +200,7 @@ int main(void)
         HomeAdaptiveLayout *adaptive_layout = g_object_get_data(
             G_OBJECT(home_scroller), "system-settings-home-adaptive-layout");
         g_assert_nonnull(adaptive_layout);
+        g_assert_true(adaptive_layout->hero == home_hero_geometry);
         g_assert_true(adaptive_layout->features == GTK_FLOW_BOX(home_features_geometry));
         g_assert_true(adaptive_layout->primary_grid == GTK_FLOW_BOX(home_grid_geometry));
         g_assert_true(adaptive_layout->status_grid == GTK_FLOW_BOX(home_status_grid_geometry));
@@ -209,6 +210,8 @@ int main(void)
         g_assert_cmpuint(home_layout_columns_for_width(900), ==, 1U);
         g_assert_cmpuint(home_layout_columns_for_width(1400), ==, 2U);
         home_layout_apply_width(adaptive_layout, 1400);
+        g_assert_cmpint(
+            gtk_widget_get_height_request(home_hero_geometry), ==, 270);
         g_assert_cmpuint(
             gtk_flow_box_get_min_children_per_line(
                 GTK_FLOW_BOX(home_features_geometry)), ==, 3U);
@@ -222,6 +225,8 @@ int main(void)
             gtk_flow_box_get_min_children_per_line(
                 GTK_FLOW_BOX(home_appearance_previews)), ==, 4U);
         home_layout_apply_width(adaptive_layout, 900);
+        g_assert_cmpint(
+            gtk_widget_get_height_request(home_hero_geometry), ==, 390);
         g_assert_cmpuint(
             gtk_flow_box_get_min_children_per_line(
                 GTK_FLOW_BOX(home_features_geometry)), ==, 1U);
