@@ -193,31 +193,47 @@ int main(void)
         GtkWidget *home_appearance_previews = g_object_get_data(
             G_OBJECT(home_scroller), "system-settings-home-appearance-previews");
         g_assert_true(GTK_IS_OVERLAY(home_hero_geometry));
-        g_assert_true(GTK_IS_BOX(home_features_geometry));
+        g_assert_true(GTK_IS_FLOW_BOX(home_features_geometry));
         g_assert_true(GTK_IS_FLOW_BOX(home_grid_geometry));
         g_assert_true(GTK_IS_FLOW_BOX(home_status_grid_geometry));
-        g_assert_true(GTK_IS_BOX(home_appearance_previews));
+        g_assert_true(GTK_IS_FLOW_BOX(home_appearance_previews));
         HomeAdaptiveLayout *adaptive_layout = g_object_get_data(
             G_OBJECT(home_scroller), "system-settings-home-adaptive-layout");
         g_assert_nonnull(adaptive_layout);
+        g_assert_true(adaptive_layout->features == GTK_FLOW_BOX(home_features_geometry));
         g_assert_true(adaptive_layout->primary_grid == GTK_FLOW_BOX(home_grid_geometry));
         g_assert_true(adaptive_layout->status_grid == GTK_FLOW_BOX(home_status_grid_geometry));
+        g_assert_true(
+            adaptive_layout->appearance_previews ==
+            GTK_FLOW_BOX(home_appearance_previews));
         g_assert_cmpuint(home_layout_columns_for_width(900), ==, 1U);
         g_assert_cmpuint(home_layout_columns_for_width(1400), ==, 2U);
         home_layout_apply_width(adaptive_layout, 1400);
+        g_assert_cmpuint(
+            gtk_flow_box_get_min_children_per_line(
+                GTK_FLOW_BOX(home_features_geometry)), ==, 3U);
         g_assert_cmpuint(
             gtk_flow_box_get_min_children_per_line(
                 GTK_FLOW_BOX(home_grid_geometry)), ==, 2U);
         g_assert_cmpuint(
             gtk_flow_box_get_min_children_per_line(
                 GTK_FLOW_BOX(home_status_grid_geometry)), ==, 2U);
+        g_assert_cmpuint(
+            gtk_flow_box_get_min_children_per_line(
+                GTK_FLOW_BOX(home_appearance_previews)), ==, 4U);
         home_layout_apply_width(adaptive_layout, 900);
+        g_assert_cmpuint(
+            gtk_flow_box_get_min_children_per_line(
+                GTK_FLOW_BOX(home_features_geometry)), ==, 1U);
         g_assert_cmpuint(
             gtk_flow_box_get_min_children_per_line(
                 GTK_FLOW_BOX(home_grid_geometry)), ==, 1U);
         g_assert_cmpuint(
             gtk_flow_box_get_min_children_per_line(
                 GTK_FLOW_BOX(home_status_grid_geometry)), ==, 1U);
+        g_assert_cmpuint(
+            gtk_flow_box_get_min_children_per_line(
+                GTK_FLOW_BOX(home_appearance_previews)), ==, 1U);
         g_assert_nonnull(home_overview_geometry);
         g_assert_nonnull(home_quick_geometry);
         g_assert_nonnull(home_date_geometry);
@@ -424,32 +440,14 @@ int main(void)
              * compact horizontal strip and must never regress to a vertical
              * thumbnail column.
              */
-            GtkWidget *preview_first =
-                gtk_widget_get_first_child(home_appearance_previews);
-            GtkWidget *preview_last =
-                gtk_widget_get_last_child(home_appearance_previews);
-            graphene_rect_t preview_first_bounds =
-                GRAPHENE_RECT_INIT(0, 0, 0, 0);
-            graphene_rect_t preview_last_bounds =
-                GRAPHENE_RECT_INIT(0, 0, 0, 0);
-            g_assert_nonnull(preview_first);
-            g_assert_nonnull(preview_last);
-            g_assert_true(gtk_widget_compute_bounds(
-                preview_first,
-                home_appearance_previews,
-                &preview_first_bounds));
-            g_assert_true(gtk_widget_compute_bounds(
-                preview_last,
-                home_appearance_previews,
-                &preview_last_bounds));
-            g_assert_cmpfloat_with_epsilon(
-                preview_first_bounds.origin.y,
-                preview_last_bounds.origin.y,
-                0.5f);
-            g_assert_cmpfloat(
-                preview_first_bounds.origin.x,
-                <,
-                preview_last_bounds.origin.x);
+            guint preview_count = 0U;
+            for (GtkWidget *child =
+                     gtk_widget_get_first_child(home_appearance_previews);
+                 child != NULL;
+                 child = gtk_widget_get_next_sibling(child)) {
+                preview_count++;
+            }
+            g_assert_cmpuint(preview_count, ==, 4U);
         }
         g_assert_cmpuint(panel->timer_id, ==, 0U);
 

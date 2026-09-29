@@ -1423,8 +1423,10 @@ static void home_status_ticker_free(gpointer data)
 }
 
 typedef struct {
+    GtkFlowBox *features;
     GtkFlowBox *primary_grid;
     GtkFlowBox *status_grid;
+    GtkFlowBox *appearance_previews;
 } HomeAdaptiveLayout;
 
 /*
@@ -1446,6 +1448,10 @@ static void home_layout_apply_width(HomeAdaptiveLayout *layout, int width)
     if (layout == NULL) {
         return;
     }
+    if (layout->features != NULL) {
+        gtk_flow_box_set_min_children_per_line(
+            layout->features, columns == 2U ? 3U : 1U);
+    }
     if (layout->primary_grid != NULL) {
         gtk_flow_box_set_min_children_per_line(
             layout->primary_grid, columns);
@@ -1453,6 +1459,10 @@ static void home_layout_apply_width(HomeAdaptiveLayout *layout, int width)
     if (layout->status_grid != NULL) {
         gtk_flow_box_set_min_children_per_line(
             layout->status_grid, columns);
+    }
+    if (layout->appearance_previews != NULL) {
+        gtk_flow_box_set_min_children_per_line(
+            layout->appearance_previews, columns == 2U ? 4U : 1U);
     }
 }
 
@@ -1491,7 +1501,7 @@ static GtkWidget *build_home_page(
     GtkWidget *hero_brand = gtk_box_new(GTK_ORIENTATION_VERTICAL, 3);
     GtkWidget *hero_icon = gtk_image_new_from_icon_name(
         "video-display-symbolic");
-    GtkWidget *features = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+    GtkWidget *features = gtk_flow_box_new();
     GtkWidget *grid = gtk_flow_box_new();
     GtkWidget *overview = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
     GtkWidget *overview_heading = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 9);
@@ -1615,16 +1625,22 @@ static GtkWidget *build_home_page(
             "home-hero-subtitle"));
 
     gtk_widget_add_css_class(features, "home-feature-row");
-    gtk_box_set_homogeneous(GTK_BOX(features), TRUE);
-    gtk_box_append(
-        GTK_BOX(features),
-        make_feature("emblem-ok-symbolic", "Simple", "Easy to use"));
-    gtk_box_append(
-        GTK_BOX(features),
-        make_feature("security-high-symbolic", "Secure", "Built for privacy"));
-    gtk_box_append(
-        GTK_BOX(features),
-        make_feature("video-display-symbolic", "Beautiful", "A desktop you’ll love"));
+    gtk_flow_box_set_selection_mode(
+        GTK_FLOW_BOX(features), GTK_SELECTION_NONE);
+    gtk_flow_box_set_min_children_per_line(GTK_FLOW_BOX(features), 1U);
+    gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(features), 3U);
+    gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(features), 10U);
+    gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(features), 8U);
+    gtk_flow_box_set_homogeneous(GTK_FLOW_BOX(features), TRUE);
+    gtk_flow_box_insert(
+        GTK_FLOW_BOX(features),
+        make_feature("emblem-ok-symbolic", "Simple", "Easy to use"), -1);
+    gtk_flow_box_insert(
+        GTK_FLOW_BOX(features),
+        make_feature("security-high-symbolic", "Secure", "Built for privacy"), -1);
+    gtk_flow_box_insert(
+        GTK_FLOW_BOX(features),
+        make_feature("video-display-symbolic", "Beautiful", "A desktop you’ll love"), -1);
     gtk_box_append(GTK_BOX(hero_copy), features);
 
     gtk_widget_set_hexpand(hero_spacer, TRUE);
@@ -1925,25 +1941,36 @@ static GtkWidget *build_home_page(
         G_OBJECT(appearance_card), "status-value-label");
     GtkWidget *appearance_detail_label = g_object_get_data(
         G_OBJECT(appearance_card), "status-detail-label");
-    appearance_previews = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
-    gtk_box_set_homogeneous(GTK_BOX(appearance_previews), TRUE);
+    appearance_previews = gtk_flow_box_new();
+    gtk_flow_box_set_selection_mode(
+        GTK_FLOW_BOX(appearance_previews), GTK_SELECTION_NONE);
+    gtk_flow_box_set_min_children_per_line(
+        GTK_FLOW_BOX(appearance_previews), 1U);
+    gtk_flow_box_set_max_children_per_line(
+        GTK_FLOW_BOX(appearance_previews), 4U);
+    gtk_flow_box_set_column_spacing(
+        GTK_FLOW_BOX(appearance_previews), 6U);
+    gtk_flow_box_set_row_spacing(
+        GTK_FLOW_BOX(appearance_previews), 6U);
+    gtk_flow_box_set_homogeneous(
+        GTK_FLOW_BOX(appearance_previews), TRUE);
     /*
      * These are illustrative choices, not an authoritative theme selector.
      * Do not mark Light/Dark as selected merely because GTK currently prefers
      * one luminance; that would falsely imply Follow OS/Mercedes state.
      */
-    gtk_box_append(
-        GTK_BOX(appearance_previews),
-        make_theme_preview("Light", "theme-light", FALSE));
-    gtk_box_append(
-        GTK_BOX(appearance_previews),
-        make_theme_preview("Dark", "theme-dark", FALSE));
-    gtk_box_append(
-        GTK_BOX(appearance_previews),
-        make_theme_preview("Follow OS", "theme-follow", FALSE));
-    gtk_box_append(
-        GTK_BOX(appearance_previews),
-        make_theme_preview("Mercedes Grey", "theme-mercedes", FALSE));
+    gtk_flow_box_insert(
+        GTK_FLOW_BOX(appearance_previews),
+        make_theme_preview("Light", "theme-light", FALSE), -1);
+    gtk_flow_box_insert(
+        GTK_FLOW_BOX(appearance_previews),
+        make_theme_preview("Dark", "theme-dark", FALSE), -1);
+    gtk_flow_box_insert(
+        GTK_FLOW_BOX(appearance_previews),
+        make_theme_preview("Follow OS", "theme-follow", FALSE), -1);
+    gtk_flow_box_insert(
+        GTK_FLOW_BOX(appearance_previews),
+        make_theme_preview("Mercedes Grey", "theme-mercedes", FALSE), -1);
     gtk_box_append(GTK_BOX(appearance_card), appearance_previews);
     gtk_flow_box_insert(GTK_FLOW_BOX(status_grid), appearance_card, -1);
 
@@ -2023,8 +2050,11 @@ static GtkWidget *build_home_page(
 
     HomeAdaptiveLayout *adaptive_layout =
         g_new0(HomeAdaptiveLayout, 1);
+    adaptive_layout->features = GTK_FLOW_BOX(features);
     adaptive_layout->primary_grid = GTK_FLOW_BOX(grid);
     adaptive_layout->status_grid = GTK_FLOW_BOX(status_grid);
+    adaptive_layout->appearance_previews =
+        GTK_FLOW_BOX(appearance_previews);
     g_object_set_data_full(
         G_OBJECT(scroller),
         "system-settings-home-adaptive-layout",

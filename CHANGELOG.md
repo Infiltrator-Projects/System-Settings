@@ -1,5 +1,7 @@
 ## 0.4.49 — 2026-09-29
 
+- Correct the third failed 0.4.49 attempt: the adaptive outer rows reduced the shell minimum to roughly 1100 px, but the permanently horizontal hero feature row still kept the Home page wider than the 960/1024 logical desktop budget.
+- Put the three hero features and four appearance previews under the same wide-desktop breakpoint as the dashboard rows: compact windows may wrap them, while wide desktops explicitly restore the intended 3-up and 4-up presentation.
 - Correct the second failed 0.4.49 attempt: fixed two-column GtkGrid containers still forced a roughly 1440 px shell minimum and therefore could not satisfy the 960/1024 logical desktop budget.
 - Make the two desktop dashboard rows genuinely adaptive. They request one column at compact widths, then explicitly lock to two columns once the actual Home viewport reaches 1240 logical pixels, restoring Overview/Quick Actions and both status-card pairs side-by-side on ordinary wide desktops without making that width a global minimum.
 - Restore Quick Actions to an internally responsive two-column FlowBox so its own minimum width does not force the outer dashboard wider.
