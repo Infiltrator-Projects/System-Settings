@@ -1562,7 +1562,13 @@ static GtkWidget *build_home_page(
     gtk_widget_add_css_class(features, "home-feature-row");
     gtk_flow_box_set_selection_mode(
         GTK_FLOW_BOX(features), GTK_SELECTION_NONE);
-    gtk_flow_box_set_min_children_per_line(GTK_FLOW_BOX(features), 1U);
+    /*
+     * Preserve the original desktop composition: the three hero feature
+     * tiles are one row. 0.4.38 changed the fixed row into a FlowBox with a
+     * minimum of one child, which let GTK stretch each homogeneous child into
+     * its own row even when there was ample horizontal space.
+     */
+    gtk_flow_box_set_min_children_per_line(GTK_FLOW_BOX(features), 3U);
     gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(features), 3U);
     gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(features), 10U);
     gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(features), 8U);
@@ -1614,7 +1620,12 @@ static GtkWidget *build_home_page(
     gtk_widget_add_css_class(grid, "home-grid");
     gtk_flow_box_set_selection_mode(
         GTK_FLOW_BOX(grid), GTK_SELECTION_NONE);
-    gtk_flow_box_set_min_children_per_line(GTK_FLOW_BOX(grid), 1U);
+    /*
+     * System Overview and Quick Actions are the two columns of the Home
+     * dashboard. Keep both children on the same row; the internal card
+     * contents remain reflowable for narrow allocations.
+     */
+    gtk_flow_box_set_min_children_per_line(GTK_FLOW_BOX(grid), 2U);
     gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(grid), 2U);
     gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(grid), 12U);
     gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(grid), 12U);
@@ -1696,7 +1707,7 @@ static GtkWidget *build_home_page(
     gtk_widget_add_css_class(quick_grid, "quick-action-grid");
     gtk_flow_box_set_selection_mode(
         GTK_FLOW_BOX(quick_grid), GTK_SELECTION_NONE);
-    gtk_flow_box_set_min_children_per_line(GTK_FLOW_BOX(quick_grid), 1U);
+    gtk_flow_box_set_min_children_per_line(GTK_FLOW_BOX(quick_grid), 2U);
     gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(quick_grid), 2U);
     gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(quick_grid), 8U);
     gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(quick_grid), 8U);
@@ -1746,7 +1757,11 @@ static GtkWidget *build_home_page(
     gtk_widget_add_css_class(status_grid, "status-grid");
     gtk_flow_box_set_selection_mode(
         GTK_FLOW_BOX(status_grid), GTK_SELECTION_NONE);
-    gtk_flow_box_set_min_children_per_line(GTK_FLOW_BOX(status_grid), 1U);
+    /*
+     * The status surface is a deliberate 2x2 dashboard: Date & Time beside
+     * Region & Language, then Display & Appearance beside Network.
+     */
+    gtk_flow_box_set_min_children_per_line(GTK_FLOW_BOX(status_grid), 2U);
     gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(status_grid), 2U);
     gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(status_grid), 12U);
     gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(status_grid), 12U);
@@ -1879,8 +1894,13 @@ static GtkWidget *build_home_page(
     appearance_previews = gtk_flow_box_new();
     gtk_flow_box_set_selection_mode(
         GTK_FLOW_BOX(appearance_previews), GTK_SELECTION_NONE);
+    /*
+     * These four compact previews were originally one horizontal strip.
+     * Requiring all four prevents the FlowBox from turning them into the
+     * vertical thumbnail stack seen in the 0.4.47 screenshots.
+     */
     gtk_flow_box_set_min_children_per_line(
-        GTK_FLOW_BOX(appearance_previews), 1U);
+        GTK_FLOW_BOX(appearance_previews), 4U);
     gtk_flow_box_set_max_children_per_line(
         GTK_FLOW_BOX(appearance_previews), 4U);
     gtk_flow_box_set_column_spacing(
@@ -1965,6 +1985,23 @@ static GtkWidget *build_home_page(
         G_OBJECT(scroller), "system-settings-home-features", features);
     g_object_set_data(
         G_OBJECT(scroller), "system-settings-home-grid", grid);
+    g_object_set_data(
+        G_OBJECT(scroller), "system-settings-home-overview", overview);
+    g_object_set_data(
+        G_OBJECT(scroller), "system-settings-home-quick", quick);
+    g_object_set_data(
+        G_OBJECT(scroller), "system-settings-home-status-grid", status_grid);
+    g_object_set_data(
+        G_OBJECT(scroller), "system-settings-home-date-card", date_card);
+    g_object_set_data(
+        G_OBJECT(scroller), "system-settings-home-region-card", region_card);
+    g_object_set_data(
+        G_OBJECT(scroller), "system-settings-home-appearance-card", appearance_card);
+    g_object_set_data(
+        G_OBJECT(scroller), "system-settings-home-network-card", network_card);
+    g_object_set_data(
+        G_OBJECT(scroller), "system-settings-home-appearance-previews",
+        appearance_previews);
 
     /*
      * Home is a live status surface, not a construction-time snapshot.

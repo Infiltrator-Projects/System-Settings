@@ -1,3 +1,10 @@
+## 0.4.49 — 2026-09-29
+
+- Restore the intended Home dashboard composition after tracing the regression to the 0.4.38 responsive-layout conversion: System Overview and Quick Actions are again a two-column row, and the four status cards are again a 2x2 grid.
+- Keep the responsive FlowBox implementation and its narrow-content wrapping, but set the structural minimum child counts to the original design instead of allowing homogeneous top-level cards to collapse into one full-width column on normal desktops.
+- Restore the Display & Appearance preview strip to four thumbnails on one row and keep the three hero feature tiles on one row.
+- Add allocation-level shell regressions that verify the top-card pair, both status-card pairs and the appearance preview strip actually occupy their intended rows, preventing another visually broken layout from passing tests.
+
 ## 0.4.48 — 2026-09-29
 
 - Fix the remaining Home hero allocation regression visible at the compact default window: the Simple / Secure / Beautiful feature tiles no longer paint underneath the System Overview card.

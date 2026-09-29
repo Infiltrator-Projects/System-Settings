@@ -176,9 +176,45 @@ int main(void)
             G_OBJECT(home_scroller), "system-settings-home-features");
         GtkWidget *home_grid_geometry = g_object_get_data(
             G_OBJECT(home_scroller), "system-settings-home-grid");
+        GtkWidget *home_overview_geometry = g_object_get_data(
+            G_OBJECT(home_scroller), "system-settings-home-overview");
+        GtkWidget *home_quick_geometry = g_object_get_data(
+            G_OBJECT(home_scroller), "system-settings-home-quick");
+        GtkWidget *home_status_grid_geometry = g_object_get_data(
+            G_OBJECT(home_scroller), "system-settings-home-status-grid");
+        GtkWidget *home_date_geometry = g_object_get_data(
+            G_OBJECT(home_scroller), "system-settings-home-date-card");
+        GtkWidget *home_region_geometry = g_object_get_data(
+            G_OBJECT(home_scroller), "system-settings-home-region-card");
+        GtkWidget *home_appearance_geometry = g_object_get_data(
+            G_OBJECT(home_scroller), "system-settings-home-appearance-card");
+        GtkWidget *home_network_geometry = g_object_get_data(
+            G_OBJECT(home_scroller), "system-settings-home-network-card");
+        GtkWidget *home_appearance_previews = g_object_get_data(
+            G_OBJECT(home_scroller), "system-settings-home-appearance-previews");
         g_assert_true(GTK_IS_OVERLAY(home_hero_geometry));
         g_assert_true(GTK_IS_FLOW_BOX(home_features_geometry));
         g_assert_true(GTK_IS_FLOW_BOX(home_grid_geometry));
+        g_assert_true(GTK_IS_FLOW_BOX(home_status_grid_geometry));
+        g_assert_true(GTK_IS_FLOW_BOX(home_appearance_previews));
+        g_assert_nonnull(home_overview_geometry);
+        g_assert_nonnull(home_quick_geometry);
+        g_assert_nonnull(home_date_geometry);
+        g_assert_nonnull(home_region_geometry);
+        g_assert_nonnull(home_appearance_geometry);
+        g_assert_nonnull(home_network_geometry);
+        g_assert_cmpuint(
+            gtk_flow_box_get_min_children_per_line(
+                GTK_FLOW_BOX(home_features_geometry)), ==, 3U);
+        g_assert_cmpuint(
+            gtk_flow_box_get_min_children_per_line(
+                GTK_FLOW_BOX(home_grid_geometry)), ==, 2U);
+        g_assert_cmpuint(
+            gtk_flow_box_get_min_children_per_line(
+                GTK_FLOW_BOX(home_status_grid_geometry)), ==, 2U);
+        g_assert_cmpuint(
+            gtk_flow_box_get_min_children_per_line(
+                GTK_FLOW_BOX(home_appearance_previews)), ==, 4U);
         g_assert_false(gtk_scrolled_window_get_overlay_scrolling(nav_scroller));
         g_assert_false(gtk_scrolled_window_get_overlay_scrolling(date_scroller));
         g_assert_false(gtk_scrolled_window_get_overlay_scrolling(home_scroller));
@@ -360,6 +396,12 @@ int main(void)
         {
             graphene_rect_t feature_bounds = GRAPHENE_RECT_INIT(0, 0, 0, 0);
             graphene_rect_t grid_bounds = GRAPHENE_RECT_INIT(0, 0, 0, 0);
+            graphene_rect_t overview_bounds = GRAPHENE_RECT_INIT(0, 0, 0, 0);
+            graphene_rect_t quick_bounds = GRAPHENE_RECT_INIT(0, 0, 0, 0);
+            graphene_rect_t date_bounds = GRAPHENE_RECT_INIT(0, 0, 0, 0);
+            graphene_rect_t region_bounds = GRAPHENE_RECT_INIT(0, 0, 0, 0);
+            graphene_rect_t appearance_bounds = GRAPHENE_RECT_INIT(0, 0, 0, 0);
+            graphene_rect_t network_bounds = GRAPHENE_RECT_INIT(0, 0, 0, 0);
             g_assert_true(gtk_widget_compute_bounds(
                 home_features_geometry,
                 GTK_WIDGET(home_scroller),
@@ -371,6 +413,76 @@ int main(void)
             g_assert_true(
                 feature_bounds.origin.y + feature_bounds.size.height
                 <= grid_bounds.origin.y);
+
+            /*
+             * Regress the pre-0.4.38 desktop composition itself, not merely
+             * widget types or preferred sizes. The two top cards and each pair
+             * of status cards must occupy the same allocated row.
+             */
+            g_assert_true(gtk_widget_compute_bounds(
+                home_overview_geometry,
+                GTK_WIDGET(home_scroller),
+                &overview_bounds));
+            g_assert_true(gtk_widget_compute_bounds(
+                home_quick_geometry,
+                GTK_WIDGET(home_scroller),
+                &quick_bounds));
+            g_assert_cmpfloat_with_epsilon(
+                overview_bounds.origin.y, quick_bounds.origin.y, 0.5f);
+            g_assert_cmpfloat(overview_bounds.origin.x, <, quick_bounds.origin.x);
+
+            g_assert_true(gtk_widget_compute_bounds(
+                home_date_geometry,
+                GTK_WIDGET(home_scroller),
+                &date_bounds));
+            g_assert_true(gtk_widget_compute_bounds(
+                home_region_geometry,
+                GTK_WIDGET(home_scroller),
+                &region_bounds));
+            g_assert_cmpfloat_with_epsilon(
+                date_bounds.origin.y, region_bounds.origin.y, 0.5f);
+            g_assert_cmpfloat(date_bounds.origin.x, <, region_bounds.origin.x);
+
+            g_assert_true(gtk_widget_compute_bounds(
+                home_appearance_geometry,
+                GTK_WIDGET(home_scroller),
+                &appearance_bounds));
+            g_assert_true(gtk_widget_compute_bounds(
+                home_network_geometry,
+                GTK_WIDGET(home_scroller),
+                &network_bounds));
+            g_assert_cmpfloat_with_epsilon(
+                appearance_bounds.origin.y, network_bounds.origin.y, 0.5f);
+            g_assert_cmpfloat(
+                appearance_bounds.origin.x, <, network_bounds.origin.x);
+            g_assert_cmpfloat(date_bounds.origin.y, <, appearance_bounds.origin.y);
+
+            GtkWidget *preview_first =
+                gtk_widget_get_first_child(home_appearance_previews);
+            GtkWidget *preview_last =
+                gtk_widget_get_last_child(home_appearance_previews);
+            graphene_rect_t preview_first_bounds =
+                GRAPHENE_RECT_INIT(0, 0, 0, 0);
+            graphene_rect_t preview_last_bounds =
+                GRAPHENE_RECT_INIT(0, 0, 0, 0);
+            g_assert_nonnull(preview_first);
+            g_assert_nonnull(preview_last);
+            g_assert_true(gtk_widget_compute_bounds(
+                preview_first,
+                home_appearance_previews,
+                &preview_first_bounds));
+            g_assert_true(gtk_widget_compute_bounds(
+                preview_last,
+                home_appearance_previews,
+                &preview_last_bounds));
+            g_assert_cmpfloat_with_epsilon(
+                preview_first_bounds.origin.y,
+                preview_last_bounds.origin.y,
+                0.5f);
+            g_assert_cmpfloat(
+                preview_first_bounds.origin.x,
+                <,
+                preview_last_bounds.origin.x);
         }
         g_assert_cmpuint(panel->timer_id, ==, 0U);
 
