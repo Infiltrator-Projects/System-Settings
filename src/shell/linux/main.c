@@ -1436,8 +1436,8 @@ static GtkWidget *build_home_page(
     GtkWidget *hero_brand = gtk_box_new(GTK_ORIENTATION_VERTICAL, 3);
     GtkWidget *hero_icon = gtk_image_new_from_icon_name(
         "video-display-symbolic");
-    GtkWidget *features = gtk_flow_box_new();
-    GtkWidget *grid = gtk_flow_box_new();
+    GtkWidget *features = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+    GtkWidget *grid = gtk_grid_new();
     GtkWidget *overview = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
     GtkWidget *overview_heading = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 9);
     GtkWidget *overview_icon_wrap = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
@@ -1453,8 +1453,8 @@ static GtkWidget *build_home_page(
     GtkWidget *quick_icon_wrap = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     GtkWidget *quick_icon = gtk_image_new_from_icon_name(
         "system-run-symbolic");
-    GtkWidget *quick_grid = gtk_flow_box_new();
-    GtkWidget *status_grid = gtk_flow_box_new();
+    GtkWidget *quick_grid = gtk_grid_new();
+    GtkWidget *status_grid = gtk_grid_new();
     GtkWidget *date_card;
     GtkWidget *region_card;
     GtkWidget *appearance_card;
@@ -1560,28 +1560,16 @@ static GtkWidget *build_home_page(
             "home-hero-subtitle"));
 
     gtk_widget_add_css_class(features, "home-feature-row");
-    gtk_flow_box_set_selection_mode(
-        GTK_FLOW_BOX(features), GTK_SELECTION_NONE);
-    /*
-     * Preserve the original desktop composition: the three hero feature
-     * tiles are one row. 0.4.38 changed the fixed row into a FlowBox with a
-     * minimum of one child, which let GTK stretch each homogeneous child into
-     * its own row even when there was ample horizontal space.
-     */
-    gtk_flow_box_set_min_children_per_line(GTK_FLOW_BOX(features), 3U);
-    gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(features), 3U);
-    gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(features), 10U);
-    gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(features), 8U);
-    gtk_flow_box_set_homogeneous(GTK_FLOW_BOX(features), TRUE);
-    gtk_flow_box_insert(
-        GTK_FLOW_BOX(features),
-        make_feature("emblem-ok-symbolic", "Simple", "Easy to use"), -1);
-    gtk_flow_box_insert(
-        GTK_FLOW_BOX(features),
-        make_feature("security-high-symbolic", "Secure", "Built for privacy"), -1);
-    gtk_flow_box_insert(
-        GTK_FLOW_BOX(features),
-        make_feature("video-display-symbolic", "Beautiful", "A desktop you’ll love"), -1);
+    gtk_box_set_homogeneous(GTK_BOX(features), TRUE);
+    gtk_box_append(
+        GTK_BOX(features),
+        make_feature("emblem-ok-symbolic", "Simple", "Easy to use"));
+    gtk_box_append(
+        GTK_BOX(features),
+        make_feature("security-high-symbolic", "Secure", "Built for privacy"));
+    gtk_box_append(
+        GTK_BOX(features),
+        make_feature("video-display-symbolic", "Beautiful", "A desktop you’ll love"));
     gtk_box_append(GTK_BOX(hero_copy), features);
 
     gtk_widget_set_hexpand(hero_spacer, TRUE);
@@ -1618,18 +1606,9 @@ static GtkWidget *build_home_page(
     gtk_box_append(GTK_BOX(page), hero);
 
     gtk_widget_add_css_class(grid, "home-grid");
-    gtk_flow_box_set_selection_mode(
-        GTK_FLOW_BOX(grid), GTK_SELECTION_NONE);
-    /*
-     * System Overview and Quick Actions are the two columns of the Home
-     * dashboard. Keep both children on the same row; the internal card
-     * contents remain reflowable for narrow allocations.
-     */
-    gtk_flow_box_set_min_children_per_line(GTK_FLOW_BOX(grid), 2U);
-    gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(grid), 2U);
-    gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(grid), 12U);
-    gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(grid), 12U);
-    gtk_flow_box_set_homogeneous(GTK_FLOW_BOX(grid), TRUE);
+    gtk_grid_set_column_spacing(GTK_GRID(grid), 12);
+    gtk_grid_set_row_spacing(GTK_GRID(grid), 12);
+    gtk_grid_set_column_homogeneous(GTK_GRID(grid), TRUE);
 
     gtk_widget_add_css_class(overview, "home-card");
     gtk_widget_add_css_class(overview_icon_wrap, "home-card-icon");
@@ -1692,7 +1671,7 @@ static GtkWidget *build_home_page(
     gtk_widget_set_hexpand(overview_data, TRUE);
     gtk_flow_box_insert(GTK_FLOW_BOX(overview_body), overview_data, -1);
     gtk_box_append(GTK_BOX(overview), overview_body);
-    gtk_flow_box_insert(GTK_FLOW_BOX(grid), overview, -1);
+    gtk_grid_attach(GTK_GRID(grid), overview, 0, 0, 1, 1);
 
     gtk_widget_add_css_class(quick, "home-card");
     gtk_widget_add_css_class(quick_icon_wrap, "home-card-icon");
@@ -1705,13 +1684,9 @@ static GtkWidget *build_home_page(
     gtk_box_append(GTK_BOX(quick), quick_heading);
 
     gtk_widget_add_css_class(quick_grid, "quick-action-grid");
-    gtk_flow_box_set_selection_mode(
-        GTK_FLOW_BOX(quick_grid), GTK_SELECTION_NONE);
-    gtk_flow_box_set_min_children_per_line(GTK_FLOW_BOX(quick_grid), 2U);
-    gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(quick_grid), 2U);
-    gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(quick_grid), 8U);
-    gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(quick_grid), 8U);
-    gtk_flow_box_set_homogeneous(GTK_FLOW_BOX(quick_grid), TRUE);
+    gtk_grid_set_column_spacing(GTK_GRID(quick_grid), 8);
+    gtk_grid_set_row_spacing(GTK_GRID(quick_grid), 8);
+    gtk_grid_set_column_homogeneous(GTK_GRID(quick_grid), TRUE);
 
     GtkWidget *date_action = make_quick_action(
         "preferences-system-time-symbolic",
@@ -1721,7 +1696,7 @@ static GtkWidget *build_home_page(
     g_signal_connect(
         date_action, "clicked",
         G_CALLBACK(open_date_time), search_state);
-    gtk_flow_box_insert(GTK_FLOW_BOX(quick_grid), date_action, -1);
+    gtk_grid_attach(GTK_GRID(quick_grid), date_action, 0, 0, 1, 1);
 
     GtkWidget *region_action = make_program_action(
         "preferences-desktop-locale-symbolic",
@@ -1730,7 +1705,7 @@ static GtkWidget *build_home_page(
         "mintlocale",
         NULL);
     gtk_widget_add_css_class(region_action, "quick-action-cyan");
-    gtk_flow_box_insert(GTK_FLOW_BOX(quick_grid), region_action, -1);
+    gtk_grid_attach(GTK_GRID(quick_grid), region_action, 1, 0, 1, 1);
 
     GtkWidget *display_action = make_program_action(
         "video-display-symbolic",
@@ -1739,7 +1714,7 @@ static GtkWidget *build_home_page(
         "cinnamon-settings",
         "display");
     gtk_widget_add_css_class(display_action, "quick-action-cyan");
-    gtk_flow_box_insert(GTK_FLOW_BOX(quick_grid), display_action, -1);
+    gtk_grid_attach(GTK_GRID(quick_grid), display_action, 0, 1, 1, 1);
 
     GtkWidget *software_action = make_program_action(
         "system-software-install-symbolic",
@@ -1748,24 +1723,16 @@ static GtkWidget *build_home_page(
         "infiltrator-software",
         NULL);
     gtk_widget_add_css_class(software_action, "quick-action-gold");
-    gtk_flow_box_insert(GTK_FLOW_BOX(quick_grid), software_action, -1);
+    gtk_grid_attach(GTK_GRID(quick_grid), software_action, 1, 1, 1, 1);
 
     gtk_box_append(GTK_BOX(quick), quick_grid);
-    gtk_flow_box_insert(GTK_FLOW_BOX(grid), quick, -1);
+    gtk_grid_attach(GTK_GRID(grid), quick, 1, 0, 1, 1);
     gtk_box_append(GTK_BOX(page), grid);
 
     gtk_widget_add_css_class(status_grid, "status-grid");
-    gtk_flow_box_set_selection_mode(
-        GTK_FLOW_BOX(status_grid), GTK_SELECTION_NONE);
-    /*
-     * The status surface is a deliberate 2x2 dashboard: Date & Time beside
-     * Region & Language, then Display & Appearance beside Network.
-     */
-    gtk_flow_box_set_min_children_per_line(GTK_FLOW_BOX(status_grid), 2U);
-    gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(status_grid), 2U);
-    gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(status_grid), 12U);
-    gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(status_grid), 12U);
-    gtk_flow_box_set_homogeneous(GTK_FLOW_BOX(status_grid), TRUE);
+    gtk_grid_set_column_spacing(GTK_GRID(status_grid), 12);
+    gtk_grid_set_row_spacing(GTK_GRID(status_grid), 12);
+    gtk_grid_set_column_homogeneous(GTK_GRID(status_grid), TRUE);
 
     date_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 9);
     gtk_widget_add_css_class(date_card, "status-card");
@@ -1839,7 +1806,7 @@ static GtkWidget *build_home_page(
     gtk_widget_set_halign(date_scene, GTK_ALIGN_END);
     gtk_flow_box_insert(GTK_FLOW_BOX(date_body), date_scene, -1);
     gtk_box_append(GTK_BOX(date_card), date_body);
-    gtk_flow_box_insert(GTK_FLOW_BOX(status_grid), date_card, -1);
+    gtk_grid_attach(GTK_GRID(status_grid), date_card, 0, 0, 1, 1);
 
     region_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
     gtk_widget_add_css_class(region_card, "status-card");
@@ -1879,7 +1846,7 @@ static GtkWidget *build_home_page(
         gtk_flow_box_insert(GTK_FLOW_BOX(region_body), region_scene, -1);
     }
     gtk_box_append(GTK_BOX(region_card), region_body);
-    gtk_flow_box_insert(GTK_FLOW_BOX(status_grid), region_card, -1);
+    gtk_grid_attach(GTK_GRID(status_grid), region_card, 1, 0, 1, 1);
 
     appearance_card = make_status_card(
         "appearance-status-card",
@@ -1891,43 +1858,27 @@ static GtkWidget *build_home_page(
         G_OBJECT(appearance_card), "status-value-label");
     GtkWidget *appearance_detail_label = g_object_get_data(
         G_OBJECT(appearance_card), "status-detail-label");
-    appearance_previews = gtk_flow_box_new();
-    gtk_flow_box_set_selection_mode(
-        GTK_FLOW_BOX(appearance_previews), GTK_SELECTION_NONE);
-    /*
-     * These four compact previews were originally one horizontal strip.
-     * Requiring all four prevents the FlowBox from turning them into the
-     * vertical thumbnail stack seen in the 0.4.47 screenshots.
-     */
-    gtk_flow_box_set_min_children_per_line(
-        GTK_FLOW_BOX(appearance_previews), 4U);
-    gtk_flow_box_set_max_children_per_line(
-        GTK_FLOW_BOX(appearance_previews), 4U);
-    gtk_flow_box_set_column_spacing(
-        GTK_FLOW_BOX(appearance_previews), 6U);
-    gtk_flow_box_set_row_spacing(
-        GTK_FLOW_BOX(appearance_previews), 6U);
-    gtk_flow_box_set_homogeneous(
-        GTK_FLOW_BOX(appearance_previews), TRUE);
+    appearance_previews = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
+    gtk_box_set_homogeneous(GTK_BOX(appearance_previews), TRUE);
     /*
      * These are illustrative choices, not an authoritative theme selector.
      * Do not mark Light/Dark as selected merely because GTK currently prefers
      * one luminance; that would falsely imply Follow OS/Mercedes state.
      */
-    gtk_flow_box_insert(
-        GTK_FLOW_BOX(appearance_previews),
-        make_theme_preview("Light", "theme-light", FALSE), -1);
-    gtk_flow_box_insert(
-        GTK_FLOW_BOX(appearance_previews),
-        make_theme_preview("Dark", "theme-dark", FALSE), -1);
-    gtk_flow_box_insert(
-        GTK_FLOW_BOX(appearance_previews),
-        make_theme_preview("Follow OS", "theme-follow", FALSE), -1);
-    gtk_flow_box_insert(
-        GTK_FLOW_BOX(appearance_previews),
-        make_theme_preview("Mercedes Grey", "theme-mercedes", FALSE), -1);
+    gtk_box_append(
+        GTK_BOX(appearance_previews),
+        make_theme_preview("Light", "theme-light", FALSE));
+    gtk_box_append(
+        GTK_BOX(appearance_previews),
+        make_theme_preview("Dark", "theme-dark", FALSE));
+    gtk_box_append(
+        GTK_BOX(appearance_previews),
+        make_theme_preview("Follow OS", "theme-follow", FALSE));
+    gtk_box_append(
+        GTK_BOX(appearance_previews),
+        make_theme_preview("Mercedes Grey", "theme-mercedes", FALSE));
     gtk_box_append(GTK_BOX(appearance_card), appearance_previews);
-    gtk_flow_box_insert(GTK_FLOW_BOX(status_grid), appearance_card, -1);
+    gtk_grid_attach(GTK_GRID(status_grid), appearance_card, 0, 1, 1, 1);
 
     network_card = make_status_card(
         "network-status-card",
@@ -1950,7 +1901,7 @@ static GtkWidget *build_home_page(
     gtk_widget_set_halign(network_visual, GTK_ALIGN_END);
     gtk_box_append(GTK_BOX(network_body), network_visual);
     gtk_box_append(GTK_BOX(network_card), network_body);
-    gtk_flow_box_insert(GTK_FLOW_BOX(status_grid), network_card, -1);
+    gtk_grid_attach(GTK_GRID(status_grid), network_card, 1, 1, 1, 1);
 
     gtk_widget_set_valign(status_grid, GTK_ALIGN_START);
     gtk_widget_set_vexpand(status_grid, FALSE);

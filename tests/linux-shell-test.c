@@ -193,28 +193,16 @@ int main(void)
         GtkWidget *home_appearance_previews = g_object_get_data(
             G_OBJECT(home_scroller), "system-settings-home-appearance-previews");
         g_assert_true(GTK_IS_OVERLAY(home_hero_geometry));
-        g_assert_true(GTK_IS_FLOW_BOX(home_features_geometry));
-        g_assert_true(GTK_IS_FLOW_BOX(home_grid_geometry));
-        g_assert_true(GTK_IS_FLOW_BOX(home_status_grid_geometry));
-        g_assert_true(GTK_IS_FLOW_BOX(home_appearance_previews));
+        g_assert_true(GTK_IS_BOX(home_features_geometry));
+        g_assert_true(GTK_IS_GRID(home_grid_geometry));
+        g_assert_true(GTK_IS_GRID(home_status_grid_geometry));
+        g_assert_true(GTK_IS_BOX(home_appearance_previews));
         g_assert_nonnull(home_overview_geometry);
         g_assert_nonnull(home_quick_geometry);
         g_assert_nonnull(home_date_geometry);
         g_assert_nonnull(home_region_geometry);
         g_assert_nonnull(home_appearance_geometry);
         g_assert_nonnull(home_network_geometry);
-        g_assert_cmpuint(
-            gtk_flow_box_get_min_children_per_line(
-                GTK_FLOW_BOX(home_features_geometry)), ==, 3U);
-        g_assert_cmpuint(
-            gtk_flow_box_get_min_children_per_line(
-                GTK_FLOW_BOX(home_grid_geometry)), ==, 2U);
-        g_assert_cmpuint(
-            gtk_flow_box_get_min_children_per_line(
-                GTK_FLOW_BOX(home_status_grid_geometry)), ==, 2U);
-        g_assert_cmpuint(
-            gtk_flow_box_get_min_children_per_line(
-                GTK_FLOW_BOX(home_appearance_previews)), ==, 4U);
         g_assert_false(gtk_scrolled_window_get_overlay_scrolling(nav_scroller));
         g_assert_false(gtk_scrolled_window_get_overlay_scrolling(date_scroller));
         g_assert_false(gtk_scrolled_window_get_overlay_scrolling(home_scroller));

@@ -1,5 +1,7 @@
 ## 0.4.49 — 2026-09-29
 
+- Restore the original structural containers for the Home composition: horizontal hero feature strip, two-column Overview/Quick Actions grid, 2x2 Quick Actions grid, 2x2 status grid, and horizontal four-preview appearance strip. Keep FlowBox only inside card bodies where reflow is genuinely useful.
+- Fix the failed first 0.4.49 CI attempt, whose forced FlowBox minimum child counts raised the shell minimum width to about 1480 px and correctly prevented publication.
 - Restore the intended Home dashboard composition after tracing the regression to the 0.4.38 responsive-layout conversion: System Overview and Quick Actions are again a two-column row, and the four status cards are again a 2x2 grid.
 - Keep the responsive FlowBox implementation and its narrow-content wrapping, but set the structural minimum child counts to the original design instead of allowing homogeneous top-level cards to collapse into one full-width column on normal desktops.
 - Restore the Display & Appearance preview strip to four thumbnails on one row and keep the three hero feature tiles on one row.
