@@ -1,5 +1,9 @@
 ## 0.4.49 — 2026-09-29
 
+- Correct the second failed 0.4.49 attempt: fixed two-column GtkGrid containers still forced a roughly 1440 px shell minimum and therefore could not satisfy the 960/1024 logical desktop budget.
+- Make the two desktop dashboard rows genuinely adaptive. They request one column at compact widths, then explicitly lock to two columns once the actual Home viewport reaches 1240 logical pixels, restoring Overview/Quick Actions and both status-card pairs side-by-side on ordinary wide desktops without making that width a global minimum.
+- Restore Quick Actions to an internally responsive two-column FlowBox so its own minimum width does not force the outer dashboard wider.
+- Keep the three hero features and four appearance previews as deliberate horizontal strips; those compact fixed rows fit within the narrow-shell budget and should not become vertical lists.
 - Restore the original structural containers for the Home composition: horizontal hero feature strip, two-column Overview/Quick Actions grid, 2x2 Quick Actions grid, 2x2 status grid, and horizontal four-preview appearance strip. Keep FlowBox only inside card bodies where reflow is genuinely useful.
 - Fix the failed first 0.4.49 CI attempt, whose forced FlowBox minimum child counts raised the shell minimum width to about 1480 px and correctly prevented publication.
 - Restore the intended Home dashboard composition after tracing the regression to the 0.4.38 responsive-layout conversion: System Overview and Quick Actions are again a two-column row, and the four status cards are again a 2x2 grid.
