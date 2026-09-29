@@ -1110,10 +1110,18 @@ static GtkWidget *make_ui_asset_picture(const char *filename,
             SYSTEM_SETTINGS_UI_SOURCE_DIR, filename, NULL);
     }
     if (!g_file_test(path, G_FILE_TEST_IS_REGULAR)) {
+        g_warning(
+            "System Settings UI asset is missing: %s",
+            path != NULL ? path : "(null)");
         return NULL;
     }
 
     picture = gtk_picture_new_for_filename(path);
+    g_object_set_data_full(
+        G_OBJECT(picture),
+        "system-settings-ui-asset-path",
+        g_strdup(path),
+        g_free);
     gtk_picture_set_can_shrink(GTK_PICTURE(picture), TRUE);
 #if GTK_CHECK_VERSION(4, 8, 0)
     gtk_picture_set_content_fit(

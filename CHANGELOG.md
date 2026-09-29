@@ -1,3 +1,11 @@
+## 0.4.46 — 2026-09-29
+
+- Fix the packaged Home artwork regression by making the Linux runtime asset path and Debian package installation prefix identical.
+- Default Linux system installs to /usr before GNUInstallDirs is evaluated, so the executable now looks for the shipped bitmap assets in /usr/share/infiltrator/system-settings/ui instead of the generic /usr/local/share path.
+- Force CPack staging to use the same CMAKE_INSTALL_PREFIX as the compiled runtime, eliminating future package/runtime path drift.
+- Add runtime diagnostics for missing UI assets.
+- Strengthen Debian integration validation so CI proves the packaged executable contains the /usr/share asset path, rejects the stale /usr/local path, and byte-compares every installed UI bitmap against its source asset.
+
 ## 0.4.45 — 2026-09-29
 
 - Fix the Home dashboard hero measurement so the System Overview and Quick Actions cards cannot be allocated over the Welcome/System Settings banner.

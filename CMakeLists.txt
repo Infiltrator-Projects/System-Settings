@@ -9,6 +9,17 @@ endif()
 
 project(InfiltratrSystemSettings VERSION "${SYSTEM_SETTINGS_VERSION}" LANGUAGES C)
 include(CTest)
+
+# System Settings is a system control panel. Keep the runtime paths compiled
+# into the executable identical to the paths used by the Debian package.
+# CPack's DEB staging is under /usr; leaving CMake's generic /usr/local default
+# here made packaged builds look for UI bitmaps in /usr/local/share while the
+# package installed them in /usr/share.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND
+   CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    set(CMAKE_INSTALL_PREFIX "/usr" CACHE PATH
+        "Install prefix for the Linux system settings shell" FORCE)
+endif()
 include(GNUInstallDirs)
 
 option(SYSTEM_SETTINGS_WARNINGS_AS_ERRORS "Treat warnings as errors" ON)
@@ -556,6 +567,8 @@ set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
 
 if(UNIX AND NOT APPLE)
     set(CPACK_GENERATOR "DEB")
+    # Keep package staging and the paths compiled into the executable in lockstep.
+    set(CPACK_PACKAGING_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
     set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
     set(CPACK_DEBIAN_PACKAGE_SECTION "utils")
     set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
