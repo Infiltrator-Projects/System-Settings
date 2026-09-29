@@ -182,17 +182,30 @@ int main(void)
      * failure, never "missing". Recovery must preserve an unreadable pending
      * journal rather than deleting evidence it cannot classify.
      */
-    CHECK(g_mkdir(expected_file, 0700) == 0);
+    CHECK(g_file_set_contents(
+        expected_file,
+        "[Location]\nName=Unreadable\nLatitude=0\nLongitude=0\n",
+        -1,
+        NULL));
+    CHECK(g_chmod(expected_file, 0000) == 0);
     CHECK(ss_location_metadata_load_status(&loaded) ==
           SS_LOCATION_METADATA_LOAD_IO_ERROR);
-    CHECK(g_rmdir(expected_file) == 0);
+    CHECK(g_chmod(expected_file, 0600) == 0);
+    CHECK(g_remove(expected_file) == 0);
     {
+        SsLocationMetadata staged = {0};
         g_autofree gchar *pending_file = g_build_filename(
             settings_dir, "location.pending", NULL);
-        CHECK(g_mkdir(pending_file, 0700) == 0);
+        g_strlcpy(staged.display_name, "Unreadable journal",
+                  sizeof(staged.display_name));
+        staged.latitude = -36.0;
+        staged.longitude = 145.0;
+        CHECK(ss_location_metadata_stage(&staged));
+        CHECK(g_chmod(pending_file, 0000) == 0);
         CHECK(!ss_location_metadata_recover(false, 0.0, 0.0));
-        CHECK(g_file_test(pending_file, G_FILE_TEST_IS_DIR));
-        CHECK(g_rmdir(pending_file) == 0);
+        CHECK(g_file_test(pending_file, G_FILE_TEST_IS_REGULAR));
+        CHECK(g_chmod(pending_file, 0600) == 0);
+        CHECK(ss_location_metadata_discard_staged());
     }
     {
         g_autofree gchar *policy_file = g_build_filename(
