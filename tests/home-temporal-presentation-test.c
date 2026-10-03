@@ -123,7 +123,7 @@ int main(void)
         g_assert_cmpuint(
             ss_home_temporal_presenter_refresh_interval_ms(presenter),
             ==,
-            250U);
+            500U);
         ss_home_temporal_presenter_free(presenter);
 
         policy.show_seconds = false;
