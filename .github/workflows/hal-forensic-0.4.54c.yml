@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: HAL forensic 0.4.54 apply v3
+
+on:
+  push:
+    branches: ["hal/system-settings-forensic-0.4.54"]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: hal/system-settings-forensic-0.4.54
+          fetch-depth: 0
+          submodules: false
+      - name: Apply 0.4.54 source transformation
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -qx '0.4.54' VERSION; then
+            exit 0
+          fi
+          awk '
+            /python3 - <<.PY./ { capture=1; next }
+            capture && /^          PY$/ { exit }
+            capture { sub(/^          /, ""); print }
+          ' .github/workflows/hal-forensic-0.4.54b.yml > /tmp/apply-0.4.54.py
+          test -s /tmp/apply-0.4.54.py
+          python3 /tmp/apply-0.4.54.py
+          git diff --check
+          git config user.name "Shannon Smith"
+          git config user.email "infiltratr@yandex.com"
+          git add VERSION CHANGELOG.md docs/ARCHITECTURE.md docs/PRESENTATION_POLICY.md \
+            src/shell/linux/main.c src/shell/linux/linux-ui-helpers.c \
+            src/modules/date-time/linux-date-time-panel-ui.c \
+            src/modules/date-time/home-temporal-presentation.c \
+            src/modules/date-time/home-temporal-presentation.h tests/linux-shell-test.c
+          git commit -m "Release 0.4.54 - lazy modules and Common spacing cleanup"
+          git push origin HEAD:hal/system-settings-forensic-0.4.54
