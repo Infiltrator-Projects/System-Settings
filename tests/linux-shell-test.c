@@ -28,10 +28,15 @@ int main(void)
         g_strcmp0(g_getenv("GTK_A11Y"), "none") != 0;
     g_autoptr(GtkApplication) app = gtk_application_new(
         "org.infiltrator.SystemSettings.Test", G_APPLICATION_NON_UNIQUE);
+    unsigned int settled_theme_generation = 0U;
     g_assert_true(g_application_register(G_APPLICATION(app), NULL, NULL));
     for (int i = 0; i < 8; ++i) {
         on_activate(app, NULL);
         while (g_main_context_iteration(NULL, FALSE)) {
+        }
+        if (i > 0) {
+            g_assert_cmpuint(
+                ss_linux_theme_generation(), ==, settled_theme_generation);
         }
         GtkWindow *window = gtk_application_get_active_window(app);
         g_assert_nonnull(window);
@@ -160,6 +165,7 @@ int main(void)
                 NULL);
             while (g_main_context_iteration(NULL, FALSE)) {
             }
+            settled_theme_generation = ss_linux_theme_generation();
         }
         GtkScrolledWindow *nav_scroller = g_object_get_data(
             G_OBJECT(window), "system-settings-navigation-scroller");

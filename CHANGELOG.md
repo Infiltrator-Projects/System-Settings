@@ -5,6 +5,7 @@
 - Keep fast extended-clock cadence intact so decimal/French and other non-SI clock displays remain accurate while moving the expensive static work off that cadence.
 - Bring the shell closer to the restrained InfiltratorOS surface language by removing the leftover Date & Time hero drop shadow and removing the obsolete gold/cyan navigation class split and styling navigation icons directly with Common's neutral accent.
 - Advance the pinned Common 1.19.38 source to current Common head `7070c5812b50821fd7580101cb2289a3184f6b2c`, including the latest portable-build and hosted-CI corrections.
+- Make Common-backed GTK theme installation idempotent so reopening the shell no longer removes and re-adds an equivalent display-global CSS provider during the previous window's teardown; add a repeated-activation regression for stable theme generation.
 
 ## 0.4.49 — 2026-09-29
 
