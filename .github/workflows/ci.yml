@@ -1,68 +1,68 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 name: System Settings CI
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
   workflow_dispatch:
 
 permissions:
   contents: read
-
-concurrency:
-  group: system-settings-ci-${{ github.ref }}
-  cancel-in-progress: true
+  actions: read
 
 jobs:
   runner-routing:
     name: Runner routing
     runs-on: ubuntu-24.04
     outputs:
-      use_bigbedroom: ${{ steps.route.outputs.use_bigbedroom }}
+      bigbedroom_online: ${{ steps.route.outputs.bigbedroom_online }}
     steps:
       - name: Prefer an online trusted BigBedroom runner
         id: route
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
         shell: bash
         run: |
           set -euo pipefail
-          use_bigbedroom=false
-          if [[ -n "${{ secrets.BIGBEDROOM_RUNNER_TOKEN }}" ]]; then
-            status="$(curl -fsSL \
-              -H 'Accept: application/vnd.github+json' \
-              -H 'Authorization: Bearer ${{ secrets.BIGBEDROOM_RUNNER_TOKEN }}' \
-              -H 'X-GitHub-Api-Version: 2022-11-28' \
-              '${{ github.api_url }}/repos/${{ github.repository }}/actions/runners' || true)"
-            if grep -Eq '"name"[[:space:]]*:[[:space:]]*"BigBedroom"' <<<"$status" && \
-               grep -Eq '"status"[[:space:]]*:[[:space:]]*"online"' <<<"$status" && \
-               grep -Eq '"busy"[[:space:]]*:[[:space:]]*false' <<<"$status"; then
-              use_bigbedroom=true
+          online=false
+          if [[ "$EVENT_NAME" != "pull_request" ]]; then
+            if gh api "repos/${{ github.repository }}/actions/runners" \
+              --jq '[.runners[] | select(.status == "online" and .busy == false) | .labels[].name] | any(. == "bigbedroom")' |
+              grep -qx true; then
+              online=true
             fi
           fi
-          echo "use_bigbedroom=$use_bigbedroom" >> "$GITHUB_OUTPUT"
+          echo "bigbedroom_online=$online" >> "$GITHUB_OUTPUT"
 
   bigbedroom-capability:
     name: BigBedroom capability probe
-    needs: runner-routing
-    if: needs.runner-routing.outputs.use_bigbedroom == 'true'
+    needs: [runner-routing]
+    if: ${{ needs.runner-routing.outputs.bigbedroom_online == 'true' }}
     runs-on: bigbedroom
+    timeout-minutes: 5
     outputs:
       ready: ${{ steps.probe.outputs.ready }}
     steps:
-      - name: Probe trusted runner toolchain
+      - name: Probe build prerequisites without modifying the runner
         id: probe
         shell: bash
         run: |
-          set -euo pipefail
+          set -u
           ready=true
-          for command_name in tar cmake ctest cc pkg-config git readelf sha256sum xvfb-run dbus-daemon; do
+          for command_name in tar cmake ctest cc pkg-config dpkg-deb git readelf sha256sum xvfb-run dbus-daemon; do
             if ! command -v "$command_name" >/dev/null 2>&1; then
+              echo "Missing BigBedroom command: $command_name"
               ready=false
             fi
           done
-          if ! pkg-config --exists gtk4 || ! pkg-config --exists geocode-glib-2.0; then
+          if ! pkg-config --exists gtk4 2>/dev/null; then
+            echo "BigBedroom is missing gtk4 development metadata."
+            ready=false
+          fi
+          if ! pkg-config --exists geocode-glib-2.0 2>/dev/null; then
+            echo "BigBedroom is missing geocode-glib-2.0 development metadata."
             ready=false
           fi
           echo "ready=$ready" >> "$GITHUB_OUTPUT"
@@ -96,7 +96,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for command_name in tar cmake ctest cc pkg-config git readelf sha256sum xvfb-run dbus-daemon; do
+          for command_name in tar cmake ctest cc pkg-config dpkg-deb git readelf sha256sum xvfb-run dbus-daemon; do
             command -v "$command_name" >/dev/null 2>&1
           done
           pkg-config --exists gtk4
@@ -106,6 +106,7 @@ jobs:
         run: cmake -S . -B build -DBUILD_TESTING=ON -DSYSTEM_SETTINGS_WARNINGS_AS_ERRORS=ON
 
       - name: Build
+        shell: bash
         run: cmake --build build --config Release --parallel "$(($(nproc)>1?$(nproc)-1:1))"
 
       - name: Test
@@ -241,18 +242,15 @@ jobs:
       - name: Test non-GTK code with ASan, UBSan and leak detection
         env:
           ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
-          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
-        run: |
-          set -euo pipefail
-          ctest --test-dir build-sanitized --output-on-failure \
-            -E 'linux-shell|linux-shell-scale2|linux-shell-accessibility'
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: ctest --test-dir build-sanitized --output-on-failure -E linux-shell
 
       - name: Test GTK shell with ASan, UBSan and leak detection
         env:
+          # GTK/Pango/fontconfig retain a few documented process-global
+          # caches. Suppress those exact external stacks instead of disabling
+          # LeakSanitizer for the entire application shell.
           ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
-          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
-        run: |
-          set -euo pipefail
-          xvfb-run -a dbus-run-session -- \
-            ctest --test-dir build-sanitized --output-on-failure \
-              -R 'linux-shell|linux-shell-scale2|linux-shell-accessibility'
+          LSAN_OPTIONS: suppressions=${{ github.workspace }}/tests/lsan.supp:print_suppressions=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: ctest --test-dir build-sanitized --output-on-failure -R linux-shell
