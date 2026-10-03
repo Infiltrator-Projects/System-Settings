@@ -139,8 +139,7 @@ void ss_linux_theme_install(void)
         ".nav-row:selected .nav-primary, .nav-row:selected .nav-secondary { color: %s; }\n"
         ".nav-row:disabled { opacity: 0.42; }\n"
         ".nav-icon-well { min-width: 38px; min-height: 38px; border-radius: 11px; padding: 5px; background: %s; border: 1px solid %s; }\n"
-        ".nav-gold .nav-icon-well image { color: %s; }\n"
-        ".nav-cyan .nav-icon-well image { color: %s; }\n"
+        ".nav-icon-well image { color: %s; }\n"
         ".nav-primary { color: %s; font-size: 14px; font-weight: %u; }\n"
         ".nav-secondary { color: %s; font-size: 11px; }\n"
         ".sidebar-footer { border-top: 1px solid %s; padding-top: 12px; margin: 10px 8px 0 8px; }\n"
@@ -162,8 +161,7 @@ void ss_linux_theme_install(void)
         muted, (unsigned int)type->ui_bold_weight,
         surface_hover,
         selected, accent, accent_foreground,
-        surface, border,
-        accent, accent,
+        surface, border, accent,
         text, (unsigned int)type->ui_bold_weight,
         muted,
         border,

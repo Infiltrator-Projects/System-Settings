@@ -147,6 +147,9 @@ static gchar *presenter_format_date(
     const gint year = g_date_time_get_year(now);
     const gint month = g_date_time_get_month(now);
     const gint day = g_date_time_get_day_of_month(now);
+    const bool gregorian =
+        g_strcmp0(presenter->policy.calendar, "gregorian") == 0;
+    g_autofree gchar *formatted = NULL;
 
     if (presenter->cached_date_text != NULL &&
         presenter->cached_calendar_id != NULL &&
@@ -158,8 +161,22 @@ static gchar *presenter_format_date(
         return g_strdup(presenter->cached_date_text);
     }
 
-    g_autofree gchar *formatted = format_date_with_provider(
-        &presenter->policy, now, presenter->calendar_provider);
+    if (gregorian) {
+        formatted = g_date_time_format(now, "%A, %e %B %Y");
+    } else {
+        const InfiltratrTemporalCalendarInfo *calendar =
+            infiltratr_temporal_calendar_find(presenter->policy.calendar);
+        formatted = ss_calendar_preview_provider_format_date(
+            presenter->calendar_provider,
+            presenter->policy.calendar,
+            year, month, day);
+        if (formatted == NULL) {
+            return calendar != NULL
+                ? g_strdup_printf(
+                      "%s — preview unavailable", calendar->name)
+                : NULL;
+        }
+    }
     if (formatted == NULL) {
         return NULL;
     }

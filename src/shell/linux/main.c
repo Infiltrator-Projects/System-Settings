@@ -295,8 +295,7 @@ static GtkWidget *make_external_navigation_row(const char *icon_name,
                                                const char *subtitle,
                                                const char *search_text,
                                                const char *program,
-                                               const char *argument,
-                                               const char *accent_class)
+                                               const char *argument)
 {
     GtkWidget *row = make_navigation_row(
         icon_name,
@@ -307,9 +306,6 @@ static GtkWidget *make_external_navigation_row(const char *icon_name,
     g_autofree gchar *path =
         find_trusted_system_program(program);
 
-    if (accent_class != NULL) {
-        gtk_widget_add_css_class(row, accent_class);
-    }
     g_object_set_data_full(
         G_OBJECT(row),
         "action-program",
@@ -336,7 +332,6 @@ static GtkWidget *make_about_navigation_row(void)
         "System information",
         NULL,
         "about system information version");
-    gtk_widget_add_css_class(row, "nav-cyan");
     g_object_set_data(
         G_OBJECT(row),
         "action-about",
@@ -608,24 +603,19 @@ static GtkWidget *build_sidebar(GtkWindow *parent,
         "Overview & quick access",
         "home",
         "home overview quick access system");
-    gtk_widget_add_css_class(home_row, "nav-gold");
-
     date_row = make_navigation_row(
         "preferences-system-time-symbolic",
         "Date & Time",
         "Clock, calendar & location",
         "date-time",
         date_search);
-    gtk_widget_add_css_class(date_row, "nav-gold");
-
     region_row = make_external_navigation_row(
         "preferences-desktop-locale-symbolic",
         "Region & Language",
         "Language, formats & input",
         "region language locale formats input",
         "mintlocale",
-        NULL,
-        "nav-gold");
+        NULL);
 
     appearance_row = make_external_navigation_row(
         "preferences-desktop-theme-symbolic",
@@ -633,8 +623,7 @@ static GtkWidget *build_sidebar(GtkWindow *parent,
         "Cinnamon themes & desktop appearance",
         "appearance theme themes desktop cinnamon",
         "cinnamon-settings",
-        "themes",
-        "nav-gold");
+        "themes");
 
     sound_row = make_external_navigation_row(
         "audio-volume-high-symbolic",
@@ -642,8 +631,7 @@ static GtkWidget *build_sidebar(GtkWindow *parent,
         "Audio devices & volume",
         "sound audio devices volume speakers",
         "cinnamon-settings",
-        "sound",
-        "nav-gold");
+        "sound");
 
     network_row = make_external_navigation_row(
         "network-wired-symbolic",
@@ -651,8 +639,7 @@ static GtkWidget *build_sidebar(GtkWindow *parent,
         "Wi-Fi, wired & internet",
         "network wifi wireless ethernet internet",
         "cinnamon-settings",
-        "network",
-        "nav-cyan");
+        "network");
 
     bluetooth_row = make_external_navigation_row(
         "bluetooth-active-symbolic",
@@ -660,8 +647,7 @@ static GtkWidget *build_sidebar(GtkWindow *parent,
         "Devices & pairing",
         "bluetooth devices pairing",
         "blueman-manager",
-        NULL,
-        "nav-cyan");
+        NULL);
 
     power_row = make_external_navigation_row(
         "battery-good-symbolic",
@@ -669,8 +655,7 @@ static GtkWidget *build_sidebar(GtkWindow *parent,
         "Battery & power management",
         "power battery energy management",
         "cinnamon-settings",
-        "power",
-        "nav-gold");
+        "power");
 
     users_row = make_external_navigation_row(
         "system-users-symbolic",
@@ -678,8 +663,7 @@ static GtkWidget *build_sidebar(GtkWindow *parent,
         "Account settings & login",
         "users accounts login password",
         "cinnamon-settings",
-        "user",
-        "nav-gold");
+        "user");
 
     privacy_row = make_external_navigation_row(
         "security-high-symbolic",
@@ -687,8 +671,7 @@ static GtkWidget *build_sidebar(GtkWindow *parent,
         "Permissions & system security",
         "privacy security permissions",
         "cinnamon-settings",
-        "privacy",
-        "nav-gold");
+        "privacy");
 
     hardware_row = make_external_navigation_row(
         "computer-symbolic",
@@ -696,8 +679,7 @@ static GtkWidget *build_sidebar(GtkWindow *parent,
         "Hardware and operating-system details",
         "hardware system information operating system details",
         "cinnamon-settings",
-        "info",
-        "nav-gold");
+        "info");
 
     software_row = make_external_navigation_row(
         "system-software-install-symbolic",
@@ -705,8 +687,7 @@ static GtkWidget *build_sidebar(GtkWindow *parent,
         "Updates, drivers & repositories",
         "software updates drivers repositories packages",
         "infiltrator-software",
-        NULL,
-        "nav-gold");
+        NULL);
 
     about_row = make_about_navigation_row();
 

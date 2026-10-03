@@ -824,7 +824,8 @@ static gboolean refresh_preview(gpointer user_data)
     g_autoptr(GDateTime) now = g_date_time_new_now_local();
     char clock_text[160];
 
-    if (state == NULL || state->clock_preview == NULL || now == NULL) {
+    if (state == NULL || state->clock_preview == NULL ||
+        state->date_preview == NULL || now == NULL) {
         return G_SOURCE_CONTINUE;
     }
 
