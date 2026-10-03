@@ -1,0 +1,42 @@
+name: Temporary 0.4.52 forensic cleanup
+
+on:
+  push:
+    branches:
+      - hal/system-settings-forensic-0.4.52
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: Repair temporary script typo
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('tools/forensic_0_4_52.py')
+          s = p.read_text()
+          s = s.replace('"warning alias init")ntheme =', '"warning alias init")\ntheme =')
+          p.write_text(s)
+          PY
+      - name: Apply forensic cleanup
+        run: python3 tools/forensic_0_4_52.py
+      - name: Remove temporary automation
+        run: |
+          rm -f tools/forensic_0_4_52.py
+          rm -f .github/workflows/forensic-0.4.52.yml
+      - name: Commit product changes
+        run: |
+          git config user.name "HAL System Settings Maintenance"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "Release 0.4.52 - forensic responsiveness and UI cleanup"
+          git push origin HEAD:hal/system-settings-forensic-0.4.52
