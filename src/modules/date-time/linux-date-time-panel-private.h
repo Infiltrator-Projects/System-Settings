@@ -66,6 +66,11 @@ struct SsLinuxDateTimePanel {
     guint timezone_generation;
     guint ntp_generation;
     guint manual_time_generation;
+    gint preview_date_year;
+    gint preview_date_month;
+    gint preview_date_day;
+    gchar *preview_date_calendar;
+    bool preview_date_cache_valid;
     bool location_metadata_present;
     bool location_metadata_uncertain;
     bool location_follows_timezone_reference;

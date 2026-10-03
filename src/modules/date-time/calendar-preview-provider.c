@@ -22,7 +22,8 @@
 #define CALENDAR_RUNTIME_SONAME "libcalendar-plus.so.0"
 #define CALENDAR_RUNTIME_REALNAME "libcalendar-plus.so.0.0.0"
 #define CALENDAR_ID_CAPACITY 64U
-#define DISCOVERY_RETRY_USEC (5 * G_USEC_PER_SEC)
+#define DISCOVERY_RETRY_INITIAL_USEC (5 * G_USEC_PER_SEC)
+#define DISCOVERY_RETRY_MAX_USEC (60 * G_USEC_PER_SEC)
 
 #ifndef SYSTEM_SETTINGS_LIBRARY_ARCHITECTURE
 #define SYSTEM_SETTINGS_LIBRARY_ARCHITECTURE ""
@@ -62,6 +63,7 @@ struct SsCalendarPreviewProvider {
     bool discover_default_runtime;
     char *discovery_root_override;
     gint64 retry_after_monotonic_us;
+    gint64 retry_delay_us;
 };
 
 static void reset_bindings(SsCalendarPreviewProvider *provider)
@@ -278,12 +280,19 @@ static bool ensure_runtime(SsCalendarPreviewProvider *provider)
         return false;
     }
 
+    if (provider->retry_delay_us <= 0) {
+        provider->retry_delay_us = DISCOVERY_RETRY_INITIAL_USEC;
+    }
     provider->retry_after_monotonic_us =
-        now + DISCOVERY_RETRY_USEC;
+        now + provider->retry_delay_us;
     if (discover_runtime(provider)) {
         provider->retry_after_monotonic_us = 0;
+        provider->retry_delay_us = DISCOVERY_RETRY_INITIAL_USEC;
         return true;
     }
+    provider->retry_delay_us = MIN(
+        provider->retry_delay_us * 2,
+        (gint64)DISCOVERY_RETRY_MAX_USEC);
     return false;
 }
 
@@ -313,6 +322,7 @@ SsCalendarPreviewProvider *ss_calendar_preview_provider_new(void)
 
     provider->library = (InfiltratrDynlib)INFILTRATR_DYNLIB_INIT;
     provider->discover_default_runtime = true;
+    provider->retry_delay_us = DISCOVERY_RETRY_INITIAL_USEC;
     return provider;
 }
 
@@ -335,6 +345,7 @@ void ss_calendar_preview_provider_force_retry_for_test(
 {
     if (provider != NULL) {
         provider->retry_after_monotonic_us = 0;
+        provider->retry_delay_us = DISCOVERY_RETRY_INITIAL_USEC;
     }
 }
 

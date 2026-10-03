@@ -1,3 +1,12 @@
+## 0.4.52 — 2026-10-03
+
+- Forensically remove remaining UI residue from the 0.4.45–0.4.49 iteration cycle: delete dead cyan/gold quick-action classes, remove the obsolete Mercedes Grey appearance preview/asset, and use one trusted executable-resolution path for delegated actions.
+- Reduce live Date & Time allocation churn by sharing one `GDateTime` per preview tick and replacing the per-tick heap-allocated date cache key with explicit cached civil-day/calendar state.
+- Back off failed optional Calendar-runtime discovery exponentially to a 60-second ceiling instead of rescanning trusted library roots every five seconds on the GTK thread.
+- Bring Home and Date & Time geometry back onto the current Common design values (18 px panel radius, 12 px card radius, 10 px control radius, 20 px screen padding) and reserve Common warning gold for actual warning semantics instead of decorative accents.
+- Align the UI vision document with the canonical Infiltrator design contract: System/Day/Night follow Common semantic palettes and metrics, while product identity remains in genuine product assets rather than ad-hoc colour splits.
+- Re-verified that the pinned Common 1.19.38 commit `7070c5812b50821fd7580101cb2289a3184f6b2c` is the current `Infiltrator-Libraries` main head; no submodule movement is required.
+
 ## 0.4.51 — 2026-10-03
 
 - Compact the Date & Time page: prevent GtkSwitch controls from expanding into row-width sliders, keep Latitude/Longitude paired in a fixed two-column grid, use Common success green for LIVE state, and reduce excess card/control spacing.

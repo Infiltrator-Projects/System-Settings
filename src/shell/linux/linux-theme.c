@@ -90,7 +90,6 @@ void ss_linux_theme_install(void)
     gchar *fault;
     gchar *surface_hover;
     gchar *status_border;
-    gchar *warm;
 
     display = gdk_display_get_default();
     if (palette == NULL || metrics == NULL || type == NULL ||
@@ -116,7 +115,6 @@ void ss_linux_theme_install(void)
     fault = rgb_css(palette->fault_rgb);
     surface_hover = rgb_css(palette->surface_hover_rgb);
     status_border = rgb_css(palette->status_border_rgb);
-    warm = rgb_css(palette->warning_rgb);
 
     /*
      * The shell deliberately uses one restrained surface hierarchy:
@@ -190,12 +188,12 @@ void ss_linux_theme_install(void)
         css,
         ".settings-content { padding: 12px 16px 16px 16px; }\n"
         ".page-header { padding: 2px 2px 4px 2px; }\n"
-        ".page-icon { min-width: 54px; min-height: 54px; background: %s; border: 1px solid %s; border-radius: 15px; padding: 10px; }\n"
+        ".page-icon { min-width: 54px; min-height: 54px; background: %s; border: 1px solid %s; border-radius: 12px; padding: 10px; }\n"
         ".page-icon image { color: %s; }\n"
         ".page-eyebrow { color: %s; font-size: 10px; font-weight: %u; letter-spacing: 0.12em; }\n"
         ".page-title { color: %s; font-size: 32px; font-weight: %u; }\n"
         ".page-summary { color: %s; font-size: 13px; margin-bottom: 8px; }\n"
-        ".hero-card { background: %s; border: 1px solid %s; border-radius: 16px; padding: 16px 18px; box-shadow: none; }\n"
+        ".hero-card { background: %s; border: 1px solid %s; border-radius: 18px; padding: 16px 18px; box-shadow: none; }\n"
         ".hero-top { min-height: 76px; }\n"
         ".hero-live-column { min-width: 0; padding: 4px 10px 4px 0; }\n"
         ".hero-kicker { color: %s; font-size: 10px; font-weight: %u; letter-spacing: 0.11em; }\n"
@@ -205,7 +203,7 @@ void ss_linux_theme_install(void)
         ".hero-badge { background: %s; border: 1px solid %s; border-radius: 999px; padding: 6px 10px; }\n"
         ".hero-badge image, .hero-badge-label { color: %s; }\n"
         ".hero-badge-label { font-size: 10px; font-weight: %u; letter-spacing: 0.10em; }\n"
-        ".overview-panel { min-width: 250px; background: %s; border: 1px solid %s; border-radius: 14px; padding: 10px; }\n"
+        ".overview-panel { min-width: 250px; background: %s; border: 1px solid %s; border-radius: 12px; padding: 10px; }\n"
         ".overview-heading { color: %s; font-size: 10px; font-weight: %u; letter-spacing: 0.11em; margin-bottom: 3px; }\n"
         ".overview-item { background: %s; border: 1px solid %s; border-radius: 10px; padding: 7px 9px; min-height: 46px; }\n"
         ".overview-item:hover { background: %s; }\n"
@@ -214,7 +212,7 @@ void ss_linux_theme_install(void)
         ".overview-label, .overview-key { color: %s; font-size: 10px; }\n"
         ".overview-value, .overview-data { color: %s; font-size: 13px; font-weight: %u; }\n"
         ".overview-link-button { background: transparent; color: %s; border: 0; }\n"
-        ".settings-card { background: %s; border: 1px solid %s; border-top-width: 2px; border-radius: 14px; padding: 14px; box-shadow: none; }\n"
+        ".settings-card { background: %s; border: 1px solid %s; border-top-width: 2px; border-radius: 12px; padding: 14px; box-shadow: none; }\n"
         ".location-card { border-top-color: %s; }\n"
         ".presentation-card { border-top-color: %s; }\n"
         ".system-card { border-top-color: %s; }\n"
@@ -225,7 +223,7 @@ void ss_linux_theme_install(void)
         ".section-summary { color: %s; font-size: 11px; }\n"
         ".setting-row { border-radius: 10px; padding: 11px 12px; }\n"
         ".setting-row:hover { background: %s; }\n"
-        ".setting-tile { background: %s; border: 1px solid %s; border-radius: 11px; padding: 8px 10px; margin: 2px 0; }\n"
+        ".setting-tile { background: %s; border: 1px solid %s; border-radius: 10px; padding: 8px 10px; margin: 2px 0; }\n"
         ".setting-tile:hover { background: %s; border-color: %s; }\n"
         ".setting-tile-icon { min-width: 32px; min-height: 32px; background: %s; border: 1px solid %s; border-radius: 9px; padding: 5px; }\n"
         ".setting-tile-icon image { color: %s; }\n"
@@ -258,7 +256,7 @@ void ss_linux_theme_install(void)
         title, (unsigned int)type->ui_bold_weight,
         accent,
         card, border,
-        warm, accent, success,
+        accent, accent, success,
         border,
         surface, border, accent,
         title, (unsigned int)type->ui_bold_weight,
@@ -320,11 +318,11 @@ void ss_linux_theme_install(void)
 
     g_string_append_printf(
         css,
-        ".home-page { padding: 22px 26px 28px 26px; }\n"
-        ".home-hero { min-height: 270px; padding: 0; border: 0; border-radius: 20px; box-shadow: none; }\n"
+        ".home-page { padding: 20px; }\n"
+        ".home-hero { min-height: 270px; padding: 0; border: 0; border-radius: 18px; box-shadow: none; }\n"
         ".hero-scene { min-width: 190px; min-height: 270px; }\n"
-        ".hero-copy-overlay { min-width: 0; padding: 14px 18px; margin: 12px; border-radius: 15px; background: rgba(0,0,0,0.56); }\n"
-        ".hero-brand-overlay { margin: 14px; padding: 12px 14px; background: rgba(0,0,0,0.46); border: 1px solid %s; border-radius: 13px; box-shadow: none; }\n"
+        ".hero-copy-overlay { min-width: 0; padding: 14px 18px; margin: 12px; border-radius: 12px; background: rgba(0,0,0,0.56); }\n"
+        ".hero-brand-overlay { margin: 14px; padding: 12px 14px; background: rgba(0,0,0,0.46); border: 1px solid %s; border-radius: 12px; box-shadow: none; }\n"
         ".hero-brand-overlay image { color: %s; }\n"
         ".home-hero-eyebrow { color: %s; font-size: 10px; font-weight: %u; letter-spacing: 0.12em; }\n"
         ".home-hero-title { color: %s; font-size: 34px; font-weight: %u; }\n"
@@ -339,13 +337,13 @@ void ss_linux_theme_install(void)
         ".home-feature image { color: %s; }\n"
         ".home-feature-title { color: %s; font-weight: %u; }\n"
         ".home-feature-copy { color: %s; font-size: 10px; }\n"
-        ".home-card, .status-card { background: %s; border: 1px solid %s; border-radius: 17px; padding: 16px 17px; box-shadow: none; }\n"
+        ".home-card, .status-card { background: %s; border: 1px solid %s; border-radius: 12px; padding: 16px; box-shadow: none; }\n"
         ".home-card:hover, .status-card:hover { border-color: %s; }\n"
         ".home-card-title { color: %s; font-size: 18px; font-weight: %u; }\n"
         ".home-card-icon, .status-card-icon, .location-pin-well { background: %s; border: 1px solid %s; border-radius: 12px; padding: 8px; }\n"
         ".home-card-icon image, .status-card-icon image, .location-pin-well image { color: %s; }\n"
         ".quick-action-grid { margin-top: 2px; }\n"
-        ".quick-action { min-height: 68px; padding: 8px 10px; background: %s; border: 1px solid %s; border-radius: 13px; }\n"
+        ".quick-action { min-height: 68px; padding: 8px 10px; background: %s; border: 1px solid %s; border-radius: 10px; }\n"
         ".quick-action:hover { background: %s; border-color: %s; box-shadow: none; }\n"
         ".quick-action-icon { min-width: 42px; min-height: 42px; border-radius: 12px; padding: 6px; background: %s; border: 1px solid %s; box-shadow: none; }\n"
         ".quick-action-icon image { color: %s; }\n"
@@ -367,9 +365,9 @@ void ss_linux_theme_install(void)
         ".theme-preview-label { color: %s; font-size: 10px; }\n"
         ".asset-missing { background: transparent; border: 1px solid transparent; box-shadow: none; }\n",
         border, accent,
-        warm, (unsigned int)type->ui_bold_weight,
+        accent, (unsigned int)type->ui_bold_weight,
         title, (unsigned int)type->ui_bold_weight,
-        warm, (unsigned int)type->ui_bold_weight,
+        accent, (unsigned int)type->ui_bold_weight,
         muted,
         border, surface, accent,
         title, (unsigned int)type->ui_bold_weight,
@@ -389,7 +387,7 @@ void ss_linux_theme_install(void)
         accent,
         title, (unsigned int)type->ui_bold_weight,
         muted,
-        warm, accent, warm, success,
+        accent, accent, accent, success,
         accent, selected,
         border,
         muted);
@@ -435,7 +433,6 @@ void ss_linux_theme_install(void)
     g_free(fault);
     g_free(surface_hover);
     g_free(status_border);
-    g_free(warm);
 }
 
 static void on_system_theme_changed(
