@@ -423,10 +423,11 @@ guint ss_home_temporal_presenter_refresh_interval_ms(
 {
     /*
      * Seconds-enabled extended clocks can advance displayed units at rates
-     * other than one SI second. Sample at 250 ms so decimal, Internet and
-     * sidereal-style displays cannot skip visible units; seconds-disabled
-     * presentation remains at the low-cost 1 Hz cadence. Date conversion is
-     * cached independently, so the higher cadence only reformats live time.
+     * other than one SI second. A 500 ms sample cadence remains comfortably
+     * faster than the shortest displayed second in the supported catalogue
+     * (French decimal time is about 0.864 SI seconds) while halving Home's
+     * formatting/timer wakeups compared with the old 250 ms prototype rate.
+     * Date conversion is cached independently, so only live time is sampled.
      */
     if (presenter == NULL || !presenter->policy_valid ||
         !presenter->policy.show_seconds) {
@@ -437,5 +438,5 @@ guint ss_home_temporal_presenter_refresh_interval_ms(
         g_strcmp0(presenter->policy.clock_mode, "standard-24") == 0) {
         return 1000U;
     }
-    return 250U;
+    return 500U;
 }
