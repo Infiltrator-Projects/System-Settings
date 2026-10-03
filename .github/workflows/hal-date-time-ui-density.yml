@@ -1,0 +1,36 @@
+name: HAL Date Time UI density
+on:
+  push:
+    branches:
+      - hal/date-time-ui-density
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: github.event.head_commit.message == 'Run compact Date Time UI patch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: hal/date-time-ui-density
+          fetch-depth: 0
+      - name: Apply patch
+        shell: bash
+        run: python3 .github/hal_patch_date_time.py
+      - name: Verify patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'compact binary control' src/shell/linux/linux-ui-helpers.c
+          grep -q 'deterministic two-column grid' src/modules/date-time/linux-date-time-panel-ui.c
+          grep -q 'surface, success, success' src/shell/linux/linux-theme.c
+      - name: Commit product changes
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/hal_patch_date_time.py .github/workflows/hal-date-time-ui-density.yml
+          git config user.name 'Shannon Smith'
+          git config user.email 'infiltratr@yandex.com'
+          git add -A
+          git commit -m 'Compact and realign Date & Time UI'
+          git push origin HEAD:hal/date-time-ui-density
