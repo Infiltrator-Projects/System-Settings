@@ -256,9 +256,12 @@ int main(void)
         g_assert_true(
             adaptive_layout->appearance_previews ==
             GTK_FLOW_BOX(home_appearance_previews));
-        g_assert_cmpuint(home_layout_columns_for_width(900), ==, 1U);
+        g_assert_cmpuint(home_layout_columns_for_width(680), ==, 1U);
+        g_assert_cmpuint(home_layout_columns_for_width(900), ==, 2U);
         g_assert_cmpuint(home_layout_columns_for_width(1400), ==, 2U);
-        home_layout_apply_width(adaptive_layout, 1400);
+        g_assert_false(gtk_flow_box_get_homogeneous(
+            GTK_FLOW_BOX(home_status_grid_geometry)));
+        home_layout_apply_width(adaptive_layout, 900);
         {
             int request_width = 0;
             int request_height = 0;
@@ -278,7 +281,7 @@ int main(void)
         g_assert_cmpuint(
             gtk_flow_box_get_min_children_per_line(
                 GTK_FLOW_BOX(home_appearance_previews)), ==, 4U);
-        home_layout_apply_width(adaptive_layout, 900);
+        home_layout_apply_width(adaptive_layout, 680);
         while (g_main_context_iteration(NULL, FALSE)) {
         }
         {

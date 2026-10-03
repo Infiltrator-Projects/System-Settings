@@ -1,3 +1,23 @@
+## 0.4.59 — 2026-10-03
+
+- Restore the Home dashboard's intended use of horizontal space: Overview/Quick Actions and the four status cards return to two columns from 720 logical pixels instead of waiting for the overly conservative 1240 px breakpoint that left scaled desktops in a giant one-column layout.
+- Stop the four Home status cards from sharing one global homogeneous height. Date & Time and Region & Language now keep row-local natural height instead of inheriting the tallest card's vertical allocation and producing large empty panels.
+- Add shell regressions for the 720 px desktop breakpoint and for non-homogeneous status-card height so this wasted-space layout cannot silently return.
+
+## 0.4.58 — 2026-10-03
+
+- Restore the Software-standard 38 px surface-backed navigation icon wells after 0.4.57 incorrectly flattened them, while retaining the compact scrollbar and expanded Home hero spacing.
+
+## 0.4.57 — 2026-10-03
+
+- Replace the oversized page scrollbars with the compact InfiltratorOS treatment and give the Home hero enough internal/vertical room for its title, subtitle and feature row.
+- The attempted sidebar icon flattening in this release was corrected immediately in 0.4.58.
+
+## 0.4.56 — 2026-10-03
+
+- Defer decoding of the large Home artwork until after first paint so the shell becomes responsive before loading decorative assets.
+- Tighten ordinary setting-row spacing to Common control/compact metrics instead of treating every row as a full section.
+
 ## 0.4.55 — 2026-10-03
 
 - Standardise the visible InfiltratorOS shell with Software without flattening System Settings' graphical Home identity: both applications now share the same 58 px header treatment, 205 px navigation rail, 34 px search control and 16 px primary content gutter.

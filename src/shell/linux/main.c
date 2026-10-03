@@ -1464,7 +1464,7 @@ typedef struct {
  */
 static guint home_layout_columns_for_width(int width)
 {
-    return width >= 1240 ? 2U : 1U;
+    return width >= 720 ? 2U : 1U;
 }
 
 static void home_layout_apply_width(HomeAdaptiveLayout *layout, int width)
@@ -1861,7 +1861,8 @@ static GtkWidget *build_home_page(
     gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(status_grid), 2U);
     gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(status_grid), 12U);
     gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(status_grid), 12U);
-    gtk_flow_box_set_homogeneous(GTK_FLOW_BOX(status_grid), TRUE);
+    /* Keep separate status rows at their natural content height. */
+    gtk_flow_box_set_homogeneous(GTK_FLOW_BOX(status_grid), FALSE);
 
     date_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 9);
     gtk_widget_add_css_class(date_card, "status-card");
