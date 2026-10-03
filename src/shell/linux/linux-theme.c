@@ -56,9 +56,7 @@ void ss_linux_theme_install(void)
      * GtkCssProvider is display-global. Replacing an equivalent provider every
      * time a System Settings window is reopened invalidates the complete GTK
      * style tree while the previous window may still be finishing teardown.
-     * That old iterative behaviour was both wasted work and, under native
-     * LTO/PGO timing, could race widget finalisation. Only reinstall when the
-     * Common palette selection can actually change.
+     * Only reinstall when the Common palette selection can actually change.
      */
     if (common_theme_provider != NULL &&
         common_theme_state_valid &&
@@ -90,6 +88,11 @@ void ss_linux_theme_install(void)
     gchar *fault;
     gchar *surface_hover;
     gchar *status_border;
+    gchar *heading;
+    gchar *summary;
+    gchar *kicker;
+    gchar *detail_label;
+    gchar *note;
 
     display = gdk_display_get_default();
     if (palette == NULL || metrics == NULL || type == NULL ||
@@ -115,20 +118,20 @@ void ss_linux_theme_install(void)
     fault = rgb_css(palette->fault_rgb);
     surface_hover = rgb_css(palette->surface_hover_rgb);
     status_border = rgb_css(palette->status_border_rgb);
+    heading = rgb_css(palette->heading_rgb);
+    summary = rgb_css(palette->summary_rgb);
+    kicker = rgb_css(palette->kicker_rgb);
+    detail_label = rgb_css(palette->detail_label_rgb);
+    note = rgb_css(palette->note_rgb);
 
     /*
-     * The shell deliberately uses one restrained surface hierarchy:
-     * background -> navigation panel -> cards -> controls. Accent colour is
-     * reserved for selection, focus and primary actions rather than decorating
-     * every section independently.
+     * Common owns semantic colour, typography and geometry vocabulary. Product
+     * imagery remains local, but labels now use Common's heading/summary/
+     * kicker/detail/note roles instead of approximating them with generic text
+     * colours. This keeps System Settings visually aligned as Common evolves.
      */
     css = g_string_new(NULL);
 
-    /*
-     * One selector owner per component. Keep responsive/layout corrections in
-     * the same rule as their visual treatment so later patches cannot leave
-     * stale cascade layers underneath the current design.
-     */
     g_string_append_printf(
         css,
         "window { background: %s; color: %s; font-family: '%s', %s; font-weight: %u; }\n"
@@ -140,9 +143,9 @@ void ss_linux_theme_install(void)
         ".header-brand-title { color: %s; font-size: 20px; font-weight: %u; }\n"
         ".header-brand-subtitle { color: %s; font-size: 11px; }\n"
         ".header-end { margin-left: 10px; }\n"
-        ".settings-search { min-width: 180px; background: %s; color: %s; border: 1px solid %s; border-radius: 14px; padding: 8px 12px; }\n"
+        ".settings-search { min-width: 180px; background: %s; color: %s; border: 1px solid %s; border-radius: 10px; padding: 8px 12px; }\n"
         ".settings-search:focus { border-color: %s; }\n"
-        ".window-control { min-width: 30px; min-height: 30px; padding: 4px; background: transparent; border: 1px solid transparent; border-radius: 8px; }\n"
+        ".window-control { min-width: 30px; min-height: 30px; padding: 4px; background: transparent; border: 1px solid transparent; border-radius: 6px; }\n"
         ".window-control:hover { background: %s; border-color: %s; }\n"
         ".window-control-close:hover { background: %s; color: %s; }\n"
         ".settings-sidebar { background: %s; border-right: 1px solid %s; padding: 12px 9px; min-width: 195px; }\n"
@@ -154,7 +157,7 @@ void ss_linux_theme_install(void)
         ".nav-row:selected { background: %s; border-color: %s; box-shadow: none; }\n"
         ".nav-row:selected .nav-primary, .nav-row:selected .nav-secondary { color: %s; }\n"
         ".nav-row:disabled { opacity: 0.42; }\n"
-        ".nav-icon-well { min-width: 38px; min-height: 38px; border-radius: 11px; padding: 5px; background: %s; border: 1px solid %s; }\n"
+        ".nav-icon-well { min-width: 38px; min-height: 38px; border-radius: 10px; padding: 5px; background: %s; border: 1px solid %s; }\n"
         ".nav-icon-well image { color: %s; }\n"
         ".nav-primary { color: %s; font-size: 14px; font-weight: %u; }\n"
         ".nav-secondary { color: %s; font-size: 11px; }\n"
@@ -168,25 +171,25 @@ void ss_linux_theme_install(void)
         background,
         panel, border,
         card, border, accent,
-        title, (unsigned int)type->ui_bold_weight,
-        muted,
+        heading, (unsigned int)type->ui_bold_weight,
+        summary,
         input, text, status_border, accent,
         surface_hover, border,
         fault, accent_foreground,
         panel, border,
-        muted, (unsigned int)type->ui_bold_weight,
+        kicker, (unsigned int)type->ui_bold_weight,
         surface_hover,
         selected, accent, accent_foreground,
         surface, border, accent,
         text, (unsigned int)type->ui_bold_weight,
-        muted,
+        detail_label,
         border,
-        muted,
+        detail_label,
         subtle, accent);
 
     g_string_append_printf(
         css,
-        ".settings-content { padding: 12px 16px 16px 16px; }\n"
+        ".settings-content { padding: 16px; }\n"
         ".page-header { padding: 2px 2px 4px 2px; }\n"
         ".page-icon { min-width: 54px; min-height: 54px; background: %s; border: 1px solid %s; border-radius: 12px; padding: 10px; }\n"
         ".page-icon image { color: %s; }\n"
@@ -225,50 +228,50 @@ void ss_linux_theme_install(void)
         ".setting-row:hover { background: %s; }\n"
         ".setting-tile { background: %s; border: 1px solid %s; border-radius: 10px; padding: 8px 10px; margin: 2px 0; }\n"
         ".setting-tile:hover { background: %s; border-color: %s; }\n"
-        ".setting-tile-icon { min-width: 32px; min-height: 32px; background: %s; border: 1px solid %s; border-radius: 9px; padding: 5px; }\n"
+        ".setting-tile-icon { min-width: 32px; min-height: 32px; background: %s; border: 1px solid %s; border-radius: 10px; padding: 5px; }\n"
         ".setting-tile-icon image { color: %s; }\n"
         ".setting-label { color: %s; font-weight: %u; }\n"
         ".setting-description { color: %s; font-size: 11px; }\n"
         ".field-caption { color: %s; font-size: 10px; font-weight: %u; }\n"
         ".accent-note { color: %s; font-size: 11px; }\n"
-        ".info-strip { background: %s; border: 1px solid %s; border-radius: 9px; padding: 7px 9px; }\n"
+        ".info-strip { background: %s; border: 1px solid %s; border-radius: 10px; padding: 7px 9px; }\n"
         ".info-strip image { color: %s; }\n"
-        ".status-ok, .error, .page-status { border-radius: 9px; padding: 8px 10px; font-size: 11px; }\n"
+        ".status-ok, .error, .page-status { border-radius: 10px; padding: 8px 10px; font-size: 11px; }\n"
         ".status-ok { color: %s; background: %s; border: 1px solid %s; }\n"
         ".error { color: %s; background: %s; border: 1px solid %s; }\n",
         surface, border, accent,
-        accent, (unsigned int)type->ui_bold_weight,
-        title, (unsigned int)type->ui_bold_weight,
-        muted,
+        kicker, (unsigned int)type->ui_bold_weight,
+        heading, (unsigned int)type->ui_bold_weight,
+        summary,
         card, border,
-        accent, (unsigned int)type->ui_bold_weight,
-        title, (unsigned int)type->ui_bold_weight,
-        muted,
-        muted,
+        kicker, (unsigned int)type->ui_bold_weight,
+        heading, (unsigned int)type->ui_bold_weight,
+        summary,
+        note,
         surface, success, success,
         (unsigned int)type->ui_bold_weight,
         surface, border,
-        muted, (unsigned int)type->ui_bold_weight,
+        kicker, (unsigned int)type->ui_bold_weight,
         card, border,
         surface_hover,
         surface, border, accent,
-        muted,
-        title, (unsigned int)type->ui_bold_weight,
+        detail_label,
+        heading, (unsigned int)type->ui_bold_weight,
         accent,
         card, border,
         accent, accent, success,
         border,
         surface, border, accent,
-        title, (unsigned int)type->ui_bold_weight,
-        muted,
+        heading, (unsigned int)type->ui_bold_weight,
+        summary,
         surface_hover,
         surface, border,
         surface_hover, subtle,
         card, border, accent,
         text, (unsigned int)type->ui_bold_weight,
-        muted,
-        subtle, (unsigned int)type->ui_bold_weight,
-        accent,
+        detail_label,
+        detail_label, (unsigned int)type->ui_bold_weight,
+        note,
         surface, border, accent,
         success, surface, status_border,
         fault, surface, fault);
@@ -294,7 +297,7 @@ void ss_linux_theme_install(void)
         ".setting-switch:checked slider { background: %s; }\n"
         ".setting-switch:disabled { opacity: 0.50; }\n"
         ".location-results { background: %s; border: 1px solid %s; border-radius: 10px; }\n"
-        ".location-results row { border-radius: 9px; margin: 2px 4px; }\n"
+        ".location-results row { border-radius: 10px; margin: 2px 4px; }\n"
         ".location-result-row { padding: 9px 10px; }\n"
         ".location-result-row:hover { background: %s; }\n",
         (unsigned int)metrics->control_radius,
@@ -312,7 +315,7 @@ void ss_linux_theme_install(void)
         surface_hover, subtle,
         accent, accent,
         accent_hover, accent_hover,
-        title, accent_foreground,
+        heading, accent_foreground,
         card, border,
         surface_hover);
 
@@ -357,40 +360,40 @@ void ss_linux_theme_install(void)
         ".region-status-card { border-top: 2px solid %s; }\n"
         ".appearance-status-card { border-top: 2px solid %s; }\n"
         ".network-status-card { border-top: 2px solid %s; }\n"
-        ".overview-scene { min-width: 190px; min-height: 126px; border-radius: 13px; }\n"
+        ".overview-scene { min-width: 190px; min-height: 126px; border-radius: 12px; }\n"
         ".network-visual { min-height: 84px; border-radius: 12px; }\n"
         ".theme-preview { padding: 5px; border: 1px solid transparent; border-radius: 10px; }\n"
         ".theme-preview-selected { border-color: %s; background: %s; }\n"
-        ".theme-preview-window { border: 1px solid %s; border-radius: 8px; }\n"
+        ".theme-preview-window { border: 1px solid %s; border-radius: 6px; }\n"
         ".theme-preview-label { color: %s; font-size: 10px; }\n"
         ".asset-missing { background: transparent; border: 1px solid transparent; box-shadow: none; }\n",
         border, accent,
+        kicker, (unsigned int)type->ui_bold_weight,
+        heading, (unsigned int)type->ui_bold_weight,
         accent, (unsigned int)type->ui_bold_weight,
-        title, (unsigned int)type->ui_bold_weight,
-        accent, (unsigned int)type->ui_bold_weight,
-        muted,
+        summary,
         border, surface, accent,
-        title, (unsigned int)type->ui_bold_weight,
-        muted,
+        heading, (unsigned int)type->ui_bold_weight,
+        detail_label,
         surface, border, accent,
-        title, (unsigned int)type->ui_bold_weight,
-        muted,
+        heading, (unsigned int)type->ui_bold_weight,
+        detail_label,
         card, border,
         accent,
-        title, (unsigned int)type->ui_bold_weight,
+        heading, (unsigned int)type->ui_bold_weight,
         surface, border, accent,
         surface, border,
         surface_hover, accent,
         surface, border, accent,
-        title, (unsigned int)type->ui_bold_weight,
-        muted,
+        heading, (unsigned int)type->ui_bold_weight,
+        detail_label,
         accent,
-        title, (unsigned int)type->ui_bold_weight,
-        muted,
+        heading, (unsigned int)type->ui_bold_weight,
+        summary,
         accent, accent, accent, success,
         accent, selected,
         border,
-        muted);
+        detail_label);
 
     provider = gtk_css_provider_new();
 #if GTK_CHECK_VERSION(4, 12, 0)
@@ -433,6 +436,11 @@ void ss_linux_theme_install(void)
     g_free(fault);
     g_free(surface_hover);
     g_free(status_border);
+    g_free(heading);
+    g_free(summary);
+    g_free(kicker);
+    g_free(detail_label);
+    g_free(note);
 }
 
 static void on_system_theme_changed(
@@ -471,4 +479,3 @@ void ss_linux_theme_watch(void)
         NULL);
     common_theme_watch_installed = true;
 }
-
