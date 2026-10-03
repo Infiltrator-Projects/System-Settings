@@ -1,5 +1,7 @@
 ## 0.4.50 — 2026-10-03
 
+- Compact the Date & Time page: prevent GtkSwitch controls from expanding into row-width sliders, keep Latitude/Longitude paired in a fixed two-column grid, use Common success green for LIVE state, and reduce excess card/control spacing.
+
 - Forensically remove high-frequency refresh-all behaviour left by the iterative Home and Date & Time UI work: unchanged GTK labels are no longer rewritten, successful calendar formatting is cached by calendar/day, and static overview policy labels are no longer asserted on every 250 ms clock tick.
 - Stop Home resize feedback from repeatedly reapplying identical FlowBox constraints for every `notify::width`; adaptive geometry now changes only when the one/two-column breakpoint is actually crossed.
 - Keep fast extended-clock cadence intact so decimal/French and other non-SI clock displays remain accurate while moving the expensive static work off that cadence.
