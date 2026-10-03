@@ -155,10 +155,9 @@ void ss_linux_theme_install(void)
         ".nav-row { min-height: 50px; border: 1px solid transparent; border-radius: 12px; padding: 7px 9px; margin: 2px 4px; }\n"
         ".nav-row:hover { background: %s; }\n"
         ".nav-row:selected { background: %s; border-color: %s; box-shadow: none; }\n"
-        ".nav-row:selected .nav-primary { color: %s; }\n"
-        ".nav-row:selected .nav-secondary { color: %s; }\n"
+        ".nav-row:selected .nav-primary, .nav-row:selected .nav-secondary { color: %s; }\n"
         ".nav-row:disabled { opacity: 0.42; }\n"
-        ".nav-icon-well { min-width: 32px; min-height: 32px; border-radius: 0; padding: 0; background: transparent; border: 1px solid transparent; }\n"
+        ".nav-icon-well { min-width: 38px; min-height: 38px; border-radius: 10px; padding: 5px; background: %s; border: 1px solid %s; }\n"
         ".nav-icon-well image { color: %s; }\n"
         ".nav-row:selected .nav-icon-well image { color: %s; }\n"
         ".nav-primary { color: %s; font-size: 14px; font-weight: %u; }\n"
@@ -182,8 +181,8 @@ void ss_linux_theme_install(void)
         panel, border,
         kicker, (unsigned int)type->ui_bold_weight,
         surface_hover,
-        selected, accent, heading, summary,
-        accent, accent,
+        selected, accent, accent_foreground,
+        surface, border, accent, accent_foreground,
         text, (unsigned int)type->ui_bold_weight,
         detail_label,
         border,
