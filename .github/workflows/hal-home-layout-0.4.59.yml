@@ -23,69 +23,45 @@ jobs:
 
           main = Path('src/shell/linux/main.c')
           text = main.read_text()
-          old = '''/*
-          * The original Home design is a two-column desktop dashboard, but forcing
-          * those two columns into the widget's minimum size makes a scaled 1920x1080
-          * desktop impossible to fit. Keep the minimum request compact, then lock the
-          * two desktop rows together only once the actual Home viewport is wide enough
-          * to contain both cards without inflating the window.
-          */
-          static guint home_layout_columns_for_width(int width)
-          {
-              return width >= 1240 ? 2U : 1U;
-          }
-          '''
-          new = '''/*
-          * Home is a desktop dashboard first.  The earlier 1240 px breakpoint was far
-          * too conservative once desktop scaling and the navigation rail were applied:
-          * wide windows collapsed into one enormous column and every status card spent
-          * most of its area on empty background.  Keep two columns whenever two useful
-          * cards can actually fit; only collapse on genuinely narrow viewports.
-          */
-          static guint home_layout_columns_for_width(int width)
-          {
-              return width >= 720 ? 2U : 1U;
-          }
-          '''
-          if old not in text:
-              raise SystemExit('Home breakpoint block not found')
+          old = '    return width >= 1240 ? 2U : 1U;'
+          new = '    return width >= 720 ? 2U : 1U;'
+          if text.count(old) != 1:
+              raise SystemExit('Home breakpoint expression not found exactly once')
           text = text.replace(old, new, 1)
           old = '    gtk_flow_box_set_homogeneous(GTK_FLOW_BOX(status_grid), TRUE);\n'
-          new = '''    /*
-              * Do not make all four status cards the height of the tallest one.  That
-              * turns compact Date/Region content into giant empty panels.  FlowBox may
-              * still align cards within each row, but separate rows keep their natural
-              * content height.
-              */
-              gtk_flow_box_set_homogeneous(GTK_FLOW_BOX(status_grid), FALSE);
-          '''
-          if old not in text:
-              raise SystemExit('status grid homogeneous setting not found')
+          new = (
+              '    /* Keep separate status rows at their natural content height. */\n'
+              '    gtk_flow_box_set_homogeneous(GTK_FLOW_BOX(status_grid), FALSE);\n'
+          )
+          if text.count(old) != 1:
+              raise SystemExit('status grid homogeneous setting not found exactly once')
           text = text.replace(old, new, 1)
           main.write_text(text)
 
           test = Path('tests/linux-shell-test.c')
           text = test.read_text()
-          old = '''        g_assert_cmpuint(home_layout_columns_for_width(900), ==, 1U);
-                  g_assert_cmpuint(home_layout_columns_for_width(1400), ==, 2U);
-                  home_layout_apply_width(adaptive_layout, 1400);
-          '''
-          new = '''        g_assert_cmpuint(home_layout_columns_for_width(680), ==, 1U);
-                  g_assert_cmpuint(home_layout_columns_for_width(900), ==, 2U);
-                  g_assert_cmpuint(home_layout_columns_for_width(1400), ==, 2U);
-                  g_assert_false(gtk_flow_box_get_homogeneous(
-                      GTK_FLOW_BOX(home_status_grid_geometry)));
-                  home_layout_apply_width(adaptive_layout, 900);
-          '''
-          if old not in text:
-              raise SystemExit('wide layout test block not found')
+          old = '        g_assert_cmpuint(home_layout_columns_for_width(900), ==, 1U);\n'
+          new = (
+              '        g_assert_cmpuint(home_layout_columns_for_width(680), ==, 1U);\n'
+              '        g_assert_cmpuint(home_layout_columns_for_width(900), ==, 2U);\n'
+          )
+          if text.count(old) != 1:
+              raise SystemExit('layout breakpoint assertion not found exactly once')
           text = text.replace(old, new, 1)
-          marker = '        home_layout_apply_width(adaptive_layout, 900);\n'
-          first = text.find(marker)
-          second = text.find(marker, first + len(marker))
-          if first < 0 or second < 0:
-              raise SystemExit('compact layout call not found')
-          text = text[:second] + '        home_layout_apply_width(adaptive_layout, 680);\n' + text[second + len(marker):]
+          old = '        home_layout_apply_width(adaptive_layout, 1400);\n'
+          new = (
+              '        g_assert_false(gtk_flow_box_get_homogeneous(\n'
+              '            GTK_FLOW_BOX(home_status_grid_geometry)));\n'
+              '        home_layout_apply_width(adaptive_layout, 900);\n'
+          )
+          if text.count(old) != 1:
+              raise SystemExit('wide layout apply call not found exactly once')
+          text = text.replace(old, new, 1)
+          old = '        home_layout_apply_width(adaptive_layout, 900);\n        while (g_main_context_iteration(NULL, FALSE)) {\n'
+          new = '        home_layout_apply_width(adaptive_layout, 680);\n        while (g_main_context_iteration(NULL, FALSE)) {\n'
+          if text.count(old) != 1:
+              raise SystemExit('compact layout apply call not found exactly once')
+          text = text.replace(old, new, 1)
           test.write_text(text)
 
           version = Path('VERSION')
