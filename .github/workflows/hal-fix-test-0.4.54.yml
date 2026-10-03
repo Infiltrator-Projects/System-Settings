@@ -1,0 +1,57 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: HAL fix lazy-panel regression test
+
+on:
+  push:
+    branches: ["hal/system-settings-forensic-0.4.54-clean"]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: hal/system-settings-forensic-0.4.54-clean
+          fetch-depth: 0
+          submodules: false
+      - shell: bash
+        run: |
+          set -euo pipefail
+          if grep -q 'ensure_date_time_panel(runtime_search_state);' tests/linux-shell-test.c; then
+            exit 0
+          fi
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('tests/linux-shell-test.c')
+          t = p.read_text()
+          old = '''        gtk_list_box_select_row(
+              runtime_search_state->list,
+              runtime_search_state->date_row);
+          while (g_main_context_iteration(NULL, FALSE)) {
+          }
+          SsLinuxDateTimePanel *panel = g_object_get_data('''
+          new = '''        ensure_date_time_panel(runtime_search_state);
+          SsLinuxDateTimePanel *panel = g_object_get_data('''
+          if t.count(old) != 1:
+              raise SystemExit('lazy construction block mismatch')
+          t = t.replace(old, new, 1)
+          old = '''        gtk_list_box_select_row(
+              navigation, runtime_search_state->home_row);
+          while (g_main_context_iteration(NULL, FALSE)) {
+          }
+          if (i == 0) {'''
+          new = '''        if (i == 0) {'''
+          if t.count(old) != 1:
+              raise SystemExit('redundant home-selection block mismatch')
+          t = t.replace(old, new, 1)
+          p.write_text(t)
+          PY
+          git diff --check
+          git config user.name "Shannon Smith"
+          git config user.email "infiltratr@yandex.com"
+          git add tests/linux-shell-test.c
+          git commit -m "Make lazy Date and Time shell regression deterministic"
+          git push origin HEAD:hal/system-settings-forensic-0.4.54-clean
