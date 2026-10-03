@@ -1,0 +1,28 @@
+name: HAL 0.4.50 native lifetime fix
+
+on:
+  push:
+    branches:
+      - "hal/0.4.50-native-lifetime-diagnostic"
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: "hal/0.4.50-native-lifetime-diagnostic"
+          fetch-depth: 0
+      - name: Apply bounded lifecycle fix
+        run: python3 .github/hal-0.4.50-native-lifetime-fix.py
+      - name: Commit lifecycle fix
+        run: |
+          git config user.name "Shannon Smith"
+          git config user.email "infiltratr@yandex.com"
+          git add -A
+          git diff --check --cached
+          git commit -m "Avoid redundant display-global theme replacement"
+          git push origin HEAD:hal/0.4.50-native-lifetime-diagnostic
