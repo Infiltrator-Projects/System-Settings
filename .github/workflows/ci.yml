@@ -12,66 +12,9 @@ permissions:
   actions: read
 
 jobs:
-  runner-routing:
-    name: Runner routing
-    runs-on: ubuntu-24.04
-    outputs:
-      bigbedroom_online: ${{ steps.route.outputs.bigbedroom_online }}
-    steps:
-      - name: Prefer an online trusted BigBedroom runner
-        id: route
-        env:
-          GH_TOKEN: ${{ github.token }}
-          EVENT_NAME: ${{ github.event_name }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          online=false
-          if [[ "$EVENT_NAME" != "pull_request" ]]; then
-            if gh api "repos/${{ github.repository }}/actions/runners" \
-              --jq '[.runners[] | select(.status == "online" and .busy == false) | .labels[].name] | any(. == "bigbedroom")' |
-              grep -qx true; then
-              online=true
-            fi
-          fi
-          echo "bigbedroom_online=$online" >> "$GITHUB_OUTPUT"
-
-  bigbedroom-capability:
-    name: BigBedroom capability probe
-    needs: [runner-routing]
-    if: ${{ needs.runner-routing.outputs.bigbedroom_online == 'true' }}
-    runs-on: bigbedroom
-    timeout-minutes: 5
-    outputs:
-      ready: ${{ steps.probe.outputs.ready }}
-    steps:
-      - name: Probe build prerequisites without modifying the runner
-        id: probe
-        shell: bash
-        run: |
-          set -u
-          ready=true
-          for command_name in tar cmake ctest cc pkg-config dpkg-deb git readelf sha256sum xvfb-run dbus-daemon; do
-            if ! command -v "$command_name" >/dev/null 2>&1; then
-              echo "Missing BigBedroom command: $command_name"
-              ready=false
-            fi
-          done
-          if ! pkg-config --exists gtk4 2>/dev/null; then
-            echo "BigBedroom is missing gtk4 development metadata."
-            ready=false
-          fi
-          if ! pkg-config --exists geocode-glib-2.0 2>/dev/null; then
-            echo "BigBedroom is missing geocode-glib-2.0 development metadata."
-            ready=false
-          fi
-          echo "ready=$ready" >> "$GITHUB_OUTPUT"
-
   linux:
     name: Linux build, test and package
-    needs: [runner-routing, bigbedroom-capability]
-    if: ${{ always() && !cancelled() }}
-    runs-on: ${{ needs.bigbedroom-capability.outputs.ready == 'true' && 'bigbedroom' || 'ubuntu-24.04' }}
+    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-24.04"]' || '["self-hosted","Linux","X64","linux-native"]') }}
     timeout-minutes: 30
     env:
       PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -119,11 +62,11 @@ jobs:
           cpack -G DEB
           deb="$(find . -maxdepth 1 -type f -name 'infiltrator-system-settings_*.deb' -print -quit)"
           test -n "$deb"
-          cp "$deb" /tmp/system-settings-first.deb
+          cp "$deb" $RUNNER_TEMP/system-settings-first.deb
           rm -f "$deb"
           cpack -G DEB
           deb="$(find . -maxdepth 1 -type f -name 'infiltrator-system-settings_*.deb' -print -quit)"
-          cmp /tmp/system-settings-first.deb "$deb"
+          cmp $RUNNER_TEMP/system-settings-first.deb "$deb"
 
       - name: Validate reproducible native release assets
         run: |
@@ -182,8 +125,11 @@ jobs:
 
   windows:
     name: Windows build and test
-    runs-on: windows-latest
+    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["windows-latest"]' || '["self-hosted","Windows","ARM64"]') }}
     timeout-minutes: 30
+    defaults:
+      run:
+        shell: powershell
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -193,7 +139,7 @@ jobs:
         run: cmake -S . -B build -DBUILD_TESTING=ON -DSYSTEM_SETTINGS_WARNINGS_AS_ERRORS=ON
 
       - name: Build
-        shell: pwsh
+        shell: powershell
         run: |
           $jobs = [Math]::Max([Environment]::ProcessorCount - 1, 1)
           cmake --build build --config Release --parallel $jobs
@@ -203,9 +149,7 @@ jobs:
 
   sanitizers:
     name: Linux ASan and UBSan
-    needs: [runner-routing, bigbedroom-capability]
-    if: ${{ always() && !cancelled() }}
-    runs-on: ${{ needs.bigbedroom-capability.outputs.ready == 'true' && 'bigbedroom' || 'ubuntu-24.04' }}
+    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-24.04"]' || '["self-hosted","Linux","X64","linux-native"]') }}
     timeout-minutes: 30
     env:
       PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -254,3 +198,4 @@ jobs:
           LSAN_OPTIONS: suppressions=${{ github.workspace }}/tests/lsan.supp:print_suppressions=1
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
         run: ctest --test-dir build-sanitized --output-on-failure -R linux-shell
+
