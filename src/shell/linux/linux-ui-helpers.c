@@ -3,14 +3,29 @@
 
 #include <infiltratr/design.h>
 
+static const InfiltratrDesignMetrics *ui_metrics(void)
+{
+    return infiltratr_design_metrics();
+}
+
+static int compact_spacing(void)
+{
+    const InfiltratrDesignMetrics *metrics = ui_metrics();
+    return metrics != NULL ? (int)metrics->compact_spacing : 6;
+}
+
+static int control_spacing(void)
+{
+    const InfiltratrDesignMetrics *metrics = ui_metrics();
+    return metrics != NULL ? (int)metrics->control_spacing : 10;
+}
+
 static GtkWidget *make_setting_identity(const char *title,
                                         const char *description)
 {
-    const InfiltratrDesignMetrics *metrics =
-        infiltratr_design_metrics();
     GtkWidget *box = gtk_box_new(
         GTK_ORIENTATION_VERTICAL,
-        metrics != NULL ? (int)metrics->compact_spacing : 6);
+        compact_spacing());
     GtkWidget *heading =
         ss_linux_ui_make_label(title, "setting-label");
     GtkWidget *copy =
@@ -41,16 +56,21 @@ GtkWidget *ss_linux_ui_make_setting_row(const char *title,
                                         GtkWidget *control)
 {
     GtkWidget *row;
-    const InfiltratrDesignMetrics *metrics =
-        infiltratr_design_metrics();
 
     if (control == NULL) {
         return NULL;
     }
 
+    /*
+     * A setting row is one control group, not a section boundary. Earlier UI
+     * iterations used Common's section spacing here, which made every row feel
+     * unnecessarily loose compared with the rest of InfiltratorOS. Keep the
+     * section metric for section-to-section layout and use the canonical
+     * control spacing inside the row itself.
+     */
     row = gtk_box_new(
         GTK_ORIENTATION_HORIZONTAL,
-        metrics != NULL ? (int)metrics->section_spacing : 18);
+        control_spacing());
     gtk_widget_add_css_class(row, "setting-row");
     gtk_widget_set_hexpand(row, TRUE);
     gtk_box_append(
@@ -82,8 +102,6 @@ GtkWidget *ss_linux_ui_make_setting_tile(const char *icon_name,
     GtkWidget *tile;
     GtkWidget *icon_wrap;
     GtkWidget *icon;
-    const InfiltratrDesignMetrics *metrics =
-        infiltratr_design_metrics();
 
     if (control == NULL) {
         return NULL;
@@ -91,7 +109,7 @@ GtkWidget *ss_linux_ui_make_setting_tile(const char *icon_name,
 
     tile = gtk_box_new(
         GTK_ORIENTATION_HORIZONTAL,
-        metrics != NULL ? (int)metrics->control_spacing : 10);
+        control_spacing());
     icon_wrap = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     icon = gtk_image_new_from_icon_name(icon_name);
 
