@@ -821,7 +821,6 @@ static gboolean refresh_preview(gpointer user_data)
 {
     SsLinuxDateTimePanel *state = user_data;
     const InfiltratrTemporalPolicyV3 *policy;
-    const InfiltratrTemporalCalendarInfo *calendar;
     g_autoptr(GDateTime) now = g_date_time_new_now_local();
     char clock_text[160];
 
@@ -834,17 +833,38 @@ static gboolean refresh_preview(gpointer user_data)
         return G_SOURCE_CONTINUE;
     }
 
-    if (format_preview(state, clock_text, sizeof(clock_text))) {
+    if (format_preview(state, clock_text, sizeof(clock_text)) &&
+        g_strcmp0(
+            gtk_label_get_text(GTK_LABEL(state->clock_preview)),
+            clock_text) != 0) {
         gtk_label_set_text(GTK_LABEL(state->clock_preview), clock_text);
     }
-    update_overview_policy(state);
 
-    calendar = infiltratr_temporal_calendar_find(policy->calendar);
-    {
+    /*
+     * Extended clocks can legitimately require a 250 ms timer, but the
+     * calendar and overview policy do not. Older iterations rebuilt the same
+     * date, called into Calendar and rewrote static labels on every clock tick.
+     * Cache successful date formatting by civil day/calendar and leave overview
+     * policy refreshes on their existing policy/settings change paths.
+     */
+    const gint year = g_date_time_get_year(now);
+    const gint month = g_date_time_get_month(now);
+    const gint day = g_date_time_get_day_of_month(now);
+    g_autofree gchar *date_key = g_strdup_printf(
+        "%04d-%02d-%02d|%s",
+        year, month, day, policy->calendar);
+    const char *cached_key = g_object_get_data(
+        G_OBJECT(state->date_preview),
+        "system-settings-preview-date-key");
+
+    if (g_strcmp0(cached_key, date_key) != 0) {
+        const InfiltratrTemporalCalendarInfo *calendar =
+            infiltratr_temporal_calendar_find(policy->calendar);
         g_autofree gchar *gregorian =
             g_date_time_format(now, "%A, %e %B %Y");
         g_autofree gchar *selected_date = NULL;
         g_autofree gchar *summary = NULL;
+        bool cacheable = false;
 
         if (calendar != NULL) {
             if (strcmp(policy->calendar, "gregorian") == 0) {
@@ -852,19 +872,21 @@ static gboolean refresh_preview(gpointer user_data)
                     "%s • %s",
                     calendar->name,
                     gregorian != NULL ? gregorian : "");
+                cacheable = true;
             } else {
                 selected_date =
                     ss_calendar_preview_provider_format_date(
                         ensure_calendar_preview_provider(state),
                         policy->calendar,
-                        g_date_time_get_year(now),
-                        g_date_time_get_month(now),
-                        g_date_time_get_day_of_month(now));
+                        year,
+                        month,
+                        day);
                 if (selected_date != NULL) {
                     summary = g_strdup_printf(
                         "%s • %s",
                         calendar->name,
                         selected_date);
+                    cacheable = true;
                 } else {
                     summary = g_strdup_printf(
                         "%s • preview unavailable",
@@ -872,9 +894,19 @@ static gboolean refresh_preview(gpointer user_data)
                 }
             }
         }
-        if (summary != NULL) {
-            gtk_label_set_text(
-                GTK_LABEL(state->date_preview), summary);
+
+        if (summary != NULL &&
+            g_strcmp0(
+                gtk_label_get_text(GTK_LABEL(state->date_preview)),
+                summary) != 0) {
+            gtk_label_set_text(GTK_LABEL(state->date_preview), summary);
+        }
+        if (cacheable) {
+            g_object_set_data_full(
+                G_OBJECT(state->date_preview),
+                "system-settings-preview-date-key",
+                g_strdup(date_key),
+                g_free);
         }
     }
 

@@ -163,7 +163,7 @@ void ss_linux_theme_install(void)
         surface_hover,
         selected, accent, accent_foreground,
         surface, border,
-        warm, accent,
+        accent, accent,
         text, (unsigned int)type->ui_bold_weight,
         muted,
         border,
@@ -179,7 +179,7 @@ void ss_linux_theme_install(void)
         ".page-eyebrow { color: %s; font-size: 10px; font-weight: %u; letter-spacing: 0.12em; }\n"
         ".page-title { color: %s; font-size: 36px; font-weight: %u; }\n"
         ".page-summary { color: %s; font-size: 13px; margin-bottom: 8px; }\n"
-        ".hero-card { background: %s; border: 1px solid %s; border-radius: 20px; padding: 26px 28px; box-shadow: 0 6px 18px rgba(0,0,0,0.22); }\n"
+        ".hero-card { background: %s; border: 1px solid %s; border-radius: 20px; padding: 26px 28px; box-shadow: none; }\n"
         ".hero-top { min-height: 94px; }\n"
         ".hero-live-column { min-width: 0; padding: 4px 10px 4px 0; }\n"
         ".hero-kicker { color: %s; font-size: 10px; font-weight: %u; letter-spacing: 0.11em; }\n"

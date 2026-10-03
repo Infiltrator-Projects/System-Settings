@@ -851,6 +851,16 @@ typedef struct {
     gulong network_connectivity_id;
 } HomeStatusTicker;
 
+static void label_set_text_if_changed(GtkLabel *label, const char *text)
+{
+    const char *next = text != NULL ? text : "";
+
+    if (label != NULL &&
+        g_strcmp0(gtk_label_get_text(label), next) != 0) {
+        gtk_label_set_text(label, next);
+    }
+}
+
 static gboolean refresh_home_temporal(gpointer user_data)
 {
     HomeTemporalTicker *ticker = user_data;
@@ -867,9 +877,10 @@ static gboolean refresh_home_temporal(gpointer user_data)
     if (ticker->presenter != NULL &&
         ss_home_temporal_presenter_format_now(
             ticker->presenter, &temporal)) {
-        gtk_label_set_text(ticker->clock, temporal.clock_text);
-        gtk_label_set_text(ticker->date, temporal.date_text);
-        gtk_label_set_text(ticker->system_time, temporal.system_time_text);
+        label_set_text_if_changed(ticker->clock, temporal.clock_text);
+        label_set_text_if_changed(ticker->date, temporal.date_text);
+        label_set_text_if_changed(
+            ticker->system_time, temporal.system_time_text);
     }
     ss_home_temporal_presentation_clear(&temporal);
 
@@ -1268,53 +1279,42 @@ static gboolean refresh_home_status(gpointer user_data)
         ? ticker->network
         : g_network_monitor_get_default();
     uptime = format_uptime();
-    if (ticker->uptime != NULL) gtk_label_set_text(ticker->uptime, uptime);
-    if (ticker->date_timezone != NULL && local_zone != NULL) {
-        gtk_label_set_text(
+    label_set_text_if_changed(ticker->uptime, uptime);
+    if (local_zone != NULL) {
+        label_set_text_if_changed(
             ticker->date_timezone,
             g_time_zone_get_identifier(local_zone));
     }
-    if (ticker->region_value != NULL) {
-        gtk_label_set_text(ticker->region_value, format_locale);
-    }
+    label_set_text_if_changed(ticker->region_value, format_locale);
     region_detail = g_strdup_printf(
         "Date/time format locale • %s • Interface language • %s",
         format_locale,
         language_name);
-    if (ticker->region_detail != NULL) {
-        gtk_label_set_text(ticker->region_detail, region_detail);
-    }
+    label_set_text_if_changed(ticker->region_detail, region_detail);
     if (settings != NULL) {
         g_object_get(settings,
             "gtk-theme-name", &theme_name,
             "gtk-application-prefer-dark-theme", &prefer_dark,
             NULL);
     }
-    if (ticker->appearance_value != NULL) {
-        gtk_label_set_text(
-            ticker->appearance_value,
-            theme_name != NULL ? theme_name : "System theme");
-    }
+    label_set_text_if_changed(
+        ticker->appearance_value,
+        theme_name != NULL ? theme_name : "System theme");
     appearance_detail = g_strdup_printf(
         "%s presentation", prefer_dark ? "Dark" : "Light");
-    if (ticker->appearance_detail != NULL) {
-        gtk_label_set_text(ticker->appearance_detail, appearance_detail);
-    }
+    label_set_text_if_changed(
+        ticker->appearance_detail, appearance_detail);
     if (network != NULL) {
         online = g_network_monitor_get_network_available(network);
         metered = g_network_monitor_get_network_metered(network);
         connectivity = g_network_monitor_get_connectivity(network);
     }
-    if (ticker->network_value != NULL) {
-        gtk_label_set_text(
-            ticker->network_value, online ? "Connected" : "Offline");
-    }
+    label_set_text_if_changed(
+        ticker->network_value, online ? "Connected" : "Offline");
     network_detail = g_strdup_printf(
         "%s%s", network_connectivity_text(connectivity),
         metered ? " • Metered" : "");
-    if (ticker->network_detail != NULL) {
-        gtk_label_set_text(ticker->network_detail, network_detail);
-    }
+    label_set_text_if_changed(ticker->network_detail, network_detail);
     g_free(theme_name);
     return G_SOURCE_CONTINUE;
 }
@@ -1428,6 +1428,7 @@ typedef struct {
     GtkFlowBox *primary_grid;
     GtkFlowBox *status_grid;
     GtkFlowBox *appearance_previews;
+    guint applied_columns;
 } HomeAdaptiveLayout;
 
 /*
@@ -1446,9 +1447,16 @@ static void home_layout_apply_width(HomeAdaptiveLayout *layout, int width)
 {
     const guint columns = home_layout_columns_for_width(width);
 
-    if (layout == NULL) {
+    if (layout == NULL || layout->applied_columns == columns) {
         return;
     }
+    /*
+     * notify::width can fire for every allocation step while a window is
+     * resized. Reapplying identical FlowBox constraints invalidates layout
+     * again, creating the resize feedback that made Home feel sticky. Only
+     * cross the adaptive contract when the actual column mode changes.
+     */
+    layout->applied_columns = columns;
     if (layout->hero != NULL) {
         /*
          * At compact widths the three feature tiles may occupy several rows.

@@ -1,3 +1,11 @@
+## 0.4.50 — 2026-10-03
+
+- Forensically remove high-frequency refresh-all behaviour left by the iterative Home and Date & Time UI work: unchanged GTK labels are no longer rewritten, successful calendar formatting is cached by calendar/day, and static overview policy labels are no longer asserted on every 250 ms clock tick.
+- Stop Home resize feedback from repeatedly reapplying identical FlowBox constraints for every `notify::width`; adaptive geometry now changes only when the one/two-column breakpoint is actually crossed.
+- Keep fast extended-clock cadence intact so decimal/French and other non-SI clock displays remain accurate while moving the expensive static work off that cadence.
+- Bring the shell closer to the restrained InfiltratorOS surface language by removing the leftover Date & Time hero drop shadow and using the Common neutral accent for both legacy navigation accent classes instead of preserving an old gold/cyan split.
+- Advance the pinned Common 1.19.38 source to current Common head `7070c5812b50821fd7580101cb2289a3184f6b2c`, including the latest portable-build and hosted-CI corrections.
+
 ## 0.4.49 — 2026-09-29
 
 - Make the location-concurrency regression deterministic in the native PGO validation path. Writer A now signals after durable publication while still holding the lock; Writer B signals immediately before contention; the parent releases A without scheduler-dependent sleeps. This removes the CI-only 250 ms lock-timeout race without weakening the production lock timeout.
