@@ -1,0 +1,68 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Standardise System Settings suite shell 0.4.55
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/standardise-suite-ui-0455.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.head_commit.message == 'Stage System Settings suite shell alignment'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+          submodules: false
+      - name: Align suite shell without flattening product identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/shell/linux/linux-theme.c')
+          text = path.read_text()
+          replacements = [
+              ('"headerbar, .shell-header { background: %s; border-bottom: 1px solid %s; min-height: 58px; }\\n"',
+               '"headerbar, .shell-header { background: %s; border-bottom: 1px solid %s; min-height: 58px; padding: 0 10px; }\\n"'),
+              ('".settings-search { min-width: 180px; background: %s; color: %s; border: 1px solid %s; border-radius: 10px; padding: 8px 12px; }\\n"',
+               '".settings-search { min-width: 180px; min-height: 34px; background: %s; color: %s; border: 1px solid %s; border-radius: 10px; padding: 8px 12px; }\\n"'),
+              ('".settings-sidebar { background: %s; border-right: 1px solid %s; padding: 12px 9px; min-width: 195px; }\\n"',
+               '".settings-sidebar { background: %s; border-right: 1px solid %s; padding: 12px 9px; min-width: 205px; }\\n"'),
+              ('".home-page { padding: 20px; }\\n"',
+               '".home-page { padding: 16px; }\\n"'),
+          ]
+          for old, new in replacements:
+              if old not in text:
+                  raise SystemExit(f'missing System Settings theme anchor: {old[:78]!r}')
+              text = text.replace(old, new, 1)
+          path.write_text(text)
+
+          version = Path('VERSION')
+          if version.read_text().strip() != '0.4.54':
+              raise SystemExit('unexpected System Settings source version')
+          version.write_text('0.4.55')
+
+          changelog = Path('CHANGELOG.md')
+          c = changelog.read_text()
+          entry = '''## 0.4.55 — 2026-10-03\n\n- Standardise the visible InfiltratorOS shell with Software without flattening System Settings' graphical Home identity: both applications now share the same 58 px header treatment, 205 px navigation rail, 34 px search control and 16 px primary content gutter.\n- Preserve the existing System Settings cinematic artwork, overlays, graphical cards, icon wells and product-specific Home composition; this release changes suite framing and rhythm rather than replacing either application's visual personality.\n- Retain the exact Common 1.19.38 pin `7070c5812b50821fd7580101cb2289a3184f6b2c`, matching Software's current shared foundation.\n\n'''
+          if c.startswith('## 0.4.55'):
+              raise SystemExit('0.4.55 changelog already exists')
+          changelog.write_text(entry + c)
+
+          Path('.github/workflows/standardise-suite-ui-0455.yml').unlink()
+          PY
+
+          git diff --check
+          git config user.name 'Shannon Smith'
+          git config user.email 'infiltratr@yandex.com'
+          git add -A
+          git commit -m 'Release 0.4.55: align suite shell geometry'
+          git push origin HEAD:main
