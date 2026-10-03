@@ -20,3 +20,4 @@ jobs:
       - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DSYSTEM_SETTINGS_BUILD_PROFILE=generic
       - run: cmake --build build --parallel 2
       - run: ctest --test-dir build --output-on-failure
+      # Temporary full Linux compile/test gate; removed before PR.
