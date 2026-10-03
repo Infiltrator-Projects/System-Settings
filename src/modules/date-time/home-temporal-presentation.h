@@ -35,10 +35,6 @@ bool ss_home_temporal_presentation_format(
     bool desktop_use_24h,
     SsHomeTemporalPresentation *out);
 
-/** Same pure-output ownership contract as ss_home_temporal_presentation_format(). */
-bool ss_home_temporal_presentation_now(
-    SsHomeTemporalPresentation *out);
-
 SsHomeTemporalPresenter *ss_home_temporal_presenter_new(void);
 void ss_home_temporal_presenter_free(
     SsHomeTemporalPresenter *presenter);

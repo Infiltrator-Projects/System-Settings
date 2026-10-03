@@ -192,13 +192,14 @@ Showing a clock-system name (for example, `Internet Time (@000 to @999)`) in
 the live-value position is not a preview, and labelling a Gregorian date as a
 selected non-Gregorian calendar is misleading.
 
-Common provides the exact generic conventional/decimal formatter. Calendar owns
-the specialised clock and chronology implementations. System Settings may
-consume Calendar's stable runtime ABI for previewing those modes, while
-remaining the authority for which mode/calendar is selected.
+Common provides the authoritative formatter for every supported clock mode,
+including the specialised historical and astronomical systems. Calendar remains
+the implementation owner of non-Gregorian chronology/date arithmetic, and System
+Settings may consume Calendar's stable date-format runtime ABI for those previews
+while remaining the authority for which clock/calendar is selected.
 
-If the provider is unavailable, the preview must say so explicitly rather than
-inventing an approximation.
+If the optional chronology provider is unavailable, the affected non-Gregorian
+date preview must say so explicitly rather than inventing an approximation.
 
 ## Calendar profiles
 

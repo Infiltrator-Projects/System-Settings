@@ -439,16 +439,3 @@ guint ss_home_temporal_presenter_refresh_interval_ms(
     }
     return 250U;
 }
-
-bool ss_home_temporal_presentation_now(
-    SsHomeTemporalPresentation *out)
-{
-    SsHomeTemporalPresenter *presenter;
-    bool ok;
-    if (out == NULL) return false;
-    presenter = ss_home_temporal_presenter_new();
-    if (presenter == NULL) return false;
-    ok = ss_home_temporal_presenter_format_now(presenter, out);
-    ss_home_temporal_presenter_free(presenter);
-    return ok;
-}

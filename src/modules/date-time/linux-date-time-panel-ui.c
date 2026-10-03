@@ -14,7 +14,26 @@
 #include "system-settings/native-clock-policy.h"
 #include "system-settings/regional-context.h"
 
+#include <infiltratr/design.h>
 #include <infiltratr/temporal.h>
+
+static int common_compact_spacing(void)
+{
+    const InfiltratrDesignMetrics *metrics = infiltratr_design_metrics();
+    return metrics != NULL ? (int)metrics->compact_spacing : 6;
+}
+
+static int common_control_spacing(void)
+{
+    const InfiltratrDesignMetrics *metrics = infiltratr_design_metrics();
+    return metrics != NULL ? (int)metrics->control_spacing : 10;
+}
+
+static int common_section_spacing(void)
+{
+    const InfiltratrDesignMetrics *metrics = infiltratr_design_metrics();
+    return metrics != NULL ? (int)metrics->section_spacing : 18;
+}
 
 static GtkStringList *clock_mode_strings(
     SsLinuxDateTimePanel *state)
@@ -104,10 +123,10 @@ static GtkWidget *make_section_heading(const char *icon_name,
                                        const char *title,
                                        const char *summary)
 {
-    GtkWidget *heading = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+    GtkWidget *heading = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, common_control_spacing());
     GtkWidget *icon_wrap = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     GtkWidget *icon = gtk_image_new_from_icon_name(icon_name);
-    GtkWidget *copy = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
+    GtkWidget *copy = gtk_box_new(GTK_ORIENTATION_VERTICAL, common_compact_spacing());
     GtkWidget *subtitle = ss_linux_ui_make_label(summary, "section-summary");
 
     gtk_widget_add_css_class(heading, "section-heading");
@@ -128,10 +147,10 @@ static GtkWidget *make_overview_item(const char *icon_name,
                                      const char *title,
                                      GtkWidget **value_out)
 {
-    GtkWidget *item = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+    GtkWidget *item = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, common_control_spacing());
     GtkWidget *icon_wrap = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     GtkWidget *icon = gtk_image_new_from_icon_name(icon_name);
-    GtkWidget *copy = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
+    GtkWidget *copy = gtk_box_new(GTK_ORIENTATION_VERTICAL, common_compact_spacing());
     GtkWidget *value = ss_linux_ui_make_label("—", "overview-value");
 
     gtk_widget_add_css_class(item, "overview-item");
@@ -156,7 +175,7 @@ static GtkWidget *make_overview_item(const char *icon_name,
 static GtkWidget *make_coordinate_field(const char *caption,
                                         GtkSpinButton *spin)
 {
-    GtkWidget *field = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
+    GtkWidget *field = gtk_box_new(GTK_ORIENTATION_VERTICAL, common_compact_spacing());
 
     gtk_box_append(
         GTK_BOX(field),
@@ -169,12 +188,12 @@ static GtkWidget *make_manual_setting_block(
     SsLinuxDateTimePanel *state,
     GtkWidget *controls)
 {
-    GtkWidget *block = gtk_box_new(GTK_ORIENTATION_VERTICAL, 7);
+    GtkWidget *block = gtk_box_new(GTK_ORIENTATION_VERTICAL, common_compact_spacing());
     GtkWidget *description = ss_linux_ui_make_label(
         "Available when Network time is off.",
         "setting-description");
 
-    GtkWidget *heading = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 10);
+    GtkWidget *heading = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, common_control_spacing());
     GtkWidget *icon_wrap = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     GtkWidget *icon = gtk_image_new_from_icon_name(
         "document-edit-symbolic");
@@ -197,29 +216,29 @@ static GtkWidget *make_manual_setting_block(
 
 GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
 {
-    GtkWidget *page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 18);
-    GtkWidget *page_header = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 14);
+    GtkWidget *page = gtk_box_new(GTK_ORIENTATION_VERTICAL, common_section_spacing());
+    GtkWidget *page_header = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, common_control_spacing());
     GtkWidget *page_icon_wrap = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     GtkWidget *page_icon = gtk_image_new_from_icon_name(
         "preferences-system-time-symbolic");
-    GtkWidget *page_copy = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
+    GtkWidget *page_copy = gtk_box_new(GTK_ORIENTATION_VERTICAL, common_compact_spacing());
     GtkWidget *summary = ss_linux_ui_make_label(
         "Clock, calendar, location and system time — live, visual and immediate.",
         "page-summary");
-    GtkWidget *hero_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
-    GtkWidget *hero_top = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 20);
-    GtkWidget *hero_copy = gtk_box_new(GTK_ORIENTATION_VERTICAL, 3);
-    GtkWidget *overview_panel = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
+    GtkWidget *hero_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, common_compact_spacing());
+    GtkWidget *hero_top = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, common_section_spacing());
+    GtkWidget *hero_copy = gtk_box_new(GTK_ORIENTATION_VERTICAL, common_compact_spacing());
+    GtkWidget *overview_panel = gtk_box_new(GTK_ORIENTATION_VERTICAL, common_compact_spacing());
     GtkWidget *overview_grid = gtk_grid_new();
-    GtkWidget *hero_badge = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 7);
+    GtkWidget *hero_badge = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, common_compact_spacing());
     GtkWidget *hero_badge_icon = gtk_image_new_from_icon_name(
         "media-playback-start-symbolic");
-    GtkWidget *location_strip = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+    GtkWidget *location_strip = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, common_compact_spacing());
     GtkWidget *location_strip_icon = gtk_image_new_from_icon_name(
         "mark-location-symbolic");
-    GtkWidget *location_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 12);
-    GtkWidget *presentation_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
-    GtkWidget *system_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 10);
+    GtkWidget *location_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, common_control_spacing());
+    GtkWidget *presentation_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, common_control_spacing());
+    GtkWidget *system_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, common_control_spacing());
     GtkWidget *lower = gtk_flow_box_new();
     GtkWidget *manual_box;
     GtkWidget *search_box;
@@ -273,8 +292,8 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         GTK_BOX(overview_panel),
         ss_linux_ui_make_label("CURRENT SYSTEM", "overview-heading"));
     gtk_widget_add_css_class(overview_grid, "overview-grid");
-    gtk_grid_set_row_spacing(GTK_GRID(overview_grid), 8);
-    gtk_grid_set_column_spacing(GTK_GRID(overview_grid), 8);
+    gtk_grid_set_row_spacing(GTK_GRID(overview_grid), (guint)common_compact_spacing());
+    gtk_grid_set_column_spacing(GTK_GRID(overview_grid), (guint)common_compact_spacing());
     gtk_grid_set_column_homogeneous(GTK_GRID(overview_grid), TRUE);
     gtk_grid_attach(
         GTK_GRID(overview_grid),
@@ -348,7 +367,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     gtk_box_append(GTK_BOX(location_strip), state->location_summary);
     gtk_box_append(GTK_BOX(location_card), location_strip);
 
-    search_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
+    search_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, common_control_spacing());
     state->location_search = GTK_ENTRY(gtk_entry_new());
     state->location_search_button =
         GTK_BUTTON(gtk_button_new_with_label("Search"));
@@ -436,7 +455,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
      * second line at ordinary desktop widths, visually separating the pair.
      * Keep them in a deterministic two-column grid instead. */
     coordinate_box = gtk_grid_new();
-    gtk_grid_set_column_spacing(GTK_GRID(coordinate_box), 10U);
+    gtk_grid_set_column_spacing(GTK_GRID(coordinate_box), (guint)common_control_spacing());
     gtk_widget_set_hexpand(coordinate_box, FALSE);
     GtkWidget *latitude_field =
         make_coordinate_field("LATITUDE", state->latitude);
@@ -462,8 +481,8 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         GTK_FLOW_BOX(lower), GTK_SELECTION_NONE);
     gtk_flow_box_set_min_children_per_line(GTK_FLOW_BOX(lower), 1U);
     gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(lower), 2U);
-    gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(lower), 12U);
-    gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(lower), 12U);
+    gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(lower), (guint)common_control_spacing());
+    gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(lower), (guint)common_control_spacing());
     gtk_flow_box_set_homogeneous(GTK_FLOW_BOX(lower), TRUE);
     gtk_widget_set_hexpand(lower, TRUE);
 
@@ -578,8 +597,8 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         GTK_FLOW_BOX(manual_box), 1U);
     gtk_flow_box_set_max_children_per_line(
         GTK_FLOW_BOX(manual_box), 3U);
-    gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(manual_box), 7U);
-    gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(manual_box), 7U);
+    gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(manual_box), (guint)common_compact_spacing());
+    gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(manual_box), (guint)common_compact_spacing());
     state->manual_date = GTK_ENTRY(gtk_entry_new());
     state->manual_time = GTK_ENTRY(gtk_entry_new());
     state->manual_set_time =

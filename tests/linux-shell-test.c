@@ -43,8 +43,16 @@ int main(void)
         g_object_ref(window);
         on_activate(app, NULL);
         g_assert_cmpuint(g_list_length(gtk_application_get_windows(app)), ==, 1U);
+        ShellSearchState *runtime_search_state = g_object_get_data(
+            G_OBJECT(window), "system-settings-search-state");
+        g_assert_nonnull(runtime_search_state);
+        g_assert_false(runtime_search_state->date_time_loaded);
+        g_assert_null(g_object_get_data(
+            G_OBJECT(window), "system-settings-date-time-panel"));
+        ensure_date_time_panel(runtime_search_state);
         SsLinuxDateTimePanel *panel = g_object_get_data(
             G_OBJECT(window), "system-settings-date-time-panel");
+        g_assert_true(runtime_search_state->date_time_loaded);
         g_assert_nonnull(panel);
         g_assert_nonnull(panel->policy_observer);
         /* Compact binary controls must never inherit row-width expansion. */
@@ -98,6 +106,15 @@ int main(void)
         GtkListBox *navigation = g_object_get_data(
             G_OBJECT(window), "system-settings-navigation-list");
         g_assert_true(GTK_IS_LIST_BOX(navigation));
+        g_assert_cmpuint(
+            gtk_stack_get_transition_duration(stack), ==, 110U);
+        if (i == 0) {
+            g_autofree gchar *trusted_shell =
+                find_trusted_system_program("sh");
+            g_assert_nonnull(trusted_shell);
+            g_assert_true(g_path_is_absolute(trusted_shell));
+            g_assert_null(find_trusted_system_program("../sh"));
+        }
         GtkWidget *header_end = g_object_get_data(
             G_OBJECT(window), "system-settings-header-end");
         GtkWidget *search = g_object_get_data(

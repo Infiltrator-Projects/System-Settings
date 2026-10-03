@@ -1,10 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "linux-ui-helpers.h"
 
+#include <infiltratr/design.h>
+
 static GtkWidget *make_setting_identity(const char *title,
                                         const char *description)
 {
-    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 3);
+    const InfiltratrDesignMetrics *metrics =
+        infiltratr_design_metrics();
+    GtkWidget *box = gtk_box_new(
+        GTK_ORIENTATION_VERTICAL,
+        metrics != NULL ? (int)metrics->compact_spacing : 6);
     GtkWidget *heading =
         ss_linux_ui_make_label(title, "setting-label");
     GtkWidget *copy =
@@ -35,12 +41,16 @@ GtkWidget *ss_linux_ui_make_setting_row(const char *title,
                                         GtkWidget *control)
 {
     GtkWidget *row;
+    const InfiltratrDesignMetrics *metrics =
+        infiltratr_design_metrics();
 
     if (control == NULL) {
         return NULL;
     }
 
-    row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 18);
+    row = gtk_box_new(
+        GTK_ORIENTATION_HORIZONTAL,
+        metrics != NULL ? (int)metrics->section_spacing : 18);
     gtk_widget_add_css_class(row, "setting-row");
     gtk_widget_set_hexpand(row, TRUE);
     gtk_box_append(
@@ -72,12 +82,16 @@ GtkWidget *ss_linux_ui_make_setting_tile(const char *icon_name,
     GtkWidget *tile;
     GtkWidget *icon_wrap;
     GtkWidget *icon;
+    const InfiltratrDesignMetrics *metrics =
+        infiltratr_design_metrics();
 
     if (control == NULL) {
         return NULL;
     }
 
-    tile = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 13);
+    tile = gtk_box_new(
+        GTK_ORIENTATION_HORIZONTAL,
+        metrics != NULL ? (int)metrics->control_spacing : 10);
     icon_wrap = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     icon = gtk_image_new_from_icon_name(icon_name);
 
