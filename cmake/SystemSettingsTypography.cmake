@@ -1,0 +1,59 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Strict first-party typography contract for the Linux System Settings shell.
+#
+# Common owns the immutable MB Corpo source identity and hashes. System Settings
+# intentionally adopts Common's strict no-fallback option: obtain those exact
+# three faces, verify them byte-for-byte, and package them with the application
+# so its typography never depends on another Infiltrator application being
+# installed first.
+
+include("${SYSTEM_SETTINGS_COMMON_DIR}/cmake/InfiltratrTypographyAssets.cmake")
+
+set(SYSTEM_SETTINGS_FONT_ARCHIVE
+    "${CMAKE_CURRENT_BINARY_DIR}/system-settings-mb-corpo-fonts.tar.xz")
+file(DOWNLOAD
+    "${INFILTRATR_MB_CORPO_ARCHIVE_URL}"
+    "${SYSTEM_SETTINGS_FONT_ARCHIVE}"
+    EXPECTED_HASH "SHA256=${INFILTRATR_MB_CORPO_ARCHIVE_SHA256}"
+    TLS_VERIFY ON
+    STATUS SYSTEM_SETTINGS_FONT_DOWNLOAD_STATUS)
+list(GET SYSTEM_SETTINGS_FONT_DOWNLOAD_STATUS 0 SYSTEM_SETTINGS_FONT_DOWNLOAD_CODE)
+if(NOT SYSTEM_SETTINGS_FONT_DOWNLOAD_CODE EQUAL 0)
+    list(GET SYSTEM_SETTINGS_FONT_DOWNLOAD_STATUS 1 SYSTEM_SETTINGS_FONT_DOWNLOAD_MESSAGE)
+    message(FATAL_ERROR
+        "Unable to obtain canonical System Settings font archive: "
+        "${SYSTEM_SETTINGS_FONT_DOWNLOAD_MESSAGE}")
+endif()
+
+set(SYSTEM_SETTINGS_FONT_DIR
+    "${CMAKE_CURRENT_BINARY_DIR}/system-settings-fonts")
+file(REMOVE_RECURSE "${SYSTEM_SETTINGS_FONT_DIR}")
+file(MAKE_DIRECTORY "${SYSTEM_SETTINGS_FONT_DIR}")
+file(ARCHIVE_EXTRACT
+    INPUT "${SYSTEM_SETTINGS_FONT_ARCHIVE}"
+    DESTINATION "${SYSTEM_SETTINGS_FONT_DIR}")
+
+set(SYSTEM_SETTINGS_FONT_FILES
+    "${SYSTEM_SETTINGS_FONT_DIR}/${INFILTRATR_MB_CORPO_BRAND_REGULAR_FILE}"
+    "${SYSTEM_SETTINGS_FONT_DIR}/${INFILTRATR_MB_CORPO_UI_BOLD_FILE}"
+    "${SYSTEM_SETTINGS_FONT_DIR}/${INFILTRATR_MB_CORPO_UI_REGULAR_FILE}")
+set(SYSTEM_SETTINGS_FONT_EXPECTED_SHA256
+    "${INFILTRATR_MB_CORPO_BRAND_REGULAR_SHA256}"
+    "${INFILTRATR_MB_CORPO_UI_BOLD_SHA256}"
+    "${INFILTRATR_MB_CORPO_UI_REGULAR_SHA256}")
+foreach(SYSTEM_SETTINGS_FONT_INDEX RANGE 0 2)
+    list(GET SYSTEM_SETTINGS_FONT_FILES
+        ${SYSTEM_SETTINGS_FONT_INDEX} SYSTEM_SETTINGS_FONT_FILE)
+    list(GET SYSTEM_SETTINGS_FONT_EXPECTED_SHA256
+        ${SYSTEM_SETTINGS_FONT_INDEX} SYSTEM_SETTINGS_FONT_SHA256_EXPECTED)
+    file(SHA256 "${SYSTEM_SETTINGS_FONT_FILE}"
+        SYSTEM_SETTINGS_FONT_SHA256_ACTUAL)
+    if(NOT SYSTEM_SETTINGS_FONT_SHA256_ACTUAL
+       STREQUAL SYSTEM_SETTINGS_FONT_SHA256_EXPECTED)
+        message(FATAL_ERROR
+            "System Settings font hash mismatch: ${SYSTEM_SETTINGS_FONT_FILE}")
+    endif()
+endforeach()
+
+install(FILES ${SYSTEM_SETTINGS_FONT_FILES}
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/fonts/truetype/infiltrator-system-settings")
