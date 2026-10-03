@@ -4,8 +4,9 @@
  * @brief Authoritative temporal formatting for the Home dashboard.
  *
  * Home uses a long-lived presenter so clock ticks never rediscover Calendar,
- * recreate GSettings, or reread policy storage. Policy-file and Cinnamon
- * changes invalidate cached state through native observers.
+ * recreate GSettings, reread policy storage, or reformat a calendar date that
+ * has not changed. Policy-file and Cinnamon changes invalidate cached state
+ * through native observers.
  */
 #include "home-temporal-presentation.h"
 #include "calendar-preview-provider.h"
@@ -29,6 +30,11 @@ struct SsHomeTemporalPresenter {
     guint policy_reload_retry_seconds;
     gchar *policy_path;
     SsCalendarPreviewProvider *calendar_provider;
+    gchar *cached_date_text;
+    gchar *cached_calendar_id;
+    gint cached_year;
+    gint cached_month;
+    gint cached_day;
 };
 
 static bool desktop_uses_24h_from_settings(GSettings *settings)
@@ -130,6 +136,69 @@ static bool format_into(
      * contents: callers may pass an ordinary uninitialised stack value.
      * Reusers clear their prior presentation before requesting a replacement.
      */
+    *out = candidate;
+    return true;
+}
+
+static gchar *presenter_format_date(
+    SsHomeTemporalPresenter *presenter,
+    GDateTime *now)
+{
+    const gint year = g_date_time_get_year(now);
+    const gint month = g_date_time_get_month(now);
+    const gint day = g_date_time_get_day_of_month(now);
+
+    if (presenter->cached_date_text != NULL &&
+        presenter->cached_calendar_id != NULL &&
+        presenter->cached_year == year &&
+        presenter->cached_month == month &&
+        presenter->cached_day == day &&
+        g_strcmp0(presenter->cached_calendar_id,
+                  presenter->policy.calendar) == 0) {
+        return g_strdup(presenter->cached_date_text);
+    }
+
+    g_autofree gchar *formatted = format_date_with_provider(
+        &presenter->policy, now, presenter->calendar_provider);
+    if (formatted == NULL) {
+        return NULL;
+    }
+
+    g_free(presenter->cached_date_text);
+    presenter->cached_date_text = g_strdup(formatted);
+    g_free(presenter->cached_calendar_id);
+    presenter->cached_calendar_id = g_strdup(presenter->policy.calendar);
+    presenter->cached_year = year;
+    presenter->cached_month = month;
+    presenter->cached_day = day;
+    return g_steal_pointer(&formatted);
+}
+
+static bool presenter_format_into(
+    SsHomeTemporalPresenter *presenter,
+    GDateTime *now,
+    SsHomeTemporalPresentation *out)
+{
+    SsHomeTemporalPresentation candidate = {0};
+
+    if (presenter == NULL || now == NULL || out == NULL ||
+        !presenter->policy_valid) {
+        return false;
+    }
+
+    candidate.clock_text = format_clock(
+        &presenter->policy, now, presenter->use_24h);
+    candidate.date_text = presenter_format_date(presenter, now);
+    if (candidate.clock_text == NULL || candidate.date_text == NULL) {
+        ss_home_temporal_presentation_clear(&candidate);
+        return false;
+    }
+    candidate.system_time_text = g_strdup_printf(
+        "%s  %s", candidate.date_text, candidate.clock_text);
+    if (candidate.system_time_text == NULL) {
+        ss_home_temporal_presentation_clear(&candidate);
+        return false;
+    }
     *out = candidate;
     return true;
 }
@@ -314,6 +383,8 @@ void ss_home_temporal_presenter_free(
     }
     g_clear_object(&presenter->settings);
     g_clear_pointer(&presenter->policy_path, g_free);
+    g_clear_pointer(&presenter->cached_date_text, g_free);
+    g_clear_pointer(&presenter->cached_calendar_id, g_free);
     ss_calendar_preview_provider_free(presenter->calendar_provider);
     g_free(presenter);
 }
@@ -327,9 +398,7 @@ bool ss_home_temporal_presenter_format_now(
         return false;
     }
     now = g_date_time_new_now_local();
-    return now != NULL && format_into(
-        &presenter->policy, now, presenter->use_24h,
-        presenter->calendar_provider, out);
+    return now != NULL && presenter_format_into(presenter, now, out);
 }
 
 guint ss_home_temporal_presenter_refresh_interval_ms(
@@ -339,7 +408,8 @@ guint ss_home_temporal_presenter_refresh_interval_ms(
      * Seconds-enabled extended clocks can advance displayed units at rates
      * other than one SI second. Sample at 250 ms so decimal, Internet and
      * sidereal-style displays cannot skip visible units; seconds-disabled
-     * presentation remains at the low-cost 1 Hz cadence.
+     * presentation remains at the low-cost 1 Hz cadence. Date conversion is
+     * cached independently, so the higher cadence only reformats live time.
      */
     if (presenter == NULL || !presenter->policy_valid ||
         !presenter->policy.show_seconds) {
