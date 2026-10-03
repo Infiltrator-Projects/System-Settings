@@ -158,21 +158,27 @@ clock mode through `infiltratr_temporal_format_clock_mode()`. Gregorian dates
 use GLib's local date formatter. Non-Gregorian chronology previews use the
 optional `libcalendar-plus.so.0` runtime ABI.
 
-The Calendar bridge still exposes a clock-format compatibility entry point and
-its fixture tests that ABI, but the current panel's clock preview uses Common.
-Without Calendar, non-Gregorian dates explicitly report preview unavailable;
-clock selection, clock rendering and persistence remain available.
+The Calendar bridge now exposes only the chronology/date-format ABI required
+for non-Gregorian previews. The retired Calendar-owned clock-format compatibility
+surface has been removed: every clock preview is rendered by Common. Without
+Calendar, non-Gregorian dates explicitly report preview unavailable; clock
+selection, clock rendering and persistence remain available.
 
 Discovery checks fixed system library roots and their compile-time multiarch
 child only. It does not recursively scan directories and does not fall back to
 bare-soname loader resolution through environment-controlled search paths. This
 optional runtime executes with ordinary user authority; it is not the future
-trusted module loader. Missing-runtime retries are throttled to five seconds. Accepted Linux runtimes
-remain resident because GLib retains registered static GType callbacks after
-provider teardown; replacing an already loaded runtime requires restarting the
-process. Each provider still releases its objects and loader reference.
+trusted module loader. Missing-runtime discovery backs off exponentially from five seconds to a
+sixty-second ceiling, so an absent optional Calendar runtime cannot become a
+recurring GTK-thread filesystem scan. Accepted Linux runtimes remain resident
+because GLib retains registered static GType callbacks after provider teardown;
+replacing an already loaded runtime requires restarting the process. Each provider still releases its objects and loader reference.
 
 ### Current lifecycle and persistence boundaries
+
+The shell constructs Home first and creates the built-in Date & Time panel only
+on first selection. Time-zone catalogue parsing, policy observers and timedated
+proxy setup therefore do not participate in shell first paint.
 
 The application presents its existing window on repeated activation. On close,
 the host removes its panel data before destroying widgets. Panel cleanup removes

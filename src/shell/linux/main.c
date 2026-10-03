@@ -35,10 +35,13 @@ typedef struct {
     GtkStack *stack;
     GtkListBoxRow *home_row;
     GtkListBoxRow *date_row;
+    GtkScrolledWindow *date_scroller;
+    bool date_time_loaded;
     gchar *query;
 } ShellSearchState;
 
 static void show_about(GtkButton *button, gpointer user_data);
+static GtkWidget *build_unavailable_panel(const char *message);
 
 static void shell_search_state_free(gpointer data)
 {
@@ -79,21 +82,60 @@ static void on_search_changed(GtkSearchEntry *entry, gpointer user_data)
     gtk_list_box_invalidate_filter(state->list);
 }
 
+static void ensure_date_time_panel(ShellSearchState *state)
+{
+    g_autoptr(GError) panel_error = NULL;
+    SsLinuxDateTimePanel *date_time;
+    GtkWidget *panel_widget;
+
+    if (state == NULL || state->date_time_loaded ||
+        state->date_scroller == NULL || state->parent == NULL) {
+        return;
+    }
+
+    /*
+     * First paint belongs to the shell. Date & Time owns timezone
+     * catalogue parsing, policy observation and timedated setup, so
+     * do not pay for that module until the user actually opens it.
+     */
+    state->date_time_loaded = true;
+    date_time = ss_linux_date_time_panel_new(
+        state->parent, &panel_error);
+    if (date_time != NULL) {
+        g_object_set_data_full(
+            G_OBJECT(state->parent),
+            "system-settings-date-time-panel",
+            date_time,
+            ss_linux_date_time_panel_free);
+        panel_widget = ss_linux_date_time_panel_widget(date_time);
+    } else {
+        panel_widget = build_unavailable_panel(
+            panel_error != NULL
+                ? panel_error->message
+                : "Unable to initialise Date & Time.");
+    }
+    gtk_scrolled_window_set_child(
+        state->date_scroller, panel_widget);
+}
+
 static void on_navigation_selected(GtkListBox *box,
                                    GtkListBoxRow *row,
                                    gpointer user_data)
 {
-    GtkStack *stack = GTK_STACK(user_data);
+    ShellSearchState *state = user_data;
     const char *page_name;
 
     (void)box;
-    if (row == NULL || stack == NULL) {
+    if (row == NULL || state == NULL || state->stack == NULL) {
         return;
     }
 
     page_name = g_object_get_data(G_OBJECT(row), "page-name");
     if (page_name != NULL) {
-        gtk_stack_set_visible_child_name(stack, page_name);
+        if (g_strcmp0(page_name, "date-time") == 0) {
+            ensure_date_time_panel(state);
+        }
+        gtk_stack_set_visible_child_name(state->stack, page_name);
     }
 }
 
@@ -709,7 +751,7 @@ static GtkWidget *build_sidebar(GtkWindow *parent,
         GTK_LIST_BOX(list), GTK_SELECTION_SINGLE);
     g_signal_connect(
         list, "row-selected",
-        G_CALLBACK(on_navigation_selected), stack);
+        G_CALLBACK(on_navigation_selected), search_state);
     g_signal_connect(
         list, "row-activated",
         G_CALLBACK(on_navigation_activated), search_state);
@@ -939,6 +981,7 @@ static void open_date_time(GtkButton *button, gpointer user_data)
     ShellSearchState *state = user_data;
     (void)button;
     if (state == NULL || state->stack == NULL) return;
+    ensure_date_time_panel(state);
     gtk_stack_set_visible_child_name(state->stack, "date-time");
     if (state->list != NULL && state->date_row != NULL) {
         gtk_list_box_select_row(state->list, state->date_row);
@@ -1707,13 +1750,13 @@ static GtkWidget *build_home_page(
     gtk_widget_set_hexpand(overview_spacer, TRUE);
     gtk_box_append(GTK_BOX(overview_heading), overview_spacer);
     gtk_widget_add_css_class(updates_button, "overview-link-button");
+    g_autofree gchar *software_path =
+        find_trusted_system_program("infiltrator-software");
     g_object_set_data_full(
         G_OBJECT(updates_button),
         "action-program",
-        g_strdup("infiltrator-software"),
+        g_strdup(software_path),
         g_free);
-    g_autofree gchar *software_path =
-        g_find_program_in_path("infiltrator-software");
     if (software_path == NULL) {
         gtk_widget_set_sensitive(updates_button, FALSE);
         gtk_widget_set_tooltip_text(
@@ -2262,14 +2305,11 @@ static void adapt_window_to_mapped_monitor(
 static void on_activate(GtkApplication *application, gpointer user_data)
 {
     const InfiltratrProjectInfo *info = ss_project_info();
-    g_autoptr(GError) panel_error = NULL;
     GtkWindow *window;
-    SsLinuxDateTimePanel *date_time;
     GtkWidget *root;
     GtkWidget *stack_widget;
     GtkStack *stack;
     GtkWidget *date_scroller;
-    GtkWidget *panel_widget;
     GtkSearchEntry *search_entry = NULL;
     ShellSearchState *search_state;
 
@@ -2306,7 +2346,7 @@ static void on_activate(GtkApplication *application, gpointer user_data)
     stack = GTK_STACK(stack_widget);
     gtk_stack_set_transition_type(
         stack, GTK_STACK_TRANSITION_TYPE_CROSSFADE);
-    gtk_stack_set_transition_duration(stack, 170U);
+    gtk_stack_set_transition_duration(stack, 110U);
     gtk_widget_set_hexpand(stack_widget, TRUE);
     gtk_widget_set_vexpand(stack_widget, TRUE);
 
@@ -2325,28 +2365,6 @@ static void on_activate(GtkApplication *application, gpointer user_data)
         "system-settings-navigation-list",
         search_state->list);
 
-    date_time = ss_linux_date_time_panel_new(
-        window, &panel_error);
-    if (date_time != NULL) {
-        /*
-         * The host window owns the current built-in module instance. Async
-         * module operations retain a window reference while in flight. Closing
-         * detaches the panel first, so late replies find NULL rather than widgets.
-         */
-        g_object_set_data_full(
-            G_OBJECT(window),
-            "system-settings-date-time-panel",
-            date_time,
-            ss_linux_date_time_panel_free);
-        panel_widget =
-            ss_linux_date_time_panel_widget(date_time);
-    } else {
-        panel_widget = build_unavailable_panel(
-            panel_error != NULL
-                ? panel_error->message
-                : "Unable to initialise Date & Time.");
-    }
-
     date_scroller = gtk_scrolled_window_new();
     gtk_scrolled_window_set_policy(
         GTK_SCROLLED_WINDOW(date_scroller),
@@ -2358,9 +2376,8 @@ static void on_activate(GtkApplication *application, gpointer user_data)
         GTK_SCROLLED_WINDOW(date_scroller), TRUE);
     gtk_widget_set_hexpand(date_scroller, TRUE);
     gtk_widget_set_vexpand(date_scroller, TRUE);
-    gtk_scrolled_window_set_child(
-        GTK_SCROLLED_WINDOW(date_scroller),
-        panel_widget);
+    search_state->date_scroller =
+        GTK_SCROLLED_WINDOW(date_scroller);
     g_object_set_data(
         G_OBJECT(window),
         "system-settings-date-scroller",

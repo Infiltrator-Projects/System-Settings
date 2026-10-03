@@ -1,3 +1,12 @@
+## 0.4.54 — 2026-10-03
+
+- Make the built-in Date & Time panel genuinely lazy: Home first paint no longer constructs the panel, parses the time-zone catalogue, installs its policy/locality observers or starts timedated setup until Date & Time is first selected.
+- Remove the obsolete one-shot `ss_home_temporal_presentation_now()` path that constructed and destroyed a full presenter for a single value; Home now has one long-lived presenter path only.
+- Route the Home “Check for updates” action through the same fixed trusted-system executable resolver used by navigation and Quick Actions instead of falling back to `PATH` lookup.
+- Align Date & Time row/tile/page spacing directly with Common `InfiltratrDesignMetrics`, and reduce shell page crossfade to the 110 ms cadence already used by the InfiltratorOS desktop family.
+- Correct maintained architecture/presentation documentation left behind by earlier iterations: Common owns all clock rendering, Calendar supplies only non-Gregorian date previews, and failed optional-runtime discovery backs off from 5 seconds to a 60-second ceiling.
+- Re-verified the exact Common 1.19.38 pin `7070c5812b50821fd7580101cb2289a3184f6b2c` against current `Infiltrator-Libraries` main; no gitlink movement is required.
+
 ## 0.4.53 — 2026-10-03
 
 - Remove the obsolete Calendar-owned clock-preview ABI and test fixture surface; Common is now the sole formatter for every supported clock mode, while the optional Calendar runtime is retained only for non-Gregorian calendar-date previews.
