@@ -165,7 +165,7 @@ jobs:
             echo "Packaged binary still contains the wrong /usr/local UI asset path." >&2
             exit 1
           fi
-          for asset in hero-asset.png overview-asset.png date-asset.png region-asset.png network-asset.png theme-light.png theme-dark.png theme-follow.png theme-mercedes.png; do
+          for asset in hero-asset.png overview-asset.png date-asset.png region-asset.png network-asset.png theme-light.png theme-dark.png theme-follow.png; do
             test -s "$ui/$asset"
             cmp "assets/ui/$asset" "$ui/$asset"
           done

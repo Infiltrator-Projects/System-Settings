@@ -993,12 +993,12 @@ static GtkWidget *make_program_action(const char *icon_name,
 {
     GtkWidget *button = make_quick_action(icon_name, title, copy);
     g_autofree gchar *path =
-        program != NULL ? g_find_program_in_path(program) : NULL;
+        find_trusted_system_program(program);
 
     g_object_set_data_full(
         G_OBJECT(button),
         "action-program",
-        g_strdup(program),
+        g_strdup(path),
         g_free);
     g_object_set_data_full(
         G_OBJECT(button),
@@ -1778,7 +1778,6 @@ static GtkWidget *build_home_page(
         "preferences-system-time-symbolic",
         "Set Date & Time",
         "Time zone, clock & calendar");
-    gtk_widget_add_css_class(date_action, "quick-action-cyan");
     g_signal_connect(
         date_action, "clicked",
         G_CALLBACK(open_date_time), search_state);
@@ -1790,7 +1789,6 @@ static GtkWidget *build_home_page(
         "Language, formats & location",
         "mintlocale",
         NULL);
-    gtk_widget_add_css_class(region_action, "quick-action-cyan");
     gtk_flow_box_insert(GTK_FLOW_BOX(quick_grid), region_action, -1);
 
     GtkWidget *display_action = make_program_action(
@@ -1799,7 +1797,6 @@ static GtkWidget *build_home_page(
         "Scaling, layout & monitors",
         "cinnamon-settings",
         "display");
-    gtk_widget_add_css_class(display_action, "quick-action-cyan");
     gtk_flow_box_insert(GTK_FLOW_BOX(quick_grid), display_action, -1);
 
     GtkWidget *software_action = make_program_action(
@@ -1808,7 +1805,6 @@ static GtkWidget *build_home_page(
         "Apps, packages & updates",
         "infiltrator-software",
         NULL);
-    gtk_widget_add_css_class(software_action, "quick-action-gold");
     gtk_flow_box_insert(GTK_FLOW_BOX(quick_grid), software_action, -1);
 
     gtk_box_append(GTK_BOX(quick), quick_grid);
@@ -1964,20 +1960,17 @@ static GtkWidget *build_home_page(
     /*
      * These are illustrative choices, not an authoritative theme selector.
      * Do not mark Light/Dark as selected merely because GTK currently prefers
-     * one luminance; that would falsely imply Follow OS/Mercedes state.
+     * one luminance; that would falsely imply System/Day/Night state.
      */
     gtk_flow_box_insert(
         GTK_FLOW_BOX(appearance_previews),
-        make_theme_preview("Light", "theme-light", FALSE), -1);
+        make_theme_preview("Day", "theme-light", FALSE), -1);
     gtk_flow_box_insert(
         GTK_FLOW_BOX(appearance_previews),
-        make_theme_preview("Dark", "theme-dark", FALSE), -1);
+        make_theme_preview("Night", "theme-dark", FALSE), -1);
     gtk_flow_box_insert(
         GTK_FLOW_BOX(appearance_previews),
-        make_theme_preview("Follow OS", "theme-follow", FALSE), -1);
-    gtk_flow_box_insert(
-        GTK_FLOW_BOX(appearance_previews),
-        make_theme_preview("Mercedes Grey", "theme-mercedes", FALSE), -1);
+        make_theme_preview("System", "theme-follow", FALSE), -1);
     gtk_box_append(GTK_BOX(appearance_card), appearance_previews);
     gtk_flow_box_insert(GTK_FLOW_BOX(status_grid), appearance_card, -1);
 

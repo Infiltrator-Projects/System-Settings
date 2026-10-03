@@ -347,7 +347,6 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         assets/ui/theme-light.png
         assets/ui/theme-dark.png
         assets/ui/theme-follow.png
-        assets/ui/theme-mercedes.png
         DESTINATION "${CMAKE_INSTALL_DATADIR}/infiltrator/system-settings/ui")
     install(FILES data/temporal-v3.provider
         DESTINATION "${CMAKE_INSTALL_DATADIR}/infiltrator/policy-providers"

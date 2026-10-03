@@ -490,9 +490,9 @@ int main(void)
             /*
              * Compact CI windows intentionally stack the two desktop columns;
              * the breakpoint logic above is separately exercised in both
-             * states. The four appearance previews, however, are always a
-             * compact horizontal strip and must never regress to a vertical
-             * thumbnail column.
+             * states. The three canonical System/Day/Night previews are a
+             * compact horizontal strip on the desktop layout and must never
+             * regress to stale fourth-theme content.
              */
             guint preview_count = 0U;
             for (GtkWidget *child =
@@ -501,7 +501,7 @@ int main(void)
                  child = gtk_widget_get_next_sibling(child)) {
                 preview_count++;
             }
-            g_assert_cmpuint(preview_count, ==, 4U);
+            g_assert_cmpuint(preview_count, ==, 3U);
         }
         g_assert_cmpuint(panel->timer_id, ==, 0U);
 

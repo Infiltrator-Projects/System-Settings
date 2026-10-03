@@ -33,7 +33,7 @@ The target direction is:
 
 - a strong application shell with persistent category navigation;
 - rich, clearly separated cards and panels instead of long flat forms;
-- blue/cyan and warm gold accents over the project's dark Mercedes-grey base;
+- Common's semantic System/Day/Night palettes, with the neutral accent used for selection/focus and warning/success/fault colours reserved for those actual states;
 - large, purposeful icons and visual status indicators;
 - live previews where a setting has a visual result;
 - concise labels with secondary explanation only where it earns its space;
@@ -61,11 +61,14 @@ display profile is selected.
 
 ## Relationship to the prototype
 
-The prototype establishes the desired level of finish, hierarchy, colour and
-graphical density. Individual imagery, labels, sample modules and decorative
-content may change as real modules are implemented. Hero artwork and any
-recognisable third-party marks shown in concept imagery are mood references only
-and are not a requirement for shipped assets.
+The prototype establishes the desired level of finish, hierarchy and graphical
+density, but the canonical visual contract is the current Common
+`infiltrator-design-v1` contract. Shared typography, semantic palette roles,
+radii and spacing follow Common; product-specific imagery remains local.
+Individual imagery, labels and sample modules may change as real modules are
+implemented. Hero artwork and any recognisable third-party marks shown in
+concept imagery are mood references only and are not a requirement for shipped
+assets.
 
 Future shell and module UI work should be checked against one simple question:
 

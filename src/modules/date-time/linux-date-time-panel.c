@@ -752,14 +752,14 @@ static bool preview_coordinates(
     return false;
 }
 
-static bool format_preview(SsLinuxDateTimePanel *state,
-                           char *buffer,
-                           size_t capacity)
+static bool format_preview_at(SsLinuxDateTimePanel *state,
+                              GDateTime *now,
+                              char *buffer,
+                              size_t capacity)
 {
     const InfiltratrTemporalPolicyV3 *policy =
         ss_date_time_model_policy(&state->model);
     const InfiltratrTemporalClockModeInfo *mode;
-    g_autoptr(GDateTime) now = g_date_time_new_now_local();
     const char *effective_mode;
     int64_t unix_us;
     gint64 offset_us;
@@ -834,7 +834,7 @@ static gboolean refresh_preview(gpointer user_data)
         return G_SOURCE_CONTINUE;
     }
 
-    if (format_preview(state, clock_text, sizeof(clock_text)) &&
+    if (format_preview_at(state, now, clock_text, sizeof(clock_text)) &&
         g_strcmp0(
             gtk_label_get_text(GTK_LABEL(state->clock_preview)),
             clock_text) != 0) {
@@ -851,14 +851,14 @@ static gboolean refresh_preview(gpointer user_data)
     const gint year = g_date_time_get_year(now);
     const gint month = g_date_time_get_month(now);
     const gint day = g_date_time_get_day_of_month(now);
-    g_autofree gchar *date_key = g_strdup_printf(
-        "%04d-%02d-%02d|%s",
-        year, month, day, policy->calendar);
-    const char *cached_key = g_object_get_data(
-        G_OBJECT(state->date_preview),
-        "system-settings-preview-date-key");
+    const bool date_cache_hit =
+        state->preview_date_cache_valid &&
+        state->preview_date_year == year &&
+        state->preview_date_month == month &&
+        state->preview_date_day == day &&
+        g_strcmp0(state->preview_date_calendar, policy->calendar) == 0;
 
-    if (g_strcmp0(cached_key, date_key) != 0) {
+    if (!date_cache_hit) {
         const InfiltratrTemporalCalendarInfo *calendar =
             infiltratr_temporal_calendar_find(policy->calendar);
         g_autofree gchar *gregorian =
@@ -903,11 +903,13 @@ static gboolean refresh_preview(gpointer user_data)
             gtk_label_set_text(GTK_LABEL(state->date_preview), summary);
         }
         if (cacheable) {
-            g_object_set_data_full(
-                G_OBJECT(state->date_preview),
-                "system-settings-preview-date-key",
-                g_strdup(date_key),
-                g_free);
+            state->preview_date_year = year;
+            state->preview_date_month = month;
+            state->preview_date_day = day;
+            g_free(state->preview_date_calendar);
+            state->preview_date_calendar = g_strdup(policy->calendar);
+            state->preview_date_cache_valid =
+                state->preview_date_calendar != NULL;
         }
     }
 
@@ -2129,6 +2131,7 @@ void ss_linux_date_time_panel_free(gpointer data)
 
     g_clear_pointer(&state->clock_mode_ids, g_ptr_array_unref);
     g_clear_pointer(&state->timezone_ids, g_ptr_array_unref);
+    g_clear_pointer(&state->preview_date_calendar, g_free);
     ss_calendar_preview_provider_free(
         state->calendar_preview_provider);
     state->calendar_preview_provider = NULL;
