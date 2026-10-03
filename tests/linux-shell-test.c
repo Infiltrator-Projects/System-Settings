@@ -49,11 +49,7 @@ int main(void)
         g_assert_false(runtime_search_state->date_time_loaded);
         g_assert_null(g_object_get_data(
             G_OBJECT(window), "system-settings-date-time-panel"));
-        gtk_list_box_select_row(
-            runtime_search_state->list,
-            runtime_search_state->date_row);
-        while (g_main_context_iteration(NULL, FALSE)) {
-        }
+        ensure_date_time_panel(runtime_search_state);
         SsLinuxDateTimePanel *panel = g_object_get_data(
             G_OBJECT(window), "system-settings-date-time-panel");
         g_assert_true(runtime_search_state->date_time_loaded);
@@ -112,10 +108,6 @@ int main(void)
         g_assert_true(GTK_IS_LIST_BOX(navigation));
         g_assert_cmpuint(
             gtk_stack_get_transition_duration(stack), ==, 110U);
-        gtk_list_box_select_row(
-            navigation, runtime_search_state->home_row);
-        while (g_main_context_iteration(NULL, FALSE)) {
-        }
         if (i == 0) {
             g_autofree gchar *trusted_shell =
                 find_trusted_system_program("sh");
