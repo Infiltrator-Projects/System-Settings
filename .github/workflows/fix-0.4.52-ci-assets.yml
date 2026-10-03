@@ -1,0 +1,40 @@
+name: Temporary 0.4.52 CI asset maintenance
+
+on:
+  push:
+    branches:
+      - hal/system-settings-forensic-0.4.52
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Remove retired asset from integration validation
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('.github/workflows/ci.yml')
+          s = p.read_text()
+          old = ' theme-follow.png theme-mercedes.png; do'
+          new = ' theme-follow.png; do'
+          if s.count(old) != 1:
+              raise SystemExit(f'expected retired asset exactly once, found {s.count(old)}')
+          p.write_text(s.replace(old, new, 1))
+          PY
+      - name: Remove temporary workflow
+        run: rm -f .github/workflows/fix-0.4.52-ci-assets.yml
+      - name: Commit CI contract update
+        run: |
+          git config user.name "HAL System Settings Maintenance"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "Remove retired theme asset from package validation"
+          git push origin HEAD:hal/system-settings-forensic-0.4.52
