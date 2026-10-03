@@ -1,3 +1,9 @@
+## 0.4.53 — 2026-10-03
+
+- Remove the obsolete Calendar-owned clock-preview ABI and test fixture surface; Common is now the sole formatter for every supported clock mode, while the optional Calendar runtime is retained only for non-Gregorian calendar-date previews.
+- Align shell typography colours with Common semantic heading, summary, kicker, detail-label and note roles instead of approximating those roles with generic title/muted colours.
+- Normalise remaining shell control geometry to the Common 6/10/12/18 radius vocabulary and keep the current Common 1.19.38 pin `7070c5812b50821fd7580101cb2289a3184f6b2c`.
+
 ## 0.4.52 — 2026-10-03
 
 - Forensically remove remaining UI residue from the 0.4.45–0.4.49 iteration cycle: delete dead cyan/gold quick-action classes, remove the obsolete Mercedes Grey appearance preview/asset, and use one trusted executable-resolution path for delegated actions.
