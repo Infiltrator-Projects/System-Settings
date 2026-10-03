@@ -1,7 +1,98 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#define SYSTEM_SETTINGS_LINUX_UI_HELPERS_IMPLEMENTATION
 #include "linux-ui-helpers.h"
 
 #include <infiltratr/design.h>
+
+typedef struct DeferredPictureLoad {
+    GtkPicture *picture;
+    gchar *filename;
+    guint source_id;
+} DeferredPictureLoad;
+
+static guint deferred_picture_sequence;
+
+static void deferred_picture_load_free(gpointer data)
+{
+    DeferredPictureLoad *load = data;
+
+    if (load == NULL) {
+        return;
+    }
+    if (load->source_id != 0U) {
+        g_source_remove(load->source_id);
+        load->source_id = 0U;
+    }
+    g_free(load->filename);
+    g_free(load);
+}
+
+static gboolean deferred_picture_load_cb(gpointer user_data)
+{
+    DeferredPictureLoad *load = user_data;
+
+    if (load == NULL || load->picture == NULL) {
+        return G_SOURCE_REMOVE;
+    }
+
+    load->source_id = 0U;
+    if (load->filename != NULL && load->filename[0] != '\0') {
+        gtk_picture_set_filename(load->picture, load->filename);
+    }
+
+    /*
+     * The GtkPicture owns this state while work is pending. Once the file has
+     * been loaded there is nothing left to retain; removing the object data
+     * invokes deferred_picture_load_free() with source_id already cleared.
+     */
+    g_object_set_data(
+        G_OBJECT(load->picture),
+        "system-settings-deferred-picture-load",
+        NULL);
+    return G_SOURCE_REMOVE;
+}
+
+GtkWidget *ss_linux_ui_picture_new_for_filename(const char *filename)
+{
+    GtkWidget *picture = gtk_picture_new();
+    DeferredPictureLoad *load;
+    guint delay_ms;
+
+    if (filename == NULL || filename[0] == '\0') {
+        return picture;
+    }
+
+    load = g_new0(DeferredPictureLoad, 1);
+    load->picture = GTK_PICTURE(picture);
+    load->filename = g_strdup(filename);
+
+    /*
+     * The graphical Home page contains several multi-megabyte PNGs. The old
+     * direct gtk_picture_new_for_filename() path decoded all of them while the
+     * shell was still being constructed, so the first frame could not appear
+     * until every dashboard illustration had been processed. Stagger these
+     * loads just beyond first paint and run them at low main-loop priority.
+     * The explicit size requests applied by callers keep layout stable while
+     * each image becomes available.
+     */
+    delay_ms = 16U + (deferred_picture_sequence % 8U) * 16U;
+    ++deferred_picture_sequence;
+    load->source_id = g_timeout_add_full(
+        G_PRIORITY_LOW,
+        delay_ms,
+        deferred_picture_load_cb,
+        load,
+        NULL);
+    g_source_set_name_by_id(
+        load->source_id,
+        "[system-settings] deferred dashboard artwork");
+    g_object_set_data_full(
+        G_OBJECT(picture),
+        "system-settings-deferred-picture-load",
+        load,
+        deferred_picture_load_free);
+    return picture;
+}
 
 static const InfiltratrDesignMetrics *ui_metrics(void)
 {
