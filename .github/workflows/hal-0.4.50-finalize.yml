@@ -1,0 +1,28 @@
+name: HAL 0.4.50 finalize
+
+on:
+  push:
+    branches:
+      - "hal/0.4.50-responsiveness-ui-common"
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: "hal/0.4.50-responsiveness-ui-common"
+          fetch-depth: 0
+      - name: Apply final bounded cleanup
+        run: python3 .github/hal-0.4.50-finalize.py
+      - name: Commit final cleanup
+        run: |
+          git config user.name "Shannon Smith"
+          git config user.email "infiltratr@yandex.com"
+          git add -A
+          git diff --check --cached
+          git commit -m "Remove stale navigation styling and harden preview cache"
+          git push origin HEAD:hal/0.4.50-responsiveness-ui-common
