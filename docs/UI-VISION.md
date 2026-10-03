@@ -19,8 +19,8 @@ system behaviour.
 
 System Settings should feel like a complete visual desktop product rather than a
 developer control surface. The interface should be graphical first: icon-led,
-preview-led, colourful, layered and immediately understandable without requiring
-the user to think like a command-line administrator.
+preview-led, layered and immediately understandable without requiring the user
+to think like a command-line administrator.
 
 The intended spirit is the visual confidence of classic GUI environments such as
 Amiga Workbench 2.x/3.x, translated into a modern native desktop application.
@@ -34,11 +34,13 @@ The target direction is:
 - a strong application shell with persistent category navigation;
 - rich, clearly separated cards and panels instead of long flat forms;
 - Common's semantic System/Day/Night palettes, with the neutral accent used for selection/focus and warning/success/fault colours reserved for those actual states;
+- Common's heading, summary, kicker, detail-label and note roles rather than local approximations of text hierarchy;
+- Common's 6/10/12/18 radius hierarchy and 6/10/18/16/20 spacing/padding vocabulary as the canonical geometry contract;
 - large, purposeful icons and visual status indicators;
 - live previews where a setting has a visual result;
 - concise labels with secondary explanation only where it earns its space;
 - useful system overview and quick-action surfaces;
-- consistent rounded geometry, depth and restrained glow/highlight treatment;
+- restrained depth and highlight treatment rather than decorative colour noise;
 - a coherent family resemblance with the rest of the Infiltrator desktop suite;
 - responsive layout that remains readable at smaller window sizes.
 
@@ -64,7 +66,9 @@ display profile is selected.
 The prototype establishes the desired level of finish, hierarchy and graphical
 density, but the canonical visual contract is the current Common
 `infiltrator-design-v1` contract. Shared typography, semantic palette roles,
-radii and spacing follow Common; product-specific imagery remains local.
+radii and spacing follow Common; product-specific imagery remains local. Shell
+styling should consume those Common roles directly so a suite-wide design change
+does not leave System Settings carrying an older local interpretation.
 Individual imagery, labels and sample modules may change as real modules are
 implemented. Hero artwork and any recognisable third-party marks shown in
 concept imagery are mood references only and are not a requirement for shipped
