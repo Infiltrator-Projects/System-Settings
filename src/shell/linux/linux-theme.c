@@ -96,6 +96,7 @@ void ss_linux_theme_install(void)
 
     display = gdk_display_get_default();
     if (palette == NULL || metrics == NULL || type == NULL ||
+        type->ui_family == NULL || type->brand_family == NULL ||
         display == NULL) {
         return;
     }
@@ -125,16 +126,18 @@ void ss_linux_theme_install(void)
     note = rgb_css(palette->note_rgb);
 
     /*
-     * Common owns semantic colour, typography and geometry vocabulary. Product
-     * imagery remains local, but labels now use Common's heading/summary/
-     * kicker/detail/note roles instead of approximating them with generic text
-     * colours. This keeps System Settings visually aligned as Common evolves.
+     * System Settings adopts Common's strict first-party typography contract.
+     * The package carries the three verified MB Corpo faces, so the GTK tree
+     * must not name a generic fallback that can silently change suite identity.
+     * Ordinary controls inherit MB Corpo S; deliberate display roles below use
+     * MB Corpo A Cond.
      */
     css = g_string_new(NULL);
 
     g_string_append_printf(
         css,
-        "window { background: %s; color: %s; font-family: '%s', %s; font-weight: %u; }\n"
+        "* { font-family: '%s'; font-weight: %u; }\n"
+        "window { background: %s; color: %s; }\n"
         ".app-shell, scrolledwindow, viewport { background: %s; }\n"
         "headerbar, .shell-header { background: %s; border-bottom: 1px solid %s; min-height: 58px; padding: 0 10px; }\n"
         ".header-brand { padding: 2px 4px; }\n"
@@ -168,8 +171,8 @@ void ss_linux_theme_install(void)
         "scrollbar trough { background: transparent; }\n"
         "scrollbar slider { min-width: 4px; min-height: 20px; margin: 1px; border-radius: 2px; background: %s; }\n"
         "scrollbar slider:hover { background: %s; }\n",
-        background, text, type->ui_family, type->gtk_fallback,
-        (unsigned int)type->ui_regular_weight,
+        type->ui_family, (unsigned int)type->ui_regular_weight,
+        background, text,
         background,
         panel, border,
         card, border, accent,
@@ -196,7 +199,7 @@ void ss_linux_theme_install(void)
         ".page-icon { min-width: 54px; min-height: 54px; background: %s; border: 1px solid %s; border-radius: 12px; padding: 10px; }\n"
         ".page-icon image { color: %s; }\n"
         ".page-eyebrow { color: %s; font-size: 10px; font-weight: %u; letter-spacing: 0.12em; }\n"
-        ".page-title { color: %s; font-size: 32px; font-weight: %u; }\n"
+        ".page-title { font-family: '%s'; color: %s; font-size: 32px; font-weight: %u; }\n"
         ".page-summary { color: %s; font-size: 13px; margin-bottom: 8px; }\n"
         ".hero-card { background: %s; border: 1px solid %s; border-radius: 18px; padding: 16px 18px; box-shadow: none; }\n"
         ".hero-top { min-height: 76px; }\n"
@@ -224,7 +227,7 @@ void ss_linux_theme_install(void)
         ".section-heading { margin-bottom: 6px; padding-bottom: 5px; border-bottom: 1px solid %s; }\n"
         ".section-icon-wrap { background: %s; border: 1px solid %s; border-radius: 10px; padding: 7px; }\n"
         ".section-icon-wrap image { color: %s; }\n"
-        ".section-title { color: %s; font-size: 17px; font-weight: %u; }\n"
+        ".section-title { font-family: '%s'; color: %s; font-size: 17px; font-weight: %u; }\n"
         ".section-summary { color: %s; font-size: 11px; }\n"
         ".setting-row { border-radius: 10px; padding: 11px 12px; }\n"
         ".setting-row:hover { background: %s; }\n"
@@ -243,7 +246,7 @@ void ss_linux_theme_install(void)
         ".error { color: %s; background: %s; border: 1px solid %s; }\n",
         surface, border, accent,
         kicker, (unsigned int)type->ui_bold_weight,
-        heading, (unsigned int)type->ui_bold_weight,
+        type->brand_family, heading, (unsigned int)type->brand_weight,
         summary,
         card, border,
         kicker, (unsigned int)type->ui_bold_weight,
@@ -264,7 +267,7 @@ void ss_linux_theme_install(void)
         accent, accent, success,
         border,
         surface, border, accent,
-        heading, (unsigned int)type->ui_bold_weight,
+        type->brand_family, heading, (unsigned int)type->brand_weight,
         summary,
         surface_hover,
         surface, border,
@@ -330,8 +333,8 @@ void ss_linux_theme_install(void)
         ".hero-brand-overlay { margin: 16px; padding: 14px 16px; background: rgba(0,0,0,0.46); border: 1px solid %s; border-radius: 12px; box-shadow: none; }\n"
         ".hero-brand-overlay image { color: %s; }\n"
         ".home-hero-eyebrow { color: %s; font-size: 10px; font-weight: %u; letter-spacing: 0.12em; margin-bottom: 5px; }\n"
-        ".home-hero-title { color: %s; font-size: 34px; font-weight: %u; margin-bottom: 2px; }\n"
-        ".home-hero-accent { color: %s; font-size: 34px; font-weight: %u; margin-bottom: 6px; }\n"
+        ".home-hero-title { font-family: '%s'; color: %s; font-size: 34px; font-weight: %u; margin-bottom: 2px; }\n"
+        ".home-hero-accent { font-family: '%s'; color: %s; font-size: 34px; font-weight: %u; margin-bottom: 6px; }\n"
         ".home-hero-subtitle { color: %s; font-size: 15px; margin-bottom: 4px; }\n"
         ".home-hero-mark { min-width: 190px; min-height: 182px; padding: 0; border: 1px solid %s; border-radius: 18px; background: %s; }\n"
         ".home-hero-mark image { color: %s; }\n"
@@ -345,7 +348,7 @@ void ss_linux_theme_install(void)
         ".home-feature-copy { color: %s; font-size: 10px; }\n"
         ".home-card, .status-card { background: %s; border: 1px solid %s; border-radius: 12px; padding: 16px; box-shadow: none; }\n"
         ".home-card:hover, .status-card:hover { border-color: %s; }\n"
-        ".home-card-title { color: %s; font-size: 18px; font-weight: %u; }\n"
+        ".home-card-title { font-family: '%s'; color: %s; font-size: 18px; font-weight: %u; }\n"
         ".home-card-icon, .status-card-icon, .location-pin-well { background: %s; border: 1px solid %s; border-radius: 12px; padding: 8px; }\n"
         ".home-card-icon image, .status-card-icon image, .location-pin-well image { color: %s; }\n"
         ".quick-action-grid { margin-top: 2px; }\n"
@@ -372,8 +375,8 @@ void ss_linux_theme_install(void)
         ".asset-missing { background: transparent; border: 1px solid transparent; box-shadow: none; }\n",
         border, accent,
         kicker, (unsigned int)type->ui_bold_weight,
-        heading, (unsigned int)type->ui_bold_weight,
-        accent, (unsigned int)type->ui_bold_weight,
+        type->brand_family, heading, (unsigned int)type->brand_weight,
+        type->brand_family, accent, (unsigned int)type->brand_weight,
         summary,
         border, surface, accent,
         heading, (unsigned int)type->ui_bold_weight,
@@ -383,7 +386,7 @@ void ss_linux_theme_install(void)
         detail_label,
         card, border,
         accent,
-        heading, (unsigned int)type->ui_bold_weight,
+        type->brand_family, heading, (unsigned int)type->brand_weight,
         surface, border, accent,
         surface, border,
         surface_hover, accent,
