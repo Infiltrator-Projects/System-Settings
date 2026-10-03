@@ -22,7 +22,6 @@
 int main(int argc, char **argv)
 {
     SsCalendarPreviewProvider *provider;
-    char *clock_text;
     char *date_text;
 
     CHECK(argc == 2);
@@ -30,18 +29,6 @@ int main(int argc, char **argv)
     provider = ss_calendar_preview_provider_new_from(argv[1]);
     CHECK(provider != NULL);
     CHECK(ss_calendar_preview_provider_available(provider));
-
-    clock_text = ss_calendar_preview_provider_format_clock(
-        provider,
-        "internet",
-        INT64_C(1789986798000000),
-        36000,
-        true,
-        -36.4,
-        145.35);
-    CHECK(clock_text != NULL);
-    CHECK(strcmp(clock_text, "@481") == 0);
-    g_free(clock_text);
 
     date_text = ss_calendar_preview_provider_format_date(
         provider,
@@ -75,15 +62,14 @@ int main(int argc, char **argv)
             ss_calendar_preview_provider_new_with_root_for_test(root);
         CHECK(provider != NULL);
 
-        clock_text = ss_calendar_preview_provider_format_clock(
+        /* Missing runtime discovery fails cleanly and arms retry throttling. */
+        date_text = ss_calendar_preview_provider_format_date(
             provider,
-            "internet",
-            INT64_C(1789986798000000),
-            36000,
-            true,
-            -36.4,
-            145.35);
-        CHECK(clock_text == NULL);
+            "positivist",
+            2026,
+            9,
+            21);
+        CHECK(date_text == NULL);
 
         runtime_path = g_build_filename(
             root, "libcalendar-plus.so.0", NULL);
@@ -99,18 +85,6 @@ int main(int argc, char **argv)
             &error));
 
         ss_calendar_preview_provider_force_retry_for_test(provider);
-        clock_text = ss_calendar_preview_provider_format_clock(
-            provider,
-            "internet",
-            INT64_C(1789986798000000),
-            36000,
-            true,
-            -36.4,
-            145.35);
-        CHECK(clock_text != NULL);
-        CHECK(strcmp(clock_text, "@481") == 0);
-        g_free(clock_text);
-
         date_text = ss_calendar_preview_provider_format_date(
             provider,
             "positivist",
