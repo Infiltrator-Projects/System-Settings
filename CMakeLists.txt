@@ -257,6 +257,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     pkg_check_modules(GIO2 REQUIRED IMPORTED_TARGET gio-2.0)
     pkg_check_modules(GTK4 REQUIRED IMPORTED_TARGET gtk4>=4.6)
     pkg_check_modules(GEOCODE REQUIRED IMPORTED_TARGET geocode-glib-2.0)
+    include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/SystemSettingsTypography.cmake")
 
     add_library(system-settings-platform STATIC
         src/platform/linux/cinnamon-interface.c
