@@ -25,28 +25,30 @@ jobs:
           fi
           python3 - <<'PY'
           from pathlib import Path
+          import re
           p = Path('tests/linux-shell-test.c')
           t = p.read_text()
-          old = '''        gtk_list_box_select_row(
-              runtime_search_state->list,
-              runtime_search_state->date_row);
-          while (g_main_context_iteration(NULL, FALSE)) {
-          }
-          SsLinuxDateTimePanel *panel = g_object_get_data('''
-          new = '''        ensure_date_time_panel(runtime_search_state);
-          SsLinuxDateTimePanel *panel = g_object_get_data('''
-          if t.count(old) != 1:
-              raise SystemExit('lazy construction block mismatch')
-          t = t.replace(old, new, 1)
-          old = '''        gtk_list_box_select_row(
-              navigation, runtime_search_state->home_row);
-          while (g_main_context_iteration(NULL, FALSE)) {
-          }
-          if (i == 0) {'''
-          new = '''        if (i == 0) {'''
-          if t.count(old) != 1:
-              raise SystemExit('redundant home-selection block mismatch')
-          t = t.replace(old, new, 1)
+          pattern = re.compile(
+              r'        gtk_list_box_select_row\(\n'
+              r'            runtime_search_state->list,\n'
+              r'            runtime_search_state->date_row\);\n'
+              r'        while \(g_main_context_iteration\(NULL, FALSE\)\) \{\n'
+              r'        \}\n'
+              r'        SsLinuxDateTimePanel \*panel = g_object_get_data\(')
+          t, n = pattern.subn(
+              '        ensure_date_time_panel(runtime_search_state);\n'
+              '        SsLinuxDateTimePanel *panel = g_object_get_data(', t, count=1)
+          if n != 1:
+              raise SystemExit(f'lazy construction block mismatch: {n}')
+          pattern = re.compile(
+              r'        gtk_list_box_select_row\(\n'
+              r'            navigation, runtime_search_state->home_row\);\n'
+              r'        while \(g_main_context_iteration\(NULL, FALSE\)\) \{\n'
+              r'        \}\n'
+              r'        if \(i == 0\) \{')
+          t, n = pattern.subn('        if (i == 0) {', t, count=1)
+          if n != 1:
+              raise SystemExit(f'redundant home-selection block mismatch: {n}')
           p.write_text(t)
           PY
           git diff --check
