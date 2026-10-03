@@ -155,16 +155,19 @@ void ss_linux_theme_install(void)
         ".nav-row { min-height: 50px; border: 1px solid transparent; border-radius: 12px; padding: 7px 9px; margin: 2px 4px; }\n"
         ".nav-row:hover { background: %s; }\n"
         ".nav-row:selected { background: %s; border-color: %s; box-shadow: none; }\n"
-        ".nav-row:selected .nav-primary, .nav-row:selected .nav-secondary { color: %s; }\n"
+        ".nav-row:selected .nav-primary { color: %s; }\n"
+        ".nav-row:selected .nav-secondary { color: %s; }\n"
         ".nav-row:disabled { opacity: 0.42; }\n"
-        ".nav-icon-well { min-width: 38px; min-height: 38px; border-radius: 10px; padding: 5px; background: %s; border: 1px solid %s; }\n"
+        ".nav-icon-well { min-width: 32px; min-height: 32px; border-radius: 0; padding: 0; background: transparent; border: 1px solid transparent; }\n"
         ".nav-icon-well image { color: %s; }\n"
+        ".nav-row:selected .nav-icon-well image { color: %s; }\n"
         ".nav-primary { color: %s; font-size: 14px; font-weight: %u; }\n"
         ".nav-secondary { color: %s; font-size: 11px; }\n"
         ".sidebar-footer { border-top: 1px solid %s; padding-top: 12px; margin: 10px 8px 0 8px; }\n"
         ".sidebar-version { color: %s; font-size: 10px; padding: 5px 2px; }\n"
-        "scrollbar { background: transparent; min-width: 10px; min-height: 10px; }\n"
-        "scrollbar slider { min-width: 8px; min-height: 28px; border-radius: 999px; background: %s; }\n"
+        "scrollbar { background: transparent; min-width: 6px; min-height: 6px; padding: 0; }\n"
+        "scrollbar trough { background: transparent; }\n"
+        "scrollbar slider { min-width: 4px; min-height: 20px; margin: 1px; border-radius: 2px; background: %s; }\n"
         "scrollbar slider:hover { background: %s; }\n",
         background, text, type->ui_family, type->gtk_fallback,
         (unsigned int)type->ui_regular_weight,
@@ -179,8 +182,8 @@ void ss_linux_theme_install(void)
         panel, border,
         kicker, (unsigned int)type->ui_bold_weight,
         surface_hover,
-        selected, accent, accent_foreground,
-        surface, border, accent,
+        selected, accent, heading, summary,
+        accent, accent,
         text, (unsigned int)type->ui_bold_weight,
         detail_label,
         border,
@@ -322,21 +325,22 @@ void ss_linux_theme_install(void)
     g_string_append_printf(
         css,
         ".home-page { padding: 16px; }\n"
-        ".home-hero { min-height: 270px; padding: 0; border: 0; border-radius: 18px; box-shadow: none; }\n"
-        ".hero-scene { min-width: 190px; min-height: 270px; }\n"
-        ".hero-copy-overlay { min-width: 0; padding: 14px 18px; margin: 12px; border-radius: 12px; background: rgba(0,0,0,0.56); }\n"
-        ".hero-brand-overlay { margin: 14px; padding: 12px 14px; background: rgba(0,0,0,0.46); border: 1px solid %s; border-radius: 12px; box-shadow: none; }\n"
+        ".home-hero { min-height: 300px; padding: 0; border: 0; border-radius: 18px; box-shadow: none; }\n"
+        ".hero-scene { min-width: 190px; min-height: 300px; }\n"
+        ".hero-copy-overlay { min-width: 0; padding: 20px 24px; margin: 16px; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; background: rgba(0,0,0,0.52); }\n"
+        ".hero-brand-overlay { margin: 16px; padding: 14px 16px; background: rgba(0,0,0,0.46); border: 1px solid %s; border-radius: 12px; box-shadow: none; }\n"
         ".hero-brand-overlay image { color: %s; }\n"
-        ".home-hero-eyebrow { color: %s; font-size: 10px; font-weight: %u; letter-spacing: 0.12em; }\n"
-        ".home-hero-title { color: %s; font-size: 34px; font-weight: %u; }\n"
-        ".home-hero-accent { color: %s; font-size: 34px; font-weight: %u; }\n"
-        ".home-hero-subtitle { color: %s; font-size: 15px; }\n"
+        ".home-hero-eyebrow { color: %s; font-size: 10px; font-weight: %u; letter-spacing: 0.12em; margin-bottom: 5px; }\n"
+        ".home-hero-title { color: %s; font-size: 34px; font-weight: %u; margin-bottom: 2px; }\n"
+        ".home-hero-accent { color: %s; font-size: 34px; font-weight: %u; margin-bottom: 6px; }\n"
+        ".home-hero-subtitle { color: %s; font-size: 15px; margin-bottom: 4px; }\n"
         ".home-hero-mark { min-width: 190px; min-height: 182px; padding: 0; border: 1px solid %s; border-radius: 18px; background: %s; }\n"
         ".home-hero-mark image { color: %s; }\n"
         ".home-hero-mark-title { color: %s; font-size: 17px; font-weight: %u; letter-spacing: 0.08em; }\n"
         ".home-hero-mark-copy { color: %s; font-size: 10px; letter-spacing: 0.08em; }\n"
-        ".home-feature-row, .home-grid, .status-grid { margin-top: 14px; }\n"
-        ".home-feature { min-height: 44px; background: %s; border: 1px solid %s; border-radius: 12px; padding: 7px 12px; }\n"
+        ".home-feature-row { margin-top: 18px; }\n"
+        ".home-grid, .status-grid { margin-top: 14px; }\n"
+        ".home-feature { min-height: 48px; background: %s; border: 1px solid %s; border-radius: 12px; padding: 8px 12px; }\n"
         ".home-feature image { color: %s; }\n"
         ".home-feature-title { color: %s; font-weight: %u; }\n"
         ".home-feature-copy { color: %s; font-size: 10px; }\n"
