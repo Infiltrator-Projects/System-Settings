@@ -47,6 +47,11 @@ GtkWidget *ss_linux_ui_make_setting_row(const char *title,
         GTK_BOX(row),
         make_setting_identity(title, description));
     gtk_widget_set_valign(control, GTK_ALIGN_CENTER);
+    if (GTK_IS_SWITCH(control)) {
+        /* A switch is a compact binary control, never a row-width slider. */
+        gtk_widget_set_hexpand(control, FALSE);
+        gtk_widget_set_size_request(control, 38, 20);
+    }
     gtk_widget_set_halign(control, GTK_ALIGN_END);
     gtk_accessible_update_property(
         GTK_ACCESSIBLE(control),
@@ -86,6 +91,11 @@ GtkWidget *ss_linux_ui_make_setting_tile(const char *icon_name,
         make_setting_identity(title, description));
     gtk_widget_set_hexpand(tile, TRUE);
     gtk_widget_set_valign(control, GTK_ALIGN_CENTER);
+    if (GTK_IS_SWITCH(control)) {
+        /* A switch is a compact binary control, never a row-width slider. */
+        gtk_widget_set_hexpand(control, FALSE);
+        gtk_widget_set_size_request(control, 38, 20);
+    }
     gtk_widget_set_halign(control, GTK_ALIGN_END);
     gtk_accessible_update_property(
         GTK_ACCESSIBLE(control),

@@ -427,24 +427,23 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         GTK_ACCESSIBLE_PROPERTY_LABEL,
         "Longitude",
         -1);
-    gtk_widget_set_size_request(GTK_WIDGET(state->latitude), 116, -1);
-    gtk_widget_set_size_request(GTK_WIDGET(state->longitude), 116, -1);
+    gtk_widget_set_size_request(GTK_WIDGET(state->latitude), 112, -1);
+    gtk_widget_set_size_request(GTK_WIDGET(state->longitude), 112, -1);
+    gtk_widget_set_hexpand(GTK_WIDGET(state->latitude), FALSE);
+    gtk_widget_set_hexpand(GTK_WIDGET(state->longitude), FALSE);
 
-    coordinate_box = gtk_flow_box_new();
-    gtk_flow_box_set_selection_mode(
-        GTK_FLOW_BOX(coordinate_box), GTK_SELECTION_NONE);
-    gtk_flow_box_set_min_children_per_line(
-        GTK_FLOW_BOX(coordinate_box), 1U);
-    gtk_flow_box_set_max_children_per_line(
-        GTK_FLOW_BOX(coordinate_box), 2U);
-    gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(coordinate_box), 10U);
-    gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(coordinate_box), 8U);
-    gtk_flow_box_insert(
-        GTK_FLOW_BOX(coordinate_box),
-        make_coordinate_field("LATITUDE", state->latitude), -1);
-    gtk_flow_box_insert(
-        GTK_FLOW_BOX(coordinate_box),
-        make_coordinate_field("LONGITUDE", state->longitude), -1);
+    /* Coordinates are one paired value. A FlowBox could wrap Longitude onto a
+     * second line at ordinary desktop widths, visually separating the pair.
+     * Keep them in a deterministic two-column grid instead. */
+    coordinate_box = gtk_grid_new();
+    gtk_grid_set_column_spacing(GTK_GRID(coordinate_box), 10U);
+    gtk_widget_set_hexpand(coordinate_box, FALSE);
+    GtkWidget *latitude_field =
+        make_coordinate_field("LATITUDE", state->latitude);
+    GtkWidget *longitude_field =
+        make_coordinate_field("LONGITUDE", state->longitude);
+    gtk_grid_attach(GTK_GRID(coordinate_box), latitude_field, 0, 0, 1, 1);
+    gtk_grid_attach(GTK_GRID(coordinate_box), longitude_field, 1, 0, 1, 1);
     gtk_box_append(
         GTK_BOX(location_card),
         ss_linux_ui_make_setting_tile(
@@ -463,8 +462,8 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         GTK_FLOW_BOX(lower), GTK_SELECTION_NONE);
     gtk_flow_box_set_min_children_per_line(GTK_FLOW_BOX(lower), 1U);
     gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(lower), 2U);
-    gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(lower), 18U);
-    gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(lower), 18U);
+    gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(lower), 12U);
+    gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(lower), 12U);
     gtk_flow_box_set_homogeneous(GTK_FLOW_BOX(lower), TRUE);
     gtk_widget_set_hexpand(lower, TRUE);
 
@@ -511,6 +510,8 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     state->show_seconds = GTK_SWITCH(gtk_switch_new());
     gtk_widget_add_css_class(
         GTK_WIDGET(state->show_seconds), "setting-switch");
+    gtk_widget_set_hexpand(GTK_WIDGET(state->show_seconds), FALSE);
+    gtk_widget_set_size_request(GTK_WIDGET(state->show_seconds), 38, 20);
     gtk_box_append(
         GTK_BOX(presentation_card),
         ss_linux_ui_make_setting_tile(
@@ -522,6 +523,8 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     state->show_date = GTK_SWITCH(gtk_switch_new());
     gtk_widget_add_css_class(
         GTK_WIDGET(state->show_date), "setting-switch");
+    gtk_widget_set_hexpand(GTK_WIDGET(state->show_date), FALSE);
+    gtk_widget_set_size_request(GTK_WIDGET(state->show_date), 38, 20);
     gtk_box_append(
         GTK_BOX(presentation_card),
         ss_linux_ui_make_setting_tile(
@@ -558,6 +561,8 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     state->network_time = GTK_SWITCH(gtk_switch_new());
     gtk_widget_add_css_class(
         GTK_WIDGET(state->network_time), "setting-switch");
+    gtk_widget_set_hexpand(GTK_WIDGET(state->network_time), FALSE);
+    gtk_widget_set_size_request(GTK_WIDGET(state->network_time), 38, 20);
     gtk_box_append(
         GTK_BOX(system_card),
         ss_linux_ui_make_setting_tile(
