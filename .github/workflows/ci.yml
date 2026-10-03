@@ -14,7 +14,7 @@ permissions:
 jobs:
   linux:
     name: Linux build, test and package
-    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-24.04"]' || '["self-hosted","Linux","X64","linux-native"]') }}
+    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-24.04"]' || '["self-hosted","Linux","X64","linux-native","bigbedroom"]') }}
     timeout-minutes: 30
     env:
       PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -40,7 +40,7 @@ jobs:
         run: |
           set -euo pipefail
           for command_name in tar cmake ctest cc pkg-config dpkg-deb git readelf sha256sum xvfb-run dbus-daemon; do
-            command -v "$command_name" >/dev/null 2>&1
+            command -v "$command_name" >/dev/null 2>&1 || { echo "Runner is missing $command_name." >&2; exit 1; }
           done
           pkg-config --exists gtk4
           pkg-config --exists geocode-glib-2.0
@@ -62,11 +62,11 @@ jobs:
           cpack -G DEB
           deb="$(find . -maxdepth 1 -type f -name 'infiltrator-system-settings_*.deb' -print -quit)"
           test -n "$deb"
-          cp "$deb" $RUNNER_TEMP/system-settings-first.deb
+          cp "$deb" "$RUNNER_TEMP/system-settings-first.deb"
           rm -f "$deb"
           cpack -G DEB
           deb="$(find . -maxdepth 1 -type f -name 'infiltrator-system-settings_*.deb' -print -quit)"
-          cmp $RUNNER_TEMP/system-settings-first.deb "$deb"
+          cmp "$RUNNER_TEMP/system-settings-first.deb" "$deb"
 
       - name: Validate reproducible native release assets
         run: |
@@ -172,7 +172,7 @@ jobs:
 
   sanitizers:
     name: Linux ASan and UBSan
-    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-24.04"]' || '["self-hosted","Linux","X64","linux-native"]') }}
+    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-24.04"]' || '["self-hosted","Linux","X64","linux-native","bigbedroom"]') }}
     timeout-minutes: 30
     env:
       PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -194,7 +194,7 @@ jobs:
         run: |
           set -euo pipefail
           for command_name in tar cmake ctest cc pkg-config git readelf sha256sum xvfb-run dbus-daemon; do
-            command -v "$command_name" >/dev/null 2>&1
+            command -v "$command_name" >/dev/null 2>&1 || { echo "Runner is missing $command_name." >&2; exit 1; }
           done
           pkg-config --exists gtk4
           pkg-config --exists geocode-glib-2.0
