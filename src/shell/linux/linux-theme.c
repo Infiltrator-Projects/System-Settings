@@ -14,6 +14,8 @@
 
 static GtkCssProvider *common_theme_provider;
 static bool common_theme_watch_installed;
+static bool common_theme_state_valid;
+static bool common_theme_dark;
 static unsigned int common_theme_generation;
 
 static gchar *rgb_css(uint32_t rgb)
@@ -46,10 +48,26 @@ static bool system_prefers_dark(void)
 
 void ss_linux_theme_install(void)
 {
-    const InfiltratrThemePalette *palette =
-        infiltratr_theme_resolve(INFILTRATR_THEME_SYSTEM,
-                                 system_prefers_dark());
-    const InfiltratrDesignMetrics *metrics = infiltratr_design_metrics();
+    const bool dark = system_prefers_dark();
+    const InfiltratrThemePalette *palette;
+    const InfiltratrDesignMetrics *metrics;
+
+    /*
+     * GtkCssProvider is display-global. Replacing an equivalent provider every
+     * time a System Settings window is reopened invalidates the complete GTK
+     * style tree while the previous window may still be finishing teardown.
+     * That old iterative behaviour was both wasted work and, under native
+     * LTO/PGO timing, could race widget finalisation. Only reinstall when the
+     * Common palette selection can actually change.
+     */
+    if (common_theme_provider != NULL &&
+        common_theme_state_valid &&
+        common_theme_dark == dark) {
+        return;
+    }
+
+    palette = infiltratr_theme_resolve(INFILTRATR_THEME_SYSTEM, dark);
+    metrics = infiltratr_design_metrics();
     const InfiltratrTypography *type = infiltratr_typography();
     GtkCssProvider *provider;
     GdkDisplay *display;
@@ -393,6 +411,8 @@ void ss_linux_theme_install(void)
         display,
         GTK_STYLE_PROVIDER(common_theme_provider),
         GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+    common_theme_dark = dark;
+    common_theme_state_valid = true;
     ++common_theme_generation;
 
     g_object_unref(provider);
