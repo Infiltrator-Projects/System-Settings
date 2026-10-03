@@ -31,6 +31,11 @@ jobs:
           ' .github/workflows/hal-forensic-0.4.54b.yml > /tmp/apply-0.4.54.py
           test -s /tmp/apply-0.4.54.py
           python3 /tmp/apply-0.4.54.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/modules/date-time/home-temporal-presentation.c')
+          p.write_text(p.read_text().rstrip() + '\n')
+          PY
           git diff --check
           git config user.name "Shannon Smith"
           git config user.email "infiltratr@yandex.com"
