@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /**
  * @file calendar-preview-provider.c
- * @brief Lazy dynamic discovery and capability binding for Calendar previews.
+ * @brief Lazy dynamic discovery for Calendar-owned date previews.
  *
- * This bridge intentionally does not copy Calendar algorithms. It binds a
- * small stable C ABI at runtime and degrades per capability when Calendar is
- * absent or exposes only part of that ABI.
+ * Common is the authoritative clock renderer. This bridge exists only for
+ * calendar systems whose date formatter is supplied by the optional Calendar
+ * runtime, and degrades cleanly when that runtime is not installed.
  */
 #define _GNU_SOURCE
 #include "calendar-preview-provider.h"
@@ -29,15 +29,6 @@
 #define SYSTEM_SETTINGS_LIBRARY_ARCHITECTURE ""
 #endif
 
-typedef int (*TimeModeFromStringFn)(const char *mode);
-typedef char *(*FormatTimeAtLocationFn)(
-    int mode,
-    int64_t unix_microseconds,
-    int utc_offset_seconds,
-    int show_seconds,
-    int vertical,
-    double latitude,
-    double longitude);
 typedef GObject *(*CalendarSystemNewFn)(const char *calendar_id);
 typedef char *(*CalendarSystemFormatDateFn)(
     GObject *calendar,
@@ -47,15 +38,14 @@ typedef char *(*CalendarSystemFormatDateFn)(
     const char *part);
 
 /*
- * Invariant: function pointers are meaningful only while library is open.
- * calendar is a cached instance for calendar_id and must be dropped before the
- * library is closed. retry_after_monotonic_us throttles failed lazy discovery
- * so a missing optional runtime cannot cause a filesystem scan every tick.
+ * Function pointers are meaningful only while library is open. calendar is a
+ * cached instance for calendar_id and must be dropped before the library is
+ * closed. Failed lazy discovery is exponentially throttled so a missing
+ * optional runtime cannot turn a live preview timer into repeated filesystem
+ * scans on the GTK thread.
  */
 struct SsCalendarPreviewProvider {
     InfiltratrDynlib library;
-    TimeModeFromStringFn time_mode_from_string;
-    FormatTimeAtLocationFn format_time_at_location;
     CalendarSystemNewFn calendar_system_new;
     CalendarSystemFormatDateFn calendar_system_format_date;
     GObject *calendar;
@@ -68,18 +58,8 @@ struct SsCalendarPreviewProvider {
 
 static void reset_bindings(SsCalendarPreviewProvider *provider)
 {
-    provider->time_mode_from_string = NULL;
-    provider->format_time_at_location = NULL;
     provider->calendar_system_new = NULL;
     provider->calendar_system_format_date = NULL;
-}
-
-static bool has_clock_runtime(const SsCalendarPreviewProvider *provider)
-{
-    return provider != NULL &&
-           infiltratr_dynlib_is_open(&provider->library) &&
-           provider->time_mode_from_string != NULL &&
-           provider->format_time_at_location != NULL;
 }
 
 static bool has_calendar_runtime(const SsCalendarPreviewProvider *provider)
@@ -90,36 +70,20 @@ static bool has_calendar_runtime(const SsCalendarPreviewProvider *provider)
            provider->calendar_system_format_date != NULL;
 }
 
-/*
- * Every symbol is individually optional. A runtime is accepted only when it
- * supplies a complete clock pair, a complete calendar pair, or both.
- */
 static bool bind_runtime(SsCalendarPreviewProvider *provider)
 {
     InfiltratrDynlibBinding bindings[] = {
         {
-            .name = "calendar_plus_time_mode_from_string",
-            .destination = &provider->time_mode_from_string,
-            .destination_size = sizeof(provider->time_mode_from_string),
-            .required = false
-        },
-        {
-            .name = "calendar_plus_format_time_at_location",
-            .destination = &provider->format_time_at_location,
-            .destination_size = sizeof(provider->format_time_at_location),
-            .required = false
-        },
-        {
             .name = "calendar_plus_calendar_system_new",
             .destination = &provider->calendar_system_new,
             .destination_size = sizeof(provider->calendar_system_new),
-            .required = false
+            .required = true
         },
         {
             .name = "calendar_plus_calendar_system_format_date",
             .destination = &provider->calendar_system_format_date,
             .destination_size = sizeof(provider->calendar_system_format_date),
-            .required = false
+            .required = true
         }
     };
 
@@ -131,12 +95,7 @@ static bool bind_runtime(SsCalendarPreviewProvider *provider)
         reset_bindings(provider);
         return false;
     }
-
-    if (!has_clock_runtime(provider) && !has_calendar_runtime(provider)) {
-        reset_bindings(provider);
-        return false;
-    }
-    return true;
+    return has_calendar_runtime(provider);
 }
 
 /*
@@ -164,10 +123,12 @@ static bool open_runtime(
         infiltratr_dynlib_close(&provider->library);
         return false;
     }
-    /* Calendar may register static GTypes whose class/vtable callbacks remain
-     * in GLib's process-wide registry after the last object is released.
-     * Pin the accepted Linux runtime; closing this provider still releases its
-     * own loader reference, but registered type code must remain executable. */
+
+    /*
+     * Calendar may register static GTypes whose class/vtable callbacks remain
+     * in GLib's process-wide registry after the last object is released. Pin
+     * the accepted Linux runtime so registered type code remains executable.
+     */
     void *resident = dlopen(library_name, RTLD_NOW | RTLD_LOCAL | RTLD_NODELETE);
     if (resident == NULL) {
         reset_bindings(provider);
@@ -249,17 +210,11 @@ static bool discover_runtime(SsCalendarPreviewProvider *provider)
     /*
      * Optional in-process Calendar code is admitted only from explicit
      * system-owned roots. Bare-soname resolution can consult environment-
-     * controlled search paths and therefore is outside the trusted runtime
-     * contract.
+     * controlled search paths and is outside the trusted runtime contract.
      */
     return false;
 }
 
-/*
- * Lazy discovery permits System Settings to start without Calendar and to
- * recover if Calendar is installed while the panel remains open. Failed
- * discovery is throttled for five seconds; success removes the throttle.
- */
 static bool ensure_runtime(SsCalendarPreviewProvider *provider)
 {
     gint64 now;
@@ -267,8 +222,7 @@ static bool ensure_runtime(SsCalendarPreviewProvider *provider)
     if (provider == NULL) {
         return false;
     }
-    if (infiltratr_dynlib_is_open(&provider->library) &&
-        (has_clock_runtime(provider) || has_calendar_runtime(provider))) {
+    if (has_calendar_runtime(provider)) {
         return true;
     }
     if (!provider->discover_default_runtime) {
@@ -365,53 +319,13 @@ void ss_calendar_preview_provider_free(
 bool ss_calendar_preview_provider_available(
     const SsCalendarPreviewProvider *provider)
 {
-    return has_clock_runtime(provider) ||
-           has_calendar_runtime(provider);
-}
-
-char *ss_calendar_preview_provider_format_clock(
-    SsCalendarPreviewProvider *provider,
-    const char *clock_mode,
-    int64_t unix_microseconds,
-    int utc_offset_seconds,
-    bool show_seconds,
-    double latitude,
-    double longitude)
-{
-    int mode;
-    char *formatted;
-
-    if (!ensure_runtime(provider) ||
-        !has_clock_runtime(provider) ||
-        clock_mode == NULL || clock_mode[0] == '\0') {
-        return NULL;
-    }
-
-    mode = provider->time_mode_from_string(clock_mode);
-    if (mode == 0) {
-        return NULL;
-    }
-
-    formatted = provider->format_time_at_location(
-        mode,
-        unix_microseconds,
-        utc_offset_seconds,
-        show_seconds ? 1 : 0,
-        0,
-        latitude,
-        longitude);
-
-    if (formatted == NULL || formatted[0] == '\0') {
-        g_free(formatted);
-        return NULL;
-    }
-    return formatted;
+    return has_calendar_runtime(provider);
 }
 
 /*
- * Cache one Calendar object because repeated one-second preview refreshes
- * normally target the same chronology. A changed identifier is constructed
- * first, then atomically replaces the old cached object.
+ * Cache one Calendar object because repeated preview refreshes normally target
+ * the same chronology. A changed identifier is constructed first, then
+ * atomically replaces the old cached object.
  */
 static bool select_calendar(
     SsCalendarPreviewProvider *provider,
