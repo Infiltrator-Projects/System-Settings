@@ -1,3 +1,9 @@
+## 0.4.55 — 2026-10-03
+
+- Standardise the visible InfiltratorOS shell with Software without flattening System Settings' graphical Home identity: both applications now share the same 58 px header treatment, 205 px navigation rail, 34 px search control and 16 px primary content gutter.
+- Preserve the existing System Settings cinematic artwork, overlays, graphical cards, icon wells and product-specific Home composition; this release changes suite framing and rhythm rather than replacing either application's visual personality.
+- Retain the exact Common 1.19.38 pin `7070c5812b50821fd7580101cb2289a3184f6b2c`, matching Software's current shared foundation.
+
 ## 0.4.54 — 2026-10-03
 
 - Make the built-in Date & Time panel genuinely lazy: Home first paint no longer constructs the panel, parses the time-zone catalogue, installs its policy/locality observers or starts timedated setup until Date & Time is first selected.

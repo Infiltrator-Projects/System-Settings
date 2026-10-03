@@ -136,19 +136,19 @@ void ss_linux_theme_install(void)
         css,
         "window { background: %s; color: %s; font-family: '%s', %s; font-weight: %u; }\n"
         ".app-shell, scrolledwindow, viewport { background: %s; }\n"
-        "headerbar, .shell-header { background: %s; border-bottom: 1px solid %s; min-height: 58px; }\n"
+        "headerbar, .shell-header { background: %s; border-bottom: 1px solid %s; min-height: 58px; padding: 0 10px; }\n"
         ".header-brand { padding: 2px 4px; }\n"
         ".header-brand-icon { background: %s; border: 1px solid %s; border-radius: 12px; padding: 7px; box-shadow: none; }\n"
         ".header-brand-icon image { color: %s; }\n"
         ".header-brand-title { color: %s; font-size: 20px; font-weight: %u; }\n"
         ".header-brand-subtitle { color: %s; font-size: 11px; }\n"
         ".header-end { margin-left: 10px; }\n"
-        ".settings-search { min-width: 180px; background: %s; color: %s; border: 1px solid %s; border-radius: 10px; padding: 8px 12px; }\n"
+        ".settings-search { min-width: 180px; min-height: 34px; background: %s; color: %s; border: 1px solid %s; border-radius: 10px; padding: 8px 12px; }\n"
         ".settings-search:focus { border-color: %s; }\n"
         ".window-control { min-width: 30px; min-height: 30px; padding: 4px; background: transparent; border: 1px solid transparent; border-radius: 6px; }\n"
         ".window-control:hover { background: %s; border-color: %s; }\n"
         ".window-control-close:hover { background: %s; color: %s; }\n"
-        ".settings-sidebar { background: %s; border-right: 1px solid %s; padding: 12px 9px; min-width: 195px; }\n"
+        ".settings-sidebar { background: %s; border-right: 1px solid %s; padding: 12px 9px; min-width: 205px; }\n"
         ".settings-sidebar list, .settings-sidebar row, flowbox, flowboxchild { background: transparent; }\n"
         ".settings-sidebar list { padding: 2px 0; }\n"
         ".nav-title { color: %s; font-size: 10px; font-weight: %u; letter-spacing: 0.10em; margin: 0 10px 8px 10px; }\n"
@@ -321,7 +321,7 @@ void ss_linux_theme_install(void)
 
     g_string_append_printf(
         css,
-        ".home-page { padding: 20px; }\n"
+        ".home-page { padding: 16px; }\n"
         ".home-hero { min-height: 270px; padding: 0; border: 0; border-radius: 18px; box-shadow: none; }\n"
         ".hero-scene { min-width: 190px; min-height: 270px; }\n"
         ".hero-copy-overlay { min-width: 0; padding: 14px 18px; margin: 12px; border-radius: 12px; background: rgba(0,0,0,0.56); }\n"
