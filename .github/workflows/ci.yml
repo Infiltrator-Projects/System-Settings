@@ -13,7 +13,7 @@ permissions:
 jobs:
   linux:
     name: Linux build, test and package
-    runs-on: ${{ fromJSON((github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Release ')) && '["ubuntu-24.04"]' || '["self-hosted","Linux","X64","linux-native","bigbedroom"]') }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -124,7 +124,7 @@ jobs:
 
   windows:
     name: Windows build and test
-    runs-on: ${{ fromJSON((github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Release ')) && '["windows-latest"]' || '["self-hosted","Windows","ARM64"]') }}
+    runs-on: windows-latest
     timeout-minutes: 30
     defaults:
       run:
@@ -171,7 +171,7 @@ jobs:
 
   sanitizers:
     name: Linux ASan and UBSan
-    runs-on: ${{ fromJSON((github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Release ')) && '["ubuntu-24.04"]' || '["self-hosted","Linux","X64","linux-native","bigbedroom"]') }}
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
