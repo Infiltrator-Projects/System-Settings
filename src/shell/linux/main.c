@@ -9,6 +9,7 @@
  */
 
 #include "home-page-private.h"
+#include "linux-theme.h"
 #include "shell-command.h"
 #include "shell-window-private.h"
 
