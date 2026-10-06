@@ -262,7 +262,7 @@ A release commit must:
 - build release archives/packages from the release commit epoch and prove reproducibility by rebuilding the Debian package and source/native assets twice in CI;
 - verify the native installer payload by comparing the complete extracted source tree against the exact exported tree before accepting the asset.
 
-## Implemented audit regressions (2026-09-25)
+## Current regression coverage
 
 CTest contains eighteen System Settings project tests on Linux when Xvfb is
 available. Coverage includes private-bus timedated success, denial,
@@ -286,13 +286,8 @@ A passing fixture is not proof of those cases.
 Manual Gregorian time rejects GLib's normalisation of nonexistent DST wall
 times; repeated wall times use GLib's documented standard-time occurrence.
 
-For trusted non-release pushes, a hosted routing job checks whether an idle
-labelled BigBedroom runner is online before assigning any work to it. If it is
-offline, busy, or lacks the required compiler/CMake/GTK/geocode/Xvfb environment,
-Linux build/package and sanitizer jobs use hosted Ubuntu without waiting on an
-unavailable home runner. BigBedroom and hosted jobs both use the exact pinned
-Git submodule object for Common rather than manufacturing provenance around a
-downloaded archive. Pull requests never execute repository-controlled code on BigBedroom. Trusted
-pushes, including release commits, prefer an idle qualified BigBedroom runner;
-the release publication job itself remains hosted. Windows continues to use the
-hosted Windows runner.
+Ordinary `main` pushes use the configured self-hosted Linux and Windows runner
+labels. Release commits use hosted GitHub runners for the full release gate, and
+release publication remains hosted. If a self-hosted runner is offline, GitHub
+may queue the ordinary push job until an eligible runner becomes available; the
+workflow does not claim transparent migration of an already-routed job.
