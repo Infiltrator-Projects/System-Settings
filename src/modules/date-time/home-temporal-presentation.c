@@ -432,9 +432,8 @@ guint ss_home_temporal_presenter_refresh_interval_ms(
         !presenter->policy.show_seconds) {
         return 1000U;
     }
-    if (g_strcmp0(presenter->policy.clock_mode, "standard") == 0 ||
-        g_strcmp0(presenter->policy.clock_mode, "standard-12") == 0 ||
-        g_strcmp0(presenter->policy.clock_mode, "standard-24") == 0) {
+    if (ss_native_clock_mode_tracks_desktop(
+            presenter->policy.clock_mode)) {
         return 1000U;
     }
     return 250U;
