@@ -15,6 +15,23 @@ static gboolean end_wait(gpointer data)
     return G_SOURCE_REMOVE;
 }
 
+static void wait_for_window_detached(GtkApplication *app, GtkWindow *window)
+{
+    for (unsigned int attempt = 0U; attempt < 1000U; ++attempt) {
+        while (g_main_context_iteration(NULL, FALSE)) {
+        }
+        if (gtk_application_get_active_window(app) != window &&
+            g_list_length(gtk_application_get_windows(app)) == 0U) {
+            return;
+        }
+        g_usleep(1000U);
+    }
+
+    g_assert_true(gtk_application_get_active_window(app) != window);
+    g_assert_cmpuint(
+        g_list_length(gtk_application_get_windows(app)), ==, 0U);
+}
+
 int main(void)
 {
     g_autofree char *root = g_dir_make_tmp("ss-shell-XXXXXX", NULL);
@@ -874,6 +891,7 @@ int main(void)
         }
         gtk_window_close(window);
         g_assert_null(g_object_get_data(G_OBJECT(window), "system-settings-date-time-panel"));
+        wait_for_window_detached(app, window);
         g_object_unref(window);
         g_autoptr(GMainLoop) loop = g_main_loop_new(NULL, FALSE);
         g_timeout_add(30U, end_wait, loop);
