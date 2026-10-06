@@ -16,8 +16,22 @@
 
 int main(void)
 {
+    InfiltratrClockProfile profile;
+
     CHECK(strcmp(ss_native_clock_mode_id(false), "standard-12") == 0);
     CHECK(strcmp(ss_native_clock_mode_id(true), "standard-24") == 0);
+
+    CHECK(ss_native_clock_mode_profile("standard", false, &profile));
+    CHECK(profile == INFILTRATR_CLOCK_PROFILE_CONVENTIONAL_12);
+    CHECK(ss_native_clock_mode_profile("standard", true, &profile));
+    CHECK(profile == INFILTRATR_CLOCK_PROFILE_CONVENTIONAL_24);
+    CHECK(ss_native_clock_mode_profile("standard-12", true, &profile));
+    CHECK(profile == INFILTRATR_CLOCK_PROFILE_CONVENTIONAL_12);
+    CHECK(ss_native_clock_mode_profile("standard-24", false, &profile));
+    CHECK(profile == INFILTRATR_CLOCK_PROFILE_CONVENTIONAL_24);
+    CHECK(!ss_native_clock_mode_profile("decimal", true, &profile));
+    CHECK(!ss_native_clock_mode_profile(NULL, true, &profile));
+    CHECK(!ss_native_clock_mode_profile("standard", true, NULL));
 
     CHECK(ss_native_clock_mode_is_legacy_default("standard"));
     CHECK(!ss_native_clock_mode_is_legacy_default("standard-12"));

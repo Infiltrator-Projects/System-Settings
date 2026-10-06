@@ -3,6 +3,7 @@
 #define SYSTEM_SETTINGS_NATIVE_CLOCK_POLICY_H
 
 #include <stdbool.h>
+#include <infiltratr/temporal.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -10,6 +11,14 @@ extern "C" {
 
 /** Return the explicit conventional clock ID matching the native desktop. */
 const char *ss_native_clock_mode_id(bool use_24h);
+
+/**
+ * Resolve legacy/native conventional policy IDs to their canonical Common
+ * clock profile. Extended clock systems deliberately return false here.
+ */
+bool ss_native_clock_mode_profile(const char *clock_mode,
+                                  bool desktop_use_24h,
+                                  InfiltratrClockProfile *profile);
 
 /** Internal bootstrap/fallback mode inherited from pre-authority designs. */
 bool ss_native_clock_mode_is_legacy_default(const char *clock_mode);

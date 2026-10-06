@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "system-settings/manual-time.h"
+#include "system-settings/native-clock-policy.h"
 
 #include <infiltratr/core.h>
 #include <infiltratr/temporal.h>
@@ -16,18 +17,8 @@ static bool profile_for_mode(const char *clock_mode,
         return false;
     }
 
-    if (strcmp(clock_mode, "standard") == 0) {
-        *profile = desktop_use_24h
-            ? INFILTRATR_CLOCK_PROFILE_CONVENTIONAL_24
-            : INFILTRATR_CLOCK_PROFILE_CONVENTIONAL_12;
-        return true;
-    }
-    if (strcmp(clock_mode, "standard-24") == 0) {
-        *profile = INFILTRATR_CLOCK_PROFILE_CONVENTIONAL_24;
-        return true;
-    }
-    if (strcmp(clock_mode, "standard-12") == 0) {
-        *profile = INFILTRATR_CLOCK_PROFILE_CONVENTIONAL_12;
+    if (ss_native_clock_mode_profile(
+            clock_mode, desktop_use_24h, profile)) {
         return true;
     }
     if (strcmp(clock_mode, "decimal") == 0) {
