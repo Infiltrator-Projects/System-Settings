@@ -115,11 +115,11 @@ jobs:
               --verify-tag \
               --target "$sha" \
               --title "System Settings $version" \
-              --notes "See CHANGELOG.md for the complete user-visible and architectural changes in System Settings $version."
+              --generate-notes
           fi
 
   apt-publication:
-    name: Publish to central APT repository
+    name: Verify central APT pull publication
     needs: publish
     if: needs.publish.result == 'success'
     permissions:
@@ -133,40 +133,15 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 1
 
-      - name: Trigger and verify central APT publication
+      - name: Verify central APT pull publication
         env:
           RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
           APP_ID: system-settings
-          DISPATCH_TOKEN: ${{ secrets.APT_REPOSITORY_DISPATCH_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
           VERSION="$(tr -d '[:space:]' < VERSION)"
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-
-          payload="$(jq -nc \
-            --arg repository "$GITHUB_REPOSITORY" \
-            --arg sha "$RELEASE_SHA" \
-            '{event_type:"application-release",client_payload:{repository:$repository,sha:$sha}}')"
-
-          dispatched=false
-          if [[ -n "${DISPATCH_TOKEN:-}" ]]; then
-            if curl --fail-with-body --silent --show-error \
-              --request POST \
-              --header "Authorization: Bearer $DISPATCH_TOKEN" \
-              --header "Accept: application/vnd.github+json" \
-              --header "X-GitHub-Api-Version: 2022-11-28" \
-              --data "$payload" \
-              https://api.github.com/repos/Infiltrator-Projects/Infiltrator-Repository/dispatches; then
-              echo "Immediate APT dispatch accepted; verifying publication."
-              dispatched=true
-            else
-              echo "::warning::Immediate APT dispatch failed; waiting for the central scheduled publisher."
-            fi
-          else
-            echo "::warning::APT dispatch token unavailable; waiting for the central scheduled publisher."
-          fi
-
           catalogue='https://infiltrator-projects.github.io/Infiltrator-Repository/catalogue/apps.json'
 
           if curl -fsS --retry 2 --retry-delay 1 "$catalogue?release=$RELEASE_SHA&attempt=0" \
@@ -176,10 +151,7 @@ jobs:
             exit 0
           fi
 
-          if [[ "$dispatched" != true ]]; then
-            echo "Immediate APT dispatch unavailable; waiting for central repository publication."
-          fi
-
+          echo "Waiting for the central repository to pull $APP_ID $VERSION."
           for attempt in $(seq 1 120); do
             if curl -fsS --retry 2 --retry-delay 1 "$catalogue?release=$RELEASE_SHA&attempt=$attempt" \
               | jq -e --arg id "$APP_ID" --arg version "$VERSION" \
