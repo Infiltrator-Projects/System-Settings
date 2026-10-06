@@ -401,6 +401,32 @@ void ss_linux_theme_install(void)
         border,
         detail_label);
 
+    /*
+     * Shared geometry comes from Common. Component-specific sizes stay local,
+     * but suite-level padding and radius roles must follow the current design
+     * contract instead of drifting as copied literals.
+     */
+    g_string_append_printf(
+        css,
+        ".settings-content { padding: %upx; }\n"
+        ".home-page { padding: %upx; }\n"
+        ".window-control, .theme-preview-window { border-radius: %upx; }\n"
+        ".settings-search, .nav-icon-well, .overview-item, .overview-icon, "
+        ".section-icon-wrap, .setting-row, .setting-tile, .setting-tile-icon, "
+        ".info-strip, .status-ok, .error, .page-status, .location-results, "
+        ".location-results row, .quick-action, .theme-preview { border-radius: %upx; }\n"
+        ".header-brand-icon, .nav-row, .page-icon, .overview-panel, "
+        ".settings-card, .hero-copy-overlay, .hero-brand-overlay, .home-feature, "
+        ".home-card, .status-card, .home-card-icon, .status-card-icon, "
+        ".location-pin-well, .overview-scene, .network-visual { border-radius: %upx; }\n"
+        ".hero-card, .home-hero, .home-hero-mark { border-radius: %upx; }\n",
+        (unsigned int)metrics->content_padding,
+        (unsigned int)metrics->screen_padding,
+        (unsigned int)metrics->small_radius,
+        (unsigned int)metrics->control_radius,
+        (unsigned int)metrics->card_radius,
+        (unsigned int)metrics->panel_radius);
+
     provider = gtk_css_provider_new();
 #if GTK_CHECK_VERSION(4, 12, 0)
     gtk_css_provider_load_from_string(provider, css->str);
