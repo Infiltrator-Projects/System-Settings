@@ -53,9 +53,9 @@ Update the owning Markdown in the same change that alters a durable contract. Pl
 
 ## Repository discipline
 
-Normal development stays on `main`. Keep commits coherent and forward-moving. Once CI exists, `main` should remain buildable and the exact release revision must pass the required gates before publication.
+Development is direct-to-`main`. Do not create development branches and do not create pull requests for this repository. Keep commits coherent and forward-moving. `main` must remain buildable, and the exact release revision must pass the required gates before publication.
 
-Do not create long-lived architectural branches.
+A change is complete only when the intended `main` revision has been pushed, validated and, when it is release work, published from that exact revision. Temporary audit, forensic, repair or experiment artefacts do not belong in the production tree.
 
 ## Licence
 
