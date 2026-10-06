@@ -123,6 +123,25 @@ static GtkWidget *make_setting_identity(const char *title,
     return box;
 }
 
+static void configure_setting_control(GtkWidget *control,
+                                      const char *title,
+                                      const char *description)
+{
+    gtk_widget_set_valign(control, GTK_ALIGN_CENTER);
+    if (GTK_IS_SWITCH(control)) {
+        gtk_widget_set_hexpand(control, FALSE);
+        gtk_widget_set_size_request(control, 38, 20);
+    }
+    gtk_widget_set_halign(control, GTK_ALIGN_END);
+    gtk_accessible_update_property(
+        GTK_ACCESSIBLE(control),
+        GTK_ACCESSIBLE_PROPERTY_LABEL,
+        title,
+        GTK_ACCESSIBLE_PROPERTY_DESCRIPTION,
+        description,
+        -1);
+}
+
 GtkWidget *ss_linux_ui_make_label(const char *text,
                                   const char *css_class)
 {
@@ -160,19 +179,7 @@ GtkWidget *ss_linux_ui_make_setting_row(const char *title,
     gtk_box_append(
         GTK_BOX(row),
         make_setting_identity(title, description));
-    gtk_widget_set_valign(control, GTK_ALIGN_CENTER);
-    if (GTK_IS_SWITCH(control)) {
-        gtk_widget_set_hexpand(control, FALSE);
-        gtk_widget_set_size_request(control, 38, 20);
-    }
-    gtk_widget_set_halign(control, GTK_ALIGN_END);
-    gtk_accessible_update_property(
-        GTK_ACCESSIBLE(control),
-        GTK_ACCESSIBLE_PROPERTY_LABEL,
-        title,
-        GTK_ACCESSIBLE_PROPERTY_DESCRIPTION,
-        description,
-        -1);
+    configure_setting_control(control, title, description);
     gtk_box_append(GTK_BOX(row), control);
     return row;
 }
@@ -205,19 +212,7 @@ GtkWidget *ss_linux_ui_make_setting_tile(const char *icon_name,
         GTK_BOX(tile),
         make_setting_identity(title, description));
     gtk_widget_set_hexpand(tile, TRUE);
-    gtk_widget_set_valign(control, GTK_ALIGN_CENTER);
-    if (GTK_IS_SWITCH(control)) {
-        gtk_widget_set_hexpand(control, FALSE);
-        gtk_widget_set_size_request(control, 38, 20);
-    }
-    gtk_widget_set_halign(control, GTK_ALIGN_END);
-    gtk_accessible_update_property(
-        GTK_ACCESSIBLE(control),
-        GTK_ACCESSIBLE_PROPERTY_LABEL,
-        title,
-        GTK_ACCESSIBLE_PROPERTY_DESCRIPTION,
-        description,
-        -1);
+    configure_setting_control(control, title, description);
     gtk_box_append(GTK_BOX(tile), control);
     return tile;
 }
