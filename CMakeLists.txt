@@ -333,6 +333,35 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         InfiltratrCommon::Portable
         PkgConfig::GTK4)
 
+    # Keep the previous decoupling as a build invariant rather than a convention.
+    get_target_property(SS_SHELL_DIRECT_LINKS system-settings LINK_LIBRARIES)
+    list(FIND SS_SHELL_DIRECT_LINKS "system-settings-platform"
+        SS_SHELL_PLATFORM_LINK_INDEX)
+    if(NOT SS_SHELL_PLATFORM_LINK_INDEX EQUAL -1)
+        message(FATAL_ERROR
+            "Generic Linux shell must not link system-settings-platform directly; "
+            "platform ownership belongs behind settings modules.")
+    endif()
+
+    get_target_property(
+        SS_DATE_TIME_DIRECT_INCLUDES
+        system-settings-date-time-linux
+        INCLUDE_DIRECTORIES)
+    set(SS_SHELL_SOURCE_INCLUDE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux")
+    list(FIND SS_DATE_TIME_DIRECT_INCLUDES "${SS_SHELL_SOURCE_INCLUDE}"
+        SS_DATE_TIME_SHELL_INCLUDE_INDEX)
+    if(NOT SS_DATE_TIME_SHELL_INCLUDE_INDEX EQUAL -1)
+        message(FATAL_ERROR
+            "Date & Time must consume Linux UI through system-settings-linux-ui; "
+            "it must not add the shell source directory directly.")
+    endif()
+    unset(SS_DATE_TIME_SHELL_INCLUDE_INDEX)
+    unset(SS_SHELL_SOURCE_INCLUDE)
+    unset(SS_DATE_TIME_DIRECT_INCLUDES)
+    unset(SS_SHELL_PLATFORM_LINK_INDEX)
+    unset(SS_SHELL_DIRECT_LINKS)
+
     install(TARGETS system-settings
         RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
     install(FILES data/org.infiltrator.SystemSettings.desktop
