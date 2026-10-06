@@ -572,7 +572,7 @@ int main(int argc, char **argv)
             if (snprintf(
                     build_profile_argument,
                     sizeof(build_profile_argument),
-                    "-DSYSTEM_SETTINGS_BUILD_PROFILE=development") <= 0 ||
+                    "-DSYSTEM_SETTINGS_BUILD_PROFILE=generic") <= 0 ||
                 snprintf(
                     c_flags_argument,
                     sizeof(c_flags_argument),
