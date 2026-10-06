@@ -4,7 +4,6 @@ name: System Settings CI
 on:
   push:
     branches: [main]
-  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -14,7 +13,7 @@ permissions:
 jobs:
   linux:
     name: Linux build, test and package
-    runs-on: ${{ fromJSON((github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Release '))) && '["ubuntu-24.04"]' || '["self-hosted","Linux","X64","linux-native","bigbedroom"]') }}
+    runs-on: ${{ fromJSON((github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Release ')) && '["ubuntu-24.04"]' || '["self-hosted","Linux","X64","linux-native","bigbedroom"]') }}
     timeout-minutes: 30
     env:
       PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -125,7 +124,7 @@ jobs:
 
   windows:
     name: Windows build and test
-    runs-on: ${{ fromJSON((github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Release '))) && '["windows-latest"]' || '["self-hosted","Windows","ARM64"]') }}
+    runs-on: ${{ fromJSON((github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Release ')) && '["windows-latest"]' || '["self-hosted","Windows","ARM64"]') }}
     timeout-minutes: 30
     defaults:
       run:
@@ -172,7 +171,7 @@ jobs:
 
   sanitizers:
     name: Linux ASan and UBSan
-    runs-on: ${{ fromJSON((github.event_name == 'pull_request' || (github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Release '))) && '["ubuntu-24.04"]' || '["self-hosted","Linux","X64","linux-native","bigbedroom"]') }}
+    runs-on: ${{ fromJSON((github.event_name == 'push' && startsWith(github.event.head_commit.message, 'Release ')) && '["ubuntu-24.04"]' || '["self-hosted","Linux","X64","linux-native","bigbedroom"]') }}
     timeout-minutes: 30
     env:
       PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -201,7 +200,13 @@ jobs:
 
       - name: Configure ASan and UBSan
         run: |
-          cmake -S . -B build-sanitized             -DCMAKE_BUILD_TYPE=Debug             -DBUILD_TESTING=ON             -DSYSTEM_SETTINGS_WARNINGS_AS_ERRORS=ON             -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"             -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"             -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address,undefined"
+          cmake -S . -B build-sanitized \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_TESTING=ON \
+            -DSYSTEM_SETTINGS_WARNINGS_AS_ERRORS=ON \
+            -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address,undefined"
 
       - name: Build sanitized targets
         run: cmake --build build-sanitized --parallel "$(($(nproc)>1?$(nproc)-1:1))"
