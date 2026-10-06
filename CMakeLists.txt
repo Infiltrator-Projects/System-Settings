@@ -218,9 +218,9 @@ target_compile_definitions(system-settings-core PUBLIC
     SYSTEM_SETTINGS_BUILD_PROFILE="${SYSTEM_SETTINGS_BUILD_PROFILE}")
 target_link_libraries(system-settings-core PUBLIC InfiltratrCommon::Portable)
 
-# Keep the generic shell free of Date & Time domain/back-end ownership.
-# The current built-in module uses a private GTK bridge, while the future
-# public module ABI remains toolkit-neutral.
+# Enforce the generic Linux shell boundary as source code, not convention.
+# The built-in composition adapter lives in src/app and is the only production
+# unit allowed to know the private Date & Time GTK bridge.
 file(GLOB SS_LINUX_SHELL_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux/*.c")
 foreach(SS_LINUX_SHELL_FILE IN LISTS SS_LINUX_SHELL_SOURCES)
@@ -232,14 +232,18 @@ foreach(SS_LINUX_SHELL_FILE IN LISTS SS_LINUX_SHELL_SOURCES)
             "location-metadata.h"
             "regional-context.h"
             "temporal-policy-store.h"
+            "linux-date-time-panel.h"
+            "home-temporal-presentation.h"
             "SsDateTimeModel"
-            "SsSystemTimeService")
+            "SsSystemTimeService"
+            "SsLinuxDateTimePanel"
+            "SsHomeTemporalPresenter")
         string(FIND "${SS_LINUX_SHELL_SOURCE}"
             "${SS_FORBIDDEN_SHELL_TOKEN}"
             SS_FORBIDDEN_SHELL_INDEX)
         if(NOT SS_FORBIDDEN_SHELL_INDEX EQUAL -1)
             message(FATAL_ERROR
-                "Linux shell regained Date & Time domain ownership in "
+                "Linux shell regained Date & Time ownership in "
                 "${SS_LINUX_SHELL_FILE}: ${SS_FORBIDDEN_SHELL_TOKEN}")
         endif()
     endforeach()
@@ -272,8 +276,6 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         src/shell/linux/linux-ui-helpers.c
         src/shell/linux/linux-theme.c)
     ss_configure(system-settings-linux-ui)
-    # Consumers use this target as the presentation boundary. Export its own
-    # headers so modules do not need to know the shell source-directory path.
     target_include_directories(system-settings-linux-ui PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux")
     target_link_libraries(system-settings-linux-ui PUBLIC
@@ -305,9 +307,18 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
             SYSTEM_SETTINGS_LIBRARY_ARCHITECTURE="${CMAKE_LIBRARY_ARCHITECTURE}")
     endif()
 
-    add_executable(system-settings
-        src/shell/linux/main.c)
-    ss_configure(system-settings)
+    # Composition root for today's built-in modules. Shell code consumes only
+    # builtin-module-host.h; private module headers never enter the shell target.
+    add_library(system-settings-linux-modules STATIC
+        src/app/linux-builtin-module-host.c)
+    ss_configure(system-settings-linux-modules)
+    target_include_directories(system-settings-linux-modules
+        PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux"
+        PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/modules/date-time")
+    target_link_libraries(system-settings-linux-modules PRIVATE
+        system-settings-date-time-linux
+        PkgConfig::GIO2
+        PkgConfig::GTK4)
 
     set(SYSTEM_SETTINGS_RUNTIME_UI_SOURCE_DIR "")
     set(SYSTEM_SETTINGS_RUNTIME_MODULE_SOURCE_DIR "")
@@ -318,30 +329,64 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         set(SYSTEM_SETTINGS_RUNTIME_MODULE_SOURCE_DIR
             "${CMAKE_CURRENT_SOURCE_DIR}/modules")
     endif()
-    target_include_directories(system-settings PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/modules/date-time"
+
+    add_library(system-settings-linux-shell STATIC
+        src/shell/linux/shell-command.c
+        src/shell/linux/home-page.c
+        src/shell/linux/shell-window.c)
+    ss_configure(system-settings-linux-shell)
+    target_include_directories(system-settings-linux-shell PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux")
-    target_compile_definitions(system-settings PRIVATE
+    target_compile_definitions(system-settings-linux-shell PRIVATE
         SYSTEM_SETTINGS_UI_ASSET_DIR="${CMAKE_INSTALL_FULL_DATADIR}/infiltrator/system-settings/ui"
         SYSTEM_SETTINGS_UI_SOURCE_DIR="${SYSTEM_SETTINGS_RUNTIME_UI_SOURCE_DIR}"
         SYSTEM_SETTINGS_MODULE_DIR="${CMAKE_INSTALL_FULL_DATADIR}/infiltrator/system-settings/modules"
         SYSTEM_SETTINGS_MODULE_SOURCE_DIR="${SYSTEM_SETTINGS_RUNTIME_MODULE_SOURCE_DIR}")
-    target_link_libraries(system-settings PRIVATE
-        system-settings-date-time-linux
+    target_link_libraries(system-settings-linux-shell PRIVATE
+        system-settings-linux-modules
         system-settings-linux-ui
         system-settings-core
         InfiltratrCommon::Portable
         PkgConfig::GTK4)
 
-    # Keep the previous decoupling as a build invariant rather than a convention.
-    get_target_property(SS_SHELL_DIRECT_LINKS system-settings LINK_LIBRARIES)
-    list(FIND SS_SHELL_DIRECT_LINKS "system-settings-platform"
-        SS_SHELL_PLATFORM_LINK_INDEX)
-    if(NOT SS_SHELL_PLATFORM_LINK_INDEX EQUAL -1)
-        message(FATAL_ERROR
-            "Generic Linux shell must not link system-settings-platform directly; "
-            "platform ownership belongs behind settings modules.")
-    endif()
+    add_executable(system-settings
+        src/shell/linux/main.c)
+    ss_configure(system-settings)
+    target_include_directories(system-settings PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux")
+    target_link_libraries(system-settings PRIVATE
+        system-settings-linux-shell
+        system-settings-core
+        InfiltratrCommon::Portable
+        PkgConfig::GTK4)
+
+    # Keep shell/module decoupling non-regressible at configure time.
+    get_target_property(
+        SS_SHELL_LIBRARY_DIRECT_LINKS system-settings-linux-shell LINK_LIBRARIES)
+    foreach(SS_FORBIDDEN_SHELL_LINK
+            system-settings-platform
+            system-settings-date-time-linux)
+        list(FIND SS_SHELL_LIBRARY_DIRECT_LINKS "${SS_FORBIDDEN_SHELL_LINK}"
+            SS_FORBIDDEN_SHELL_LINK_INDEX)
+        if(NOT SS_FORBIDDEN_SHELL_LINK_INDEX EQUAL -1)
+            message(FATAL_ERROR
+                "Generic Linux shell must reach modules through "
+                "system-settings-linux-modules, not ${SS_FORBIDDEN_SHELL_LINK}.")
+        endif()
+    endforeach()
+
+    get_target_property(SS_EXECUTABLE_DIRECT_LINKS system-settings LINK_LIBRARIES)
+    foreach(SS_FORBIDDEN_EXECUTABLE_LINK
+            system-settings-platform
+            system-settings-date-time-linux)
+        list(FIND SS_EXECUTABLE_DIRECT_LINKS "${SS_FORBIDDEN_EXECUTABLE_LINK}"
+            SS_FORBIDDEN_EXECUTABLE_LINK_INDEX)
+        if(NOT SS_FORBIDDEN_EXECUTABLE_LINK_INDEX EQUAL -1)
+            message(FATAL_ERROR
+                "System Settings executable must link the generic shell, not "
+                "${SS_FORBIDDEN_EXECUTABLE_LINK} directly.")
+        endif()
+    endforeach()
 
     get_target_property(
         SS_DATE_TIME_DIRECT_INCLUDES
@@ -359,8 +404,10 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     unset(SS_DATE_TIME_SHELL_INCLUDE_INDEX)
     unset(SS_SHELL_SOURCE_INCLUDE)
     unset(SS_DATE_TIME_DIRECT_INCLUDES)
-    unset(SS_SHELL_PLATFORM_LINK_INDEX)
-    unset(SS_SHELL_DIRECT_LINKS)
+    unset(SS_FORBIDDEN_EXECUTABLE_LINK_INDEX)
+    unset(SS_EXECUTABLE_DIRECT_LINKS)
+    unset(SS_FORBIDDEN_SHELL_LINK_INDEX)
+    unset(SS_SHELL_LIBRARY_DIRECT_LINKS)
 
     install(TARGETS system-settings
         RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
@@ -464,8 +511,12 @@ if(BUILD_TESTING)
             SYSTEM_SETTINGS_MODULE_DIR="${CMAKE_INSTALL_FULL_DATADIR}/infiltrator/system-settings/modules"
             SYSTEM_SETTINGS_MODULE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/modules")
         target_link_libraries(linux-shell-test PRIVATE
-            system-settings-date-time-linux system-settings-linux-ui
-            system-settings-core system-settings-platform PkgConfig::GTK4)
+            system-settings-linux-shell
+            system-settings-date-time-linux
+            system-settings-linux-ui
+            system-settings-core
+            system-settings-platform
+            PkgConfig::GTK4)
         find_program(SS_XVFB_RUN xvfb-run)
         if(SS_XVFB_RUN)
             add_test(NAME linux-shell COMMAND ${SS_XVFB_RUN} -a $<TARGET_FILE:linux-shell-test>)
