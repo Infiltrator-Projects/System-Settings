@@ -272,7 +272,9 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         src/shell/linux/linux-ui-helpers.c
         src/shell/linux/linux-theme.c)
     ss_configure(system-settings-linux-ui)
-    target_include_directories(system-settings-linux-ui PRIVATE
+    # Consumers use this target as the presentation boundary. Export its own
+    # headers so modules do not need to know the shell source-directory path.
+    target_include_directories(system-settings-linux-ui PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux")
     target_link_libraries(system-settings-linux-ui PUBLIC
         PkgConfig::GTK4
@@ -288,8 +290,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         src/platform/linux/location-search.c)
     ss_configure(system-settings-date-time-linux)
     target_include_directories(system-settings-date-time-linux PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/modules/date-time"
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux")
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/modules/date-time")
     target_link_libraries(system-settings-date-time-linux PRIVATE
         system-settings-core
         system-settings-platform
@@ -329,7 +330,6 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         system-settings-date-time-linux
         system-settings-linux-ui
         system-settings-core
-        system-settings-platform
         InfiltratrCommon::Portable
         PkgConfig::GTK4)
 
