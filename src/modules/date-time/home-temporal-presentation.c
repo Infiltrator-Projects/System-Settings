@@ -421,21 +421,10 @@ bool ss_home_temporal_presenter_format_now(
 guint ss_home_temporal_presenter_refresh_interval_ms(
     const SsHomeTemporalPresenter *presenter)
 {
-    /*
-     * Seconds-enabled extended clocks can advance displayed units at rates
-     * other than one SI second. A 500 ms sample cadence remains comfortably
-     * faster than the shortest displayed second in the supported catalogue
-     * (French decimal time is about 0.864 SI seconds) while halving Home's
-     * formatting/timer wakeups compared with the old 250 ms prototype rate.
-     * Date conversion is cached independently, so only live time is sampled.
-     */
-    if (presenter == NULL || !presenter->policy_valid ||
-        !presenter->policy.show_seconds) {
+    if (presenter == NULL || !presenter->policy_valid) {
         return 1000U;
     }
-    if (ss_native_clock_mode_tracks_desktop(
-            presenter->policy.clock_mode)) {
-        return 1000U;
-    }
-    return 500U;
+    return ss_clock_presentation_refresh_interval_ms(
+        presenter->policy.clock_mode,
+        presenter->policy.show_seconds);
 }
