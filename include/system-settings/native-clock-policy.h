@@ -33,6 +33,18 @@ bool ss_native_clock_mode_is_conventional(const char *clock_mode);
  */
 bool ss_native_clock_mode_tracks_desktop(const char *clock_mode);
 
+/**
+ * Return the canonical UI refresh cadence for a clock presentation.
+ *
+ * Conventional clocks and clocks without visible seconds need only a 1 Hz
+ * refresh. Extended clocks with visible seconds use 500 ms: this is faster
+ * than the shortest displayed second in the supported catalogue while
+ * avoiding the old duplicated 250/500 ms policy split between UI surfaces.
+ */
+unsigned int ss_clock_presentation_refresh_interval_ms(
+    const char *clock_mode,
+    bool show_seconds);
+
 #ifdef __cplusplus
 }
 #endif

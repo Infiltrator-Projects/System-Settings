@@ -54,3 +54,13 @@ bool ss_native_clock_mode_tracks_desktop(const char *clock_mode)
     return ss_native_clock_mode_is_legacy_default(clock_mode) ||
            ss_native_clock_mode_is_conventional(clock_mode);
 }
+
+unsigned int ss_clock_presentation_refresh_interval_ms(
+    const char *clock_mode,
+    bool show_seconds)
+{
+    if (!show_seconds || ss_native_clock_mode_tracks_desktop(clock_mode)) {
+        return 1000U;
+    }
+    return 500U;
+}

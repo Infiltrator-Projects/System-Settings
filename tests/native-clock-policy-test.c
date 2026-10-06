@@ -45,5 +45,14 @@ int main(void)
     CHECK(ss_native_clock_mode_tracks_desktop("standard-24"));
     CHECK(!ss_native_clock_mode_tracks_desktop("decimal"));
     CHECK(!ss_native_clock_mode_tracks_desktop("sidereal"));
+
+    CHECK(ss_clock_presentation_refresh_interval_ms("standard", false) == 1000U);
+    CHECK(ss_clock_presentation_refresh_interval_ms("standard", true) == 1000U);
+    CHECK(ss_clock_presentation_refresh_interval_ms("standard-12", true) == 1000U);
+    CHECK(ss_clock_presentation_refresh_interval_ms("standard-24", true) == 1000U);
+    CHECK(ss_clock_presentation_refresh_interval_ms("decimal", false) == 1000U);
+    CHECK(ss_clock_presentation_refresh_interval_ms("decimal", true) == 500U);
+    CHECK(ss_clock_presentation_refresh_interval_ms("sidereal", true) == 500U);
+    CHECK(ss_clock_presentation_refresh_interval_ms(NULL, true) == 500U);
     return 0;
 }
