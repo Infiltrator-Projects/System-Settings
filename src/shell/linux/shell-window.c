@@ -3,9 +3,10 @@
  * @file shell-window.c
  * @brief Native Linux System Settings shell/window controller.
  *
- * This unit owns application lifecycle, framing, navigation and search. It
- * knows only the generic built-in module host; module-private Date & Time
- * types and construction stay behind that composition boundary.
+ * This unit owns application lifecycle, framing, navigation and search. Built-
+ * in module pages are registered by logical page ID and routed through the
+ * generic module host; the shell does not retain module-private controller
+ * state.
  */
 
 #include "shell-window-private.h"
@@ -30,10 +31,80 @@
 #define SYSTEM_SETTINGS_MODULE_SOURCE_DIR ""
 #endif
 
+#define SS_HOME_PAGE_ID "home"
 #define SS_DATE_TIME_PAGE_ID "date-time"
 
 static void show_about(GtkButton *button, gpointer user_data);
-static GtkWidget *build_unavailable_panel(const char *message);
+static GtkWidget *build_unavailable_panel(
+    const char *title,
+    const char *message);
+
+static void shell_module_page_free(gpointer data)
+{
+    ShellModulePage *page = data;
+
+    if (page == NULL) {
+        return;
+    }
+    g_free(page->page_id);
+    g_free(page->title);
+    g_free(page);
+}
+
+static ShellModulePage *shell_module_page_lookup(
+    ShellSearchState *state,
+    const char *page_id)
+{
+    if (state == NULL || state->module_pages == NULL ||
+        page_id == NULL || page_id[0] == '\0') {
+        return NULL;
+    }
+    return g_hash_table_lookup(state->module_pages, page_id);
+}
+
+static void shell_register_module_page(
+    ShellSearchState *state,
+    const char *page_id,
+    const char *title,
+    GtkListBoxRow *row)
+{
+    ShellModulePage *page;
+
+    if (state == NULL || state->module_pages == NULL ||
+        page_id == NULL || page_id[0] == '\0') {
+        return;
+    }
+
+    page = g_new0(ShellModulePage, 1);
+    page->page_id = g_strdup(page_id);
+    page->title = g_strdup(
+        title != NULL && title[0] != '\0' ? title : page_id);
+    page->row = row;
+    g_hash_table_replace(
+        state->module_pages,
+        g_strdup(page_id),
+        page);
+
+    if (g_strcmp0(page_id, state->home_primary_page_id) == 0) {
+        state->primary_module_row = row;
+    }
+}
+
+static void shell_set_module_container(
+    ShellSearchState *state,
+    const char *page_id,
+    GtkScrolledWindow *container)
+{
+    ShellModulePage *page = shell_module_page_lookup(state, page_id);
+
+    if (page == NULL) {
+        return;
+    }
+    page->container = container;
+    if (g_strcmp0(page_id, state->home_primary_page_id) == 0) {
+        state->primary_module_container = container;
+    }
+}
 
 static void shell_search_state_free(gpointer data)
 {
@@ -42,6 +113,7 @@ static void shell_search_state_free(gpointer data)
     if (state == NULL) {
         return;
     }
+    g_clear_pointer(&state->module_pages, g_hash_table_unref);
     g_free(state->query);
     g_free(state);
 }
@@ -75,37 +147,93 @@ void on_search_changed(GtkSearchEntry *entry, gpointer user_data)
     gtk_list_box_invalidate_filter(state->list);
 }
 
-void ensure_date_time_panel(ShellSearchState *state)
+static bool ensure_module_page(
+    ShellSearchState *state,
+    const char *page_id)
 {
+    ShellModulePage *page;
     g_autoptr(GError) panel_error = NULL;
 
-    if (state == NULL || state->date_scroller == NULL ||
-        state->module_host == NULL) {
-        return;
+    if (state == NULL || state->module_host == NULL) {
+        return false;
     }
 
-    if (ss_builtin_module_host_is_loaded(
-            state->module_host, SS_DATE_TIME_PAGE_ID)) {
-        state->date_time_loaded = true;
-        return;
+    page = shell_module_page_lookup(state, page_id);
+    if (page == NULL || page->container == NULL) {
+        return false;
+    }
+
+    if (ss_builtin_module_host_is_loaded(state->module_host, page_id)) {
+        if (g_strcmp0(page_id, state->home_primary_page_id) == 0) {
+            state->primary_module_loaded = true;
+        }
+        return true;
     }
 
     if (!ss_builtin_module_host_ensure_page(
             state->module_host,
-            SS_DATE_TIME_PAGE_ID,
-            state->date_scroller,
+            page_id,
+            page->container,
             &panel_error)) {
-        state->date_time_loaded = false;
+        if (g_strcmp0(page_id, state->home_primary_page_id) == 0) {
+            state->primary_module_loaded = false;
+        }
         gtk_scrolled_window_set_child(
-            state->date_scroller,
+            page->container,
             build_unavailable_panel(
+                page->title,
                 panel_error != NULL
                     ? panel_error->message
-                    : "Unable to initialise Date & Time."));
-        return;
+                    : "Unable to initialise this settings module."));
+        return false;
     }
 
-    state->date_time_loaded = true;
+    if (g_strcmp0(page_id, state->home_primary_page_id) == 0) {
+        state->primary_module_loaded = true;
+    }
+    return true;
+}
+
+bool shell_open_page(ShellSearchState *state, const char *page_id)
+{
+    ShellModulePage *module_page;
+    bool ready = true;
+
+    if (state == NULL || state->stack == NULL ||
+        page_id == NULL || page_id[0] == '\0') {
+        return false;
+    }
+
+    module_page = shell_module_page_lookup(state, page_id);
+    if (module_page != NULL) {
+        ready = ensure_module_page(state, page_id);
+    }
+
+    gtk_stack_set_visible_child_name(state->stack, page_id);
+    if (state->list != NULL) {
+        if (module_page != NULL && module_page->row != NULL) {
+            gtk_list_box_select_row(state->list, module_page->row);
+        } else if (g_strcmp0(page_id, SS_HOME_PAGE_ID) == 0 &&
+                   state->home_row != NULL) {
+            gtk_list_box_select_row(state->list, state->home_row);
+        }
+    }
+    return ready;
+}
+
+/*
+ * These wrappers exist only because the existing white-box shell regression
+ * test calls the old names directly. Production routing uses shell_open_page().
+ */
+void ensure_date_time_panel(ShellSearchState *state)
+{
+    (void)ensure_module_page(state, SS_DATE_TIME_PAGE_ID);
+}
+
+void open_date_time(GtkButton *button, gpointer user_data)
+{
+    (void)button;
+    (void)shell_open_page(user_data, SS_DATE_TIME_PAGE_ID);
 }
 
 static void on_navigation_selected(
@@ -117,33 +245,31 @@ static void on_navigation_selected(
     const char *page_name;
 
     (void)box;
-    if (row == NULL || state == NULL || state->stack == NULL) {
+    if (row == NULL || state == NULL) {
         return;
     }
 
     page_name = g_object_get_data(G_OBJECT(row), "page-name");
-    if (page_name == NULL) {
-        return;
+    if (page_name != NULL) {
+        (void)shell_open_page(state, page_name);
     }
-    if (g_strcmp0(page_name, SS_DATE_TIME_PAGE_ID) == 0) {
-        ensure_date_time_panel(state);
-    }
-    gtk_stack_set_visible_child_name(state->stack, page_name);
 }
 
 static void restore_navigation_selection(ShellSearchState *state)
 {
     const char *visible_name;
+    ShellModulePage *module_page;
 
     if (state == NULL || state->list == NULL || state->stack == NULL) {
         return;
     }
 
     visible_name = gtk_stack_get_visible_child_name(state->stack);
-    if (g_strcmp0(visible_name, SS_DATE_TIME_PAGE_ID) == 0 &&
-        state->date_row != NULL) {
-        gtk_list_box_select_row(state->list, state->date_row);
-    } else if (state->home_row != NULL) {
+    module_page = shell_module_page_lookup(state, visible_name);
+    if (module_page != NULL && module_page->row != NULL) {
+        gtk_list_box_select_row(state->list, module_page->row);
+    } else if (g_strcmp0(visible_name, SS_HOME_PAGE_ID) == 0 &&
+               state->home_row != NULL) {
         gtk_list_box_select_row(state->list, state->home_row);
     }
 }
@@ -275,13 +401,10 @@ static void append_manifest_value(
     }
 }
 
-static gchar *date_time_search_text(void)
+static gchar *module_search_text(
+    const char *manifest_filename,
+    const char *fallback)
 {
-    static const char fallback[] =
-        "date time clock calendar location timezone seconds precision "
-        "12 hour 24 hour decimal internet ntp network time unix binary "
-        "hexadecimal julian sidereal solar roman chinese japanese gregorian "
-        "hebrew islamic persian mayan french republican first day week";
     const char *override_dir =
         g_getenv("SYSTEM_SETTINGS_MODULE_DIR_OVERRIDE");
     const bool override_active =
@@ -291,6 +414,10 @@ static gchar *date_time_search_text(void)
         override_active ? NULL : SYSTEM_SETTINGS_MODULE_DIR,
         NULL
     };
+
+    if (manifest_filename == NULL || manifest_filename[0] == '\0') {
+        return g_strdup(fallback != NULL ? fallback : "");
+    }
 
     for (size_t directory_index = 0U;
          directories[directory_index] != NULL;
@@ -306,16 +433,14 @@ static gchar *date_time_search_text(void)
             continue;
         }
         path = g_build_filename(
-            directories[directory_index],
-            "date-time.settings-module",
-            NULL);
+            directories[directory_index], manifest_filename, NULL);
         key_file = g_key_file_new();
         if (!g_key_file_load_from_file(
                 key_file, path, G_KEY_FILE_NONE, &error)) {
             continue;
         }
 
-        search = g_string_new("date time");
+        search = g_string_new("");
         append_manifest_value(search, key_file, "Module", "Title");
         append_manifest_value(search, key_file, "Module", "Summary");
         append_manifest_value(search, key_file, "Search", "Keywords");
@@ -330,10 +455,13 @@ static gchar *date_time_search_text(void)
                     search, key_file, groups[group_index], "Keywords");
             }
         }
-        return g_string_free(search, FALSE);
+        if (search->len > 0U) {
+            return g_string_free(search, FALSE);
+        }
+        g_string_free(search, TRUE);
     }
 
-    return g_strdup(fallback);
+    return g_strdup(fallback != NULL ? fallback : "");
 }
 
 static void minimize_window(GtkButton *button, gpointer user_data)
@@ -463,6 +591,11 @@ static GtkWidget *build_sidebar(
     GtkSearchEntry *search_entry,
     ShellSearchState *search_state)
 {
+    static const char date_fallback[] =
+        "date time clock calendar location timezone seconds precision "
+        "12 hour 24 hour decimal internet ntp network time unix binary "
+        "hexadecimal julian sidereal solar roman chinese japanese gregorian "
+        "hebrew islamic persian mayan french republican first day week";
     const InfiltratrProjectInfo *info = ss_project_info();
     GtkWidget *sidebar = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
     GtkWidget *list = gtk_list_box_new();
@@ -482,7 +615,8 @@ static GtkWidget *build_sidebar(
     GtkWidget *about_row;
     GtkWidget *footer = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
     g_autofree gchar *version = g_strdup_printf("Version %s", info->version);
-    g_autofree gchar *date_search = date_time_search_text();
+    g_autofree gchar *date_search = module_search_text(
+        "date-time.settings-module", date_fallback);
 
     gtk_widget_set_size_request(sidebar, 205, -1);
     gtk_widget_set_hexpand(sidebar, FALSE);
@@ -495,7 +629,7 @@ static GtkWidget *build_sidebar(
         "go-home-symbolic",
         "Home",
         "Overview & quick access",
-        "home",
+        SS_HOME_PAGE_ID,
         "home overview quick access system");
     date_row = make_navigation_row(
         "preferences-system-time-symbolic",
@@ -606,7 +740,11 @@ static GtkWidget *build_sidebar(
         search_state->parent = parent;
         search_state->stack = stack;
         search_state->home_row = GTK_LIST_BOX_ROW(home_row);
-        search_state->date_row = GTK_LIST_BOX_ROW(date_row);
+        shell_register_module_page(
+            search_state,
+            SS_DATE_TIME_PAGE_ID,
+            "Date & Time",
+            GTK_LIST_BOX_ROW(date_row));
         gtk_list_box_set_filter_func(
             GTK_LIST_BOX(list), navigation_filter, search_state, NULL);
         if (search_entry != NULL) {
@@ -641,24 +779,14 @@ static GtkWidget *build_sidebar(
     return sidebar;
 }
 
-void open_date_time(GtkButton *button, gpointer user_data)
+static void open_home_primary_page(gpointer user_data)
 {
     ShellSearchState *state = user_data;
 
-    (void)button;
-    if (state == NULL || state->stack == NULL) {
+    if (state == NULL || state->home_primary_page_id == NULL) {
         return;
     }
-    ensure_date_time_panel(state);
-    gtk_stack_set_visible_child_name(state->stack, SS_DATE_TIME_PAGE_ID);
-    if (state->list != NULL && state->date_row != NULL) {
-        gtk_list_box_select_row(state->list, state->date_row);
-    }
-}
-
-static void open_date_time_from_home(gpointer user_data)
-{
-    open_date_time(NULL, user_data);
+    (void)shell_open_page(state, state->home_primary_page_id);
 }
 
 static gboolean about_close_requested(GtkWindow *window, gpointer user_data)
@@ -720,20 +848,26 @@ static void show_about(GtkButton *button, gpointer user_data)
     gtk_window_present(GTK_WINDOW(dialog));
 }
 
-static GtkWidget *build_unavailable_panel(const char *message)
+static GtkWidget *build_unavailable_panel(
+    const char *title,
+    const char *message)
 {
     GtkWidget *page = gtk_box_new(GTK_ORIENTATION_VERTICAL, 14);
     GtkWidget *copy = ss_linux_ui_make_label(
-        message != NULL ? message : "Date & Time is unavailable.",
+        message != NULL ? message : "This settings module is unavailable.",
         "error");
+    g_autofree gchar *eyebrow = g_strdup_printf(
+        "SYSTEM / %s",
+        title != NULL ? title : "SETTINGS");
 
     gtk_widget_add_css_class(page, "settings-content");
     gtk_box_append(
         GTK_BOX(page),
-        ss_linux_ui_make_label("SYSTEM / DATE & TIME", "page-eyebrow"));
+        ss_linux_ui_make_label(eyebrow, "page-eyebrow"));
     gtk_box_append(
         GTK_BOX(page),
-        ss_linux_ui_make_label("Date & Time", "page-title"));
+        ss_linux_ui_make_label(
+            title != NULL ? title : "Settings", "page-title"));
     gtk_label_set_wrap(GTK_LABEL(copy), TRUE);
     gtk_box_append(GTK_BOX(page), copy);
     return page;
@@ -748,13 +882,13 @@ static gboolean on_close_requested(GtkWindow *window, gpointer user_data)
         G_OBJECT(window), "system-settings-search-state");
     if (state != NULL) {
         state->module_host = NULL;
-        state->date_time_loaded = false;
+        state->primary_module_loaded = false;
     }
 
     /*
      * Destroy the module composition object before GTK tears down the window.
-     * Its destructor clears the compatibility lookup used by pending Date &
-     * Time callbacks, so no reply can observe freed module state.
+     * Its destructor clears module compatibility lookups used by pending
+     * callbacks so no reply can observe freed module state.
      */
     g_object_set_data(G_OBJECT(window), "system-settings-module-host", NULL);
     return FALSE;
@@ -813,7 +947,7 @@ void on_activate(GtkApplication *application, gpointer user_data)
     GtkWidget *root;
     GtkWidget *stack_widget;
     GtkStack *stack;
-    GtkWidget *date_scroller;
+    GtkWidget *module_scroller;
     GtkWidget *home_scroller;
     GtkSearchEntry *search_entry = NULL;
     ShellSearchState *search_state;
@@ -872,6 +1006,12 @@ void on_activate(GtkApplication *application, gpointer user_data)
 
     search_state = g_new0(ShellSearchState, 1);
     search_state->module_host = module_host;
+    search_state->home_primary_page_id = SS_DATE_TIME_PAGE_ID;
+    search_state->module_pages = g_hash_table_new_full(
+        g_str_hash,
+        g_str_equal,
+        g_free,
+        shell_module_page_free);
     g_object_set_data_full(
         G_OBJECT(window),
         "system-settings-search-state",
@@ -885,37 +1025,39 @@ void on_activate(GtkApplication *application, gpointer user_data)
         "system-settings-navigation-list",
         search_state->list);
 
-    date_scroller = gtk_scrolled_window_new();
+    module_scroller = gtk_scrolled_window_new();
     gtk_scrolled_window_set_policy(
-        GTK_SCROLLED_WINDOW(date_scroller),
+        GTK_SCROLLED_WINDOW(module_scroller),
         GTK_POLICY_NEVER,
         GTK_POLICY_AUTOMATIC);
     gtk_scrolled_window_set_overlay_scrolling(
-        GTK_SCROLLED_WINDOW(date_scroller), FALSE);
+        GTK_SCROLLED_WINDOW(module_scroller), FALSE);
     gtk_scrolled_window_set_kinetic_scrolling(
-        GTK_SCROLLED_WINDOW(date_scroller), TRUE);
-    gtk_widget_set_hexpand(date_scroller, TRUE);
-    gtk_widget_set_vexpand(date_scroller, TRUE);
-    search_state->date_scroller = GTK_SCROLLED_WINDOW(date_scroller);
+        GTK_SCROLLED_WINDOW(module_scroller), TRUE);
+    gtk_widget_set_hexpand(module_scroller, TRUE);
+    gtk_widget_set_vexpand(module_scroller, TRUE);
+    shell_set_module_container(
+        search_state,
+        SS_DATE_TIME_PAGE_ID,
+        GTK_SCROLLED_WINDOW(module_scroller));
+
+    /* Compatibility key retained for the current shell geometry regression. */
     g_object_set_data(
         G_OBJECT(window),
         "system-settings-date-scroller",
-        date_scroller);
+        module_scroller);
 
     home_context = (SsHomePageContext){
         .module_host = module_host,
-        .open_date_time = open_date_time_from_home,
-        .open_date_time_data = search_state
+        .navigate = open_home_primary_page,
+        .navigate_data = search_state
     };
     home_scroller = ss_linux_home_page_new(&home_context);
     g_object_set_data(
         G_OBJECT(stack), "system-settings-home-scroller", home_scroller);
-    gtk_stack_add_named(stack, home_scroller, "home");
-    gtk_stack_add_named(stack, date_scroller, SS_DATE_TIME_PAGE_ID);
-    gtk_stack_set_visible_child_name(stack, "home");
-    if (search_state->list != NULL && search_state->home_row != NULL) {
-        gtk_list_box_select_row(search_state->list, search_state->home_row);
-    }
+    gtk_stack_add_named(stack, home_scroller, SS_HOME_PAGE_ID);
+    gtk_stack_add_named(stack, module_scroller, SS_DATE_TIME_PAGE_ID);
+    (void)shell_open_page(search_state, SS_HOME_PAGE_ID);
     g_object_set_data(
         G_OBJECT(window), "system-settings-stack", stack);
     gtk_box_append(GTK_BOX(root), stack_widget);

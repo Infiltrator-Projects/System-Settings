@@ -14,6 +14,48 @@
 #include <gio/gio.h>
 #include <gtk/gtk.h>
 
+/*
+ * Date & Time used to keep every behavioural field flat in one controller.
+ * Keep the GTK widget references on the panel, but split mutable domain state
+ * by owner so location, system-time and preview code have explicit boundaries.
+ */
+typedef struct SsLinuxDateTimeLocationState {
+    SsLocationMetadata metadata;
+    SsPolicyFileObserver *metadata_observer;
+    GPtrArray *timezone_ids;
+    GCancellable *search_cancellable;
+    GCancellable *timezone_cancellable;
+    guint coordinate_commit_id;
+    guint recovery_retry_id;
+    guint recovery_retry_seconds;
+    guint search_generation;
+    guint timezone_generation;
+    bool metadata_present;
+    bool metadata_uncertain;
+    bool follows_timezone_reference;
+    bool recovery_failed;
+} SsLinuxDateTimeLocationState;
+
+typedef struct SsLinuxDateTimeSystemTimeState {
+    SsSystemTimeService *service;
+    GCancellable *service_cancellable;
+    GCancellable *ntp_cancellable;
+    GCancellable *manual_time_cancellable;
+    guint ntp_generation;
+    guint manual_time_generation;
+} SsLinuxDateTimeSystemTimeState;
+
+typedef struct SsLinuxDateTimePreviewState {
+    SsCalendarPreviewProvider *calendar_provider;
+    guint timer_id;
+    guint idle_id;
+    gint date_year;
+    gint date_month;
+    gint date_day;
+    gchar *date_calendar;
+    bool date_cache_valid;
+} SsLinuxDateTimePreviewState;
+
 struct SsLinuxDateTimePanel {
     GtkWindow *window;
     GtkWidget *root;
@@ -42,42 +84,68 @@ struct SsLinuxDateTimePanel {
     GtkSwitch *show_date;
     GtkDropDown *first_day;
     GtkWidget *status_label;
+
     GSettings *cinnamon_interface_settings;
     SsDateTimeModel model;
     SsRegionalContext regional_context;
-    SsLocationMetadata location_metadata;
-    SsSystemTimeService *system_time_service;
-    SsCalendarPreviewProvider *calendar_preview_provider;
     SsPolicyFileObserver *policy_observer;
-    SsPolicyFileObserver *location_metadata_observer;
     GPtrArray *clock_mode_ids;
-    GPtrArray *timezone_ids;
-    GCancellable *location_search_cancellable;
-    GCancellable *service_cancellable;
-    GCancellable *timezone_cancellable;
-    GCancellable *ntp_cancellable;
-    GCancellable *manual_time_cancellable;
-    guint timer_id;
-    guint preview_idle_id;
-    guint coordinate_commit_id;
-    guint locality_recovery_retry_id;
-    guint locality_recovery_retry_seconds;
-    guint location_search_generation;
-    guint timezone_generation;
-    guint ntp_generation;
-    guint manual_time_generation;
-    gint preview_date_year;
-    gint preview_date_month;
-    gint preview_date_day;
-    gchar *preview_date_calendar;
-    bool preview_date_cache_valid;
-    bool location_metadata_present;
-    bool location_metadata_uncertain;
-    bool location_follows_timezone_reference;
+
+    /*
+     * The anonymous compatibility views preserve current translation-unit and
+     * regression-test source while establishing the bounded state objects
+     * above as the canonical ownership model. New code should use
+     * state->location, state->system_time and state->preview.
+     */
+    union {
+        SsLinuxDateTimeLocationState location;
+        struct {
+            SsLocationMetadata location_metadata;
+            SsPolicyFileObserver *location_metadata_observer;
+            GPtrArray *timezone_ids;
+            GCancellable *location_search_cancellable;
+            GCancellable *timezone_cancellable;
+            guint coordinate_commit_id;
+            guint locality_recovery_retry_id;
+            guint locality_recovery_retry_seconds;
+            guint location_search_generation;
+            guint timezone_generation;
+            bool location_metadata_present;
+            bool location_metadata_uncertain;
+            bool location_follows_timezone_reference;
+            bool locality_recovery_failed;
+        };
+    };
+
+    union {
+        SsLinuxDateTimeSystemTimeState system_time;
+        struct {
+            SsSystemTimeService *system_time_service;
+            GCancellable *service_cancellable;
+            GCancellable *ntp_cancellable;
+            GCancellable *manual_time_cancellable;
+            guint ntp_generation;
+            guint manual_time_generation;
+        };
+    };
+
+    union {
+        SsLinuxDateTimePreviewState preview;
+        struct {
+            SsCalendarPreviewProvider *calendar_preview_provider;
+            guint timer_id;
+            guint preview_idle_id;
+            gint preview_date_year;
+            gint preview_date_month;
+            gint preview_date_day;
+            gchar *preview_date_calendar;
+            bool preview_date_cache_valid;
+        };
+    };
+
     bool updating_controls;
     bool updating_system_controls;
     bool manual_dirty;
-    bool locality_recovery_failed;
 };
 
 GtkWidget *ss_linux_date_time_panel_build_ui(
