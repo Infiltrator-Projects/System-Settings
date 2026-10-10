@@ -803,8 +803,8 @@ static bool format_preview_at(SsLinuxDateTimePanel *state,
     unix_us = g_date_time_to_unix(now) * G_USEC_PER_SEC +
         g_date_time_get_microsecond(now);
     offset_us = g_date_time_get_utc_offset(now);
-    return infiltratr_temporal_format_clock_mode(
-        effective_mode,
+    return infiltratr_temporal_format_clock_mode_localized(
+        g_get_language_names()[0], effective_mode,
         unix_us,
         (int32_t)(offset_us / G_USEC_PER_SEC),
         policy->show_seconds,

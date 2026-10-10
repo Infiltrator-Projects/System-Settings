@@ -1,3 +1,9 @@
+## 0.4.67 — 2026-10-10
+
+- Pin Common 1.19.40 and make both Home and Date & Time clock previews follow the desktop UI language. English Chinese-time labels use transliterated branch names and first/second-half wording; Chinese-language labels retain native script.
+- Preserve the selected calendar, traditional clock units, Roman numerals and phase boundaries. Calendar's optional date provider follows the same UI-language preference.
+- Add an English/Chinese preview regression without changing temporal policy storage.
+
 ## 0.4.66 — 2026-10-10
 
 - Consume Common's corrected document-style Traditional Chinese double-hour presentation: Earthly-Branch time now renders as forms such as `申時`, with native `初`/`正` half-shí precision when finer detail is enabled instead of pinyin/English zodiac teaching labels.

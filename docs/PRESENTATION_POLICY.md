@@ -159,7 +159,7 @@ Machine/export contexts may deliberately resolve to a fixed canonical representa
 
 Temporal Presentation uses stable clock-system identifiers supplied by Common rather than application-local conditionals.
 
-The pinned Common 1.19.38 carries the complete current clock catalogue shared with Calendar: standard OS-locale time, explicit 12-hour and 24-hour time, Internet Time, Unix time, binary and hexadecimal clocks, Julian/MJD, sidereal/apparent/mean-solar time, French Republican decimal time, traditional Chinese double-hours and hundred-kè, Roman temporal time, Edo Japanese seasonal time, Italian hours, Babylonian hours, Indian ghaṭī time and Nuremberg hours.
+The pinned Common 1.19.40 carries the complete current clock catalogue shared with Calendar: standard OS-locale time, explicit 12-hour and 24-hour time, Internet Time, Unix time, binary and hexadecimal clocks, Julian/MJD, sidereal/apparent/mean-solar time, French Republican decimal time, traditional Chinese double-hours and hundred-kè, Roman temporal time, Edo Japanese seasonal time, Italian hours, Babylonian hours, Indian ghaṭī time and Nuremberg hours.
 
 System Settings is the authority. The internal Common catalogue retains the `standard` identifier as a bootstrap/fallback for consumers that must run without System Settings, but System Settings itself does not present that identifier as a third conventional choice. Its user-facing conventional clock systems are **Standard time (12-hour)** and **Standard time (24-hour)**. The Cinnamon/GNOME 12/24-hour Boolean is the exact native compatibility backend for those modes, not another visible authority. Common-aware applications consume the System Settings policy directly rather than offering competing local clock/calendar choices.
 
@@ -204,6 +204,8 @@ date preview must say so explicitly rather than inventing an approximation.
 ## Calendar profiles
 
 Clock representation and calendar representation are independent policy dimensions.
+Clock language and timekeeping system are independent. Common's localized clock renderer receives the desktop UI-language preference; Calendar's ICU-backed date formatter receives that same preference. English Chinese-calendar dates therefore remain English, and Chinese clocks use English branch names and hourly-half wording in an English UI. Chinese-language output uses Chinese text. Roman clocks retain Roman numerals and seasonal twelfths while hour/watch wording is translated. Unsupported clock translations fall back to English. These choices do not change canonical timestamps, chronology or native update boundaries.
+
 
 Temporal policy v3 combines these dimensions directly. For example:
 
@@ -281,7 +283,7 @@ Presentation policy is user state, not application-local state.
 
 The Infiltrator policy is an optional enrichment layer for participating applications, not a hard dependency that prevents an application from running without System Settings. When no valid policy has been published, a platform-integrated consumer resolves the equivalent native operating-system/desktop preferences and remains fully usable. On Mint/Cinnamon, Calendar therefore behaves like the stock temporal surface until an Infiltrator policy exists; once a valid policy exists, the richer Infiltrator clock/calendar/location choices become authoritative for Common-aware presentation.
 
-The pinned Common 1.19.38 provides the canonical POSIX XDG location, validated load/atomic-save mechanics and the installed `temporal-v3` provider capability contract for this policy. System Settings publishes the provider marker when installed and writes the authoritative per-user `presentation.conf` only after the user changes temporal policy. Policy v3 stores `clock-mode`, `calendar`, `show-seconds`, `location-configured`, `latitude` and `longitude`. Linux stores it below the XDG configuration home; Windows stores the equivalent user policy below LocalAppData. Common parses/serializes the same versioned contract on both platforms. Existing v2 files are privately migrated by keeping their former primary calendar as the single v3 calendar and discarding the retired secondary value.
+The pinned Common 1.19.40 provides the canonical POSIX XDG location, validated load/atomic-save mechanics and the installed `temporal-v3` provider capability contract for this policy. System Settings publishes the provider marker when installed and writes the authoritative per-user `presentation.conf` only after the user changes temporal policy. Policy v3 stores `clock-mode`, `calendar`, `show-seconds`, `location-configured`, `latitude` and `longitude`. Linux stores it below the XDG configuration home; Windows stores the equivalent user policy below LocalAppData. Common parses/serializes the same versioned contract on both platforms. Existing v2 files are privately migrated by keeping their former primary calendar as the single v3 calendar and discarding the retired secondary value.
 
 ## Third-party applications
 

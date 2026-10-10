@@ -14,6 +14,7 @@ int main(void)
     g_assert_nonnull(root);
     g_setenv("XDG_CONFIG_HOME", root, TRUE);
     g_setenv("GSETTINGS_BACKEND", "memory", TRUE);
+    g_setenv("LANGUAGE", "en_AU", TRUE);
 
     InfiltratrTemporalPolicyV3 policy;
     SsHomeTemporalPresentation presentation;
@@ -136,6 +137,17 @@ int main(void)
             1000U);
         ss_home_temporal_presenter_free(presenter);
     }
+
+    infiltratr_copy_string(policy.clock_mode, sizeof(policy.clock_mode), "chinese-time");
+    policy.show_seconds = true;
+    g_assert_true(ss_home_temporal_presentation_format(&policy, noon, true, &presentation));
+    g_assert_cmpstr(presentation.clock_text, ==, "Wǔ, second half");
+    ss_home_temporal_presentation_clear(&presentation);
+    g_setenv("LANGUAGE", "zh_TW", TRUE);
+    g_assert_true(ss_home_temporal_presentation_format(&policy, noon, true, &presentation));
+    g_assert_cmpstr(presentation.clock_text, ==, "午正");
+    ss_home_temporal_presentation_clear(&presentation);
+    g_setenv("LANGUAGE", "en_AU", TRUE);
 
     g_autofree gchar *policy_file = g_build_filename(
         root, "infiltrator", "presentation.conf", NULL);
