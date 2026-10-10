@@ -1,3 +1,9 @@
+## 0.4.68 — 2026-10-10
+
+- Pin Common 1.19.41 so both temporal preview surfaces consume native Edo bell numerals and localized branch wording, plus locale-correct explicit 12-hour markers and ordering.
+- Consume Calendar 1.0.86's shared native cyclic-year date presentation for Chinese/Dangi previews; calendar conversion and preference authority remain in their existing owners.
+- Add Home regressions for localized 12-hour markers and both Edo clock models without adding application-owned formatting.
+
 ## 0.4.67 — 2026-10-10
 
 - Pin Common 1.19.40 and make both Home and Date & Time clock previews follow the desktop UI language. English Chinese-time labels use transliterated branch names and first/second-half wording; Chinese-language labels retain native script.

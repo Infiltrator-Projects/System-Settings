@@ -147,7 +147,29 @@ int main(void)
     g_assert_true(ss_home_temporal_presentation_format(&policy, noon, true, &presentation));
     g_assert_cmpstr(presentation.clock_text, ==, "午正");
     ss_home_temporal_presentation_clear(&presentation);
+    infiltratr_copy_string(policy.clock_mode, sizeof(policy.clock_mode), "standard-12");
+    policy.show_seconds = false;
+    g_assert_true(ss_home_temporal_presentation_format(&policy, noon, true, &presentation));
+    g_assert_cmpstr(presentation.clock_text, ==, "下午12:00");
+    ss_home_temporal_presentation_clear(&presentation);
+    g_setenv("LANGUAGE", "ja_JP", TRUE);
+    g_assert_true(ss_home_temporal_presentation_format(&policy, noon, true, &presentation));
+    g_assert_cmpstr(presentation.clock_text, ==, "午後12:00");
+    ss_home_temporal_presentation_clear(&presentation);
     g_setenv("LANGUAGE", "en_AU", TRUE);
+    {
+        const char *modes[] = { "japanese-temporal", "japanese-temporal-early" };
+        g_autoptr(GDateTime) j2000 = g_date_time_new_utc(2000, 1, 1, 12, 0, 0.0);
+        policy.location_configured = true;
+        policy.latitude = 0.0;
+        policy.longitude = 0.0;
+        for (gsize i = 0; i < G_N_ELEMENTS(modes); i++) {
+            infiltratr_copy_string(policy.clock_mode, sizeof(policy.clock_mode), modes[i]);
+            g_assert_true(ss_home_temporal_presentation_format(&policy, j2000, true, &presentation));
+            g_assert_cmpstr(presentation.clock_text, ==, "Mi · 四 bells");
+            ss_home_temporal_presentation_clear(&presentation);
+        }
+    }
 
     g_autofree gchar *policy_file = g_build_filename(
         root, "infiltrator", "presentation.conf", NULL);
