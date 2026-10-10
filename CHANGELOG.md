@@ -1,3 +1,9 @@
+## 0.4.66 — 2026-10-10
+
+- Consume Common's corrected document-style Traditional Chinese double-hour presentation: Earthly-Branch time now renders as forms such as `申時`, with native `初`/`正` half-shí precision when finer detail is enabled instead of pinyin/English zodiac teaching labels.
+- Consume Common's native Roman daylight precision so `Show seconds` means the closest historically meaningful subdivision (`unciae`) of the current unequal `hora`, while the four-watch night convention remains coarse rather than inventing modern minutes.
+- Keep clock/calendar policy ownership unchanged: System Settings selects the presentation and Common remains the single formatter used by participating applications.
+
 ## 0.4.59 — 2026-10-03
 
 - Restore the Home dashboard's intended use of horizontal space: Overview/Quick Actions and the four status cards return to two columns from 720 logical pixels instead of waiting for the overly conservative 1240 px breakpoint that left scaled desktops in a giant one-column layout.
