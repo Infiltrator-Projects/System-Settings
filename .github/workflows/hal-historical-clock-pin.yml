@@ -1,0 +1,48 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Historical clock presentation update
+
+on:
+  push:
+    branches: [fix/historical-clock-presentation]
+
+permissions:
+  contents: write
+
+jobs:
+  apply-verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: fix/historical-clock-presentation
+          fetch-depth: 0
+          submodules: recursive
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev libgeocode-glib-dev pkg-config xvfb dbus-x11
+      - name: Apply release and Common pin update
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/hal_apply_historical_clock_pin.py
+          git -C src/vendor/infiltratr-common fetch origin d880d90c5786887079920096b5ad41afca095c5d
+          git -C src/vendor/infiltratr-common checkout --detach d880d90c5786887079920096b5ad41afca095c5d
+      - name: Configure, build and test
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON -DSYSTEM_SETTINGS_WARNINGS_AS_ERRORS=ON
+          cmake --build build --parallel 2
+          xvfb-run -a ctest --test-dir build --output-on-failure
+      - name: Commit verified source only
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm tools/hal_apply_historical_clock_pin.py
+          rm .github/workflows/hal-historical-clock-pin.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A CMakeLists.txt VERSION CHANGELOG.md src/vendor/infiltratr-common tools .github/workflows
+          git diff --cached --check
+          git commit -m "fix: consume authentic historical clock presentation"
+          git push origin HEAD:fix/historical-clock-presentation
