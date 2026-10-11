@@ -243,6 +243,8 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         src/shell/linux/linux-ui-helpers.c
         src/shell/linux/linux-theme.c)
     ss_configure(system-settings-linux-ui)
+    target_compile_definitions(system-settings-linux-ui PRIVATE
+        SYSTEM_SETTINGS_GENERIC_SHELL=1)
     target_include_directories(system-settings-linux-ui PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux")
     target_link_libraries(system-settings-linux-ui PUBLIC
@@ -329,6 +331,8 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     add_executable(system-settings
         src/shell/linux/main.c)
     ss_configure(system-settings)
+    target_compile_definitions(system-settings PRIVATE
+        SYSTEM_SETTINGS_GENERIC_SHELL=1)
     target_include_directories(system-settings PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux")
     target_link_libraries(system-settings PRIVATE
