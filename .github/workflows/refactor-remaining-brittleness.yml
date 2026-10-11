@@ -20,6 +20,20 @@ jobs:
           ref: fix/remaining-brittleness-2026-10-12
           fetch-depth: 0
 
+      - name: Preserve separators between extracted C functions
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('tools/refactor_remaining_brittleness.py')
+          text = path.read_text(encoding='utf-8')
+          old = '''        end = _matching_brace(text, brace) + 1\n        start = match.start()\n        while start > 0 and text[start - 1] == "\\n":\n            start -= 1\n            if start > 0 and text[start - 1] != "\\n":\n                break\n        while end < len(text) and text[end] == "\\n":\n            end += 1\n        return start, end\n'''
+          new = '''        end = _matching_brace(text, brace) + 1\n        start = match.start()\n        return start, end\n'''
+          if text.count(old) != 1:
+              raise SystemExit('function-span separator patch did not match exactly once')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+
       - name: Apply deterministic structural refactor
         run: python3 tools/refactor_remaining_brittleness.py
 
