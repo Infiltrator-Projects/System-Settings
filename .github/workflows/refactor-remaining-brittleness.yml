@@ -65,11 +65,26 @@ jobs:
               '#include "shell-module-catalog.h"\n\n#include <stdbool.h>\n\n',
               'manifest bool include')
 
-          replace_once(
-              'src/shell/linux/home-page.c',
-              '    const char *architecture = uname_result == 0 ? uts.machine : "Unknown";\n    SsHomeStatusSnapshot status;\n',
-              '    const char *architecture = uname_result == 0 ? uts.machine : "Unknown";\n    SsHomeTemporalSnapshot temporal;\n    SsHomeStatusSnapshot status;\n',
-              'Home temporal snapshot declaration')
+          home = Path('src/shell/linux/home-page.c')
+          home_text = home.read_text(encoding='utf-8')
+          old = '    const char *architecture = uname_result == 0 ? uts.machine : "Unknown";\n    SsHomeStatusSnapshot status;\n'
+          new = '    const char *architecture = uname_result == 0 ? uts.machine : "Unknown";\n    SsHomeTemporalSnapshot temporal;\n    SsHomeStatusSnapshot status;\n'
+          if home_text.count(old) != 1:
+              raise SystemExit('Home temporal snapshot declaration did not match exactly once')
+          home_text = home_text.replace(old, new, 1)
+
+          identifier_fixes = {
+              'status.region_detail_label': ('region_detail_label', 3),
+              'status.appearance_detail_label': ('appearance_detail_label', 1),
+              'status.network_detail_label': ('network_detail_label', 1),
+          }
+          for old_name, (new_name, expected) in identifier_fixes.items():
+              actual = home_text.count(old_name)
+              if actual != expected:
+                  raise SystemExit(
+                      f'{old_name}: expected {expected} occurrences, got {actual}')
+              home_text = home_text.replace(old_name, new_name)
+          home.write_text(home_text, encoding='utf-8')
           PY
 
       - name: Install Linux UI dependencies
