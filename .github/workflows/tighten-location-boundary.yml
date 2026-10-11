@@ -1,0 +1,121 @@
+name: tighten-location-boundary
+
+on:
+  push:
+    branches:
+      - fix/brittleness-next3
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Tighten locality ownership
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new, label):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{label}: expected one match, found {count}')
+              p.write_text(text.replace(old, new, 1))
+
+          header = 'src/modules/date-time/linux-date-time-panel-private.h'
+          replace_once(
+              header,
+              '''    bool follows_timezone_reference;\n    bool recovery_failed;\n} SsLinuxDateTimeLocationState;\n''',
+              '''    bool follows_timezone_reference;\n    bool recovery_failed;\n    bool updating_controls;\n} SsLinuxDateTimeLocationState;\n''',
+              'location update guard ownership')
+          replace_once(
+              header,
+              '''guint ss_linux_date_time_panel_preview_interval_ms(\n    const SsLinuxDateTimePanel *state);\n\nbool ss_linux_date_time_location_coordinate_close(\n''',
+              '''guint ss_linux_date_time_panel_preview_interval_ms(\n    const SsLinuxDateTimePanel *state);\nbool ss_linux_date_time_panel_read_system_time(\n    const SsLinuxDateTimePanel *state,\n    SsSystemTimeState *out);\n\nbool ss_linux_date_time_location_coordinate_close(\n''',
+              'system-time read bridge declaration')
+
+          panel = 'src/modules/date-time/linux-date-time-panel.c'
+          replace_once(
+              panel,
+              '''static guint timezone_index_for_id(\n    const SsLinuxDateTimePanel *state,\n    const char *timezone_id)\n''',
+              '''bool ss_linux_date_time_panel_read_system_time(\n    const SsLinuxDateTimePanel *state,\n    SsSystemTimeState *out)\n{\n    return state != NULL &&\n           out != NULL &&\n           state->system_time.service != NULL &&\n           ss_system_time_service_read(state->system_time.service, out);\n}\n\nstatic guint timezone_index_for_id(\n    const SsLinuxDateTimePanel *state,\n    const char *timezone_id)\n''',
+              'system-time read bridge implementation')
+          replace_once(
+              panel,
+              '''    state->updating_controls = true;\n    gtk_drop_down_set_selected(\n''',
+              '''    state->updating_controls = true;\n    state->location.updating_controls = true;\n    gtk_drop_down_set_selected(\n''',
+              'sync controls location guard begin')
+          replace_once(
+              panel,
+              '''    }\n    state->updating_controls = false;\n    update_control_capabilities(state);\n}\n''',
+              '''    }\n    state->location.updating_controls = false;\n    state->updating_controls = false;\n    update_control_capabilities(state);\n}\n''',
+              'sync controls location guard end')
+          replace_once(
+              panel,
+              '''            } else {\n                state->updating_controls = true;\n                gtk_spin_button_set_value(\n''',
+              '''            } else {\n                state->location.updating_controls = true;\n                gtk_spin_button_set_value(\n''',
+              'timezone reconciliation guard begin')
+          replace_once(
+              panel,
+              '''                }\n                state->updating_controls = false;\n            }\n        }\n''',
+              '''                }\n                state->location.updating_controls = false;\n            }\n        }\n''',
+              'timezone reconciliation guard end')
+
+          location = 'src/modules/date-time/linux-date-time-location.c'
+          replace_once(
+              location,
+              '''    if (state->system_time.service != NULL &&\n        ss_system_time_service_read(\n            state->system_time.service, &current_system) &&\n        current_system.timezone[0] != '\\0') {\n''',
+              '''    if (ss_linux_date_time_panel_read_system_time(\n            state, &current_system) &&\n        current_system.timezone[0] != '\\0') {\n''',
+              'locality system-time bridge')
+          replace_once(
+              location,
+              '''    state->location.follows_timezone_reference = false;\n    state->updating_controls = true;\n    gtk_editable_set_text(\n''',
+              '''    state->location.follows_timezone_reference = false;\n    state->location.updating_controls = true;\n    gtk_editable_set_text(\n''',
+              'location selection guard begin')
+          replace_once(
+              location,
+              '''    gtk_spin_button_set_value(\n        state->location.longitude, result->longitude);\n    state->updating_controls = false;\n''',
+              '''    gtk_spin_button_set_value(\n        state->location.longitude, result->longitude);\n    state->location.updating_controls = false;\n''',
+              'location selection guard end')
+          replace_once(
+              location,
+              '''    if (state == NULL || state->updating_controls) {\n''',
+              '''    if (state == NULL || state->location.updating_controls) {\n''',
+              'location coordinate callback guard')
+
+          cmake = 'CMakeLists.txt'
+          replace_once(
+              cmake,
+              '''unset(SS_LINUX_SHELL_SOURCE)\nunset(SS_LINUX_SHELL_SOURCES)\n\nif(WIN32)\n''',
+              '''unset(SS_LINUX_SHELL_SOURCE)\nunset(SS_LINUX_SHELL_SOURCES)\n\n# The locality implementation may coordinate through the panel's narrow\n# private services, but it must not reach into unrelated mutable sub-domains.\n# Keep that ownership boundary executable so a later edit cannot silently\n# recreate the shared-controller coupling this split removes.\nset(SS_DATE_TIME_LOCATION_SOURCE_FILE\n    "${CMAKE_CURRENT_SOURCE_DIR}/src/modules/date-time/linux-date-time-location.c")\nfile(READ "${SS_DATE_TIME_LOCATION_SOURCE_FILE}" SS_DATE_TIME_LOCATION_SOURCE)\nforeach(SS_FORBIDDEN_LOCATION_TOKEN\n        "state->system_time"\n        "state->preview"\n        "state->updating_controls")\n    string(FIND "${SS_DATE_TIME_LOCATION_SOURCE}"\n        "${SS_FORBIDDEN_LOCATION_TOKEN}"\n        SS_FORBIDDEN_LOCATION_INDEX)\n    if(NOT SS_FORBIDDEN_LOCATION_INDEX EQUAL -1)\n        message(FATAL_ERROR\n            "Date & Time locality regained unrelated controller ownership: "\n            "${SS_FORBIDDEN_LOCATION_TOKEN}")\n    endif()\nendforeach()\nunset(SS_FORBIDDEN_LOCATION_INDEX)\nunset(SS_DATE_TIME_LOCATION_SOURCE)\nunset(SS_DATE_TIME_LOCATION_SOURCE_FILE)\n\nif(WIN32)\n''',
+              'locality build-time ownership guard')
+
+          architecture = 'docs/ARCHITECTURE.md'
+          replace_once(
+              architecture,
+              '''The application presents its existing window on repeated activation. On close,\nthe host removes its panel data before destroying widgets. Panel cleanup removes\n''',
+              '''The application presents its existing window on repeated activation. On close,\nthe host releases its module instances before the window is destroyed. Panel cleanup removes\n''',
+              'architecture host teardown wording')
+
+          # Verify the locality translation unit no longer knows foreign mutable fields.
+          location_text = Path(location).read_text()
+          for forbidden in ('state->system_time', 'state->preview', 'state->updating_controls'):
+              if forbidden in location_text:
+                  raise SystemExit(f'stale locality coupling remains: {forbidden}')
+
+          Path('.github/workflows/tighten-location-boundary.yml').unlink()
+          PY
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Enforce Date Time locality ownership boundary"
+          git push origin HEAD:fix/brittleness-next3
