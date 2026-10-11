@@ -22,7 +22,7 @@ static gboolean subtree_has_label(GtkWidget *widget, const char *text)
          child != NULL;
          child = gtk_widget_get_next_sibling(child)) {
         if (subtree_has_label(child, text)) {
-  return TRUE;
+            return TRUE;
         }
     }
     return FALSE;
@@ -41,7 +41,7 @@ static GtkWidget *find_widget_type(GtkWidget *widget, GType type)
          child = gtk_widget_get_next_sibling(child)) {
         GtkWidget *match = find_widget_type(child, type);
         if (match != NULL) {
-  return match;
+            return match;
         }
     }
     return NULL;
@@ -60,7 +60,7 @@ static GtkWidget *find_widget_tooltip(GtkWidget *widget, const char *tooltip)
          child = gtk_widget_get_next_sibling(child)) {
         GtkWidget *match = find_widget_tooltip(child, tooltip);
         if (match != NULL) {
-  return match;
+            return match;
         }
     }
     return NULL;
@@ -79,7 +79,7 @@ static GtkListBoxRow *find_row_with_label(GtkWidget *widget, const char *label)
          child = gtk_widget_get_next_sibling(child)) {
         GtkListBoxRow *match = find_row_with_label(child, label);
         if (match != NULL) {
-  return match;
+            return match;
         }
     }
     return NULL;
@@ -103,9 +103,16 @@ static void exercise_window(GtkApplication *app)
     g_assert_true(subtree_has_label(root, "System Overview"));
     g_assert_true(subtree_has_label(root, "Quick Actions"));
     g_assert_true(subtree_has_label(root, "Configure your system, your way."));
-    g_assert_nonnull(find_widget_type(root, GTK_TYPE_SEARCH_ENTRY));
+
+    /*
+     * The titlebar is deliberately outside gtk_window_get_child(). Search the
+     * public GtkWindow widget tree rather than depending on private object-data
+     * keys or exact header composition.
+     */
+    g_assert_nonnull(find_widget_type(GTK_WIDGET(window), GTK_TYPE_SEARCH_ENTRY));
     g_assert_nonnull(find_widget_tooltip(GTK_WIDGET(window), "Minimize"));
-    g_assert_nonnull(find_widget_tooltip(GTK_WIDGET(window), "Maximize / Restore"));
+    g_assert_nonnull(
+        find_widget_tooltip(GTK_WIDGET(window), "Maximize / Restore"));
     g_assert_nonnull(find_widget_tooltip(GTK_WIDGET(window), "Close"));
 
     GtkListBoxRow *date_row = find_row_with_label(root, "Date & Time");
@@ -128,7 +135,7 @@ static void exercise_window(GtkApplication *app)
     for (unsigned int attempt = 0U; attempt < 1000U; ++attempt) {
         drain_main_context();
         if (g_list_length(gtk_application_get_windows(app)) == 0U) {
-  break;
+            break;
         }
         g_usleep(1000U);
     }
