@@ -18,6 +18,12 @@
 #include <gio/gio.h>
 #include <gtk/gtk.h>
 
+/* Controller-only lifetime operations are intentionally not exposed to locality. */
+SsLinuxDateTimeLifetime *ss_linux_date_time_lifetime_new(
+    SsLinuxDateTimePanel *panel);
+void ss_linux_date_time_lifetime_invalidate(
+    SsLinuxDateTimeLifetime *lifetime);
+
 /*
  * The complete controller is visible only to composition/controller units.
  * Locality has its own compiler-visible private boundary and cannot include
