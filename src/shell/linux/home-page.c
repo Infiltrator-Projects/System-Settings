@@ -22,6 +22,24 @@
 #define SYSTEM_SETTINGS_UI_SOURCE_DIR ""
 #endif
 
+typedef struct HomeProgramAction {
+    gchar *program;
+    gchar *argument;
+} HomeProgramAction;
+
+static void home_program_action_free(gpointer data, GClosure *closure)
+{
+    HomeProgramAction *action = data;
+
+    (void)closure;
+    if (action == NULL) {
+        return;
+    }
+    g_free(action->program);
+    g_free(action->argument);
+    g_free(action);
+}
+
 static GtkWidget *make_feature(
     const char *icon_name,
     const char *title,
@@ -175,11 +193,47 @@ static void open_date_time_from_home(GtkButton *button, gpointer user_data)
 
 static void launch_external_program(GtkButton *button, gpointer user_data)
 {
-    (void)user_data;
+    HomeProgramAction *action = user_data;
+
+    if (action == NULL || action->program == NULL) {
+        return;
+    }
     (void)launch_command(
-        GTK_WIDGET(button),
-        g_object_get_data(G_OBJECT(button), "action-program"),
-        g_object_get_data(G_OBJECT(button), "action-argument"));
+        GTK_WIDGET(button), action->program, action->argument);
+}
+
+static bool connect_program_action(
+    GtkWidget *button,
+    const char *program,
+    const char *argument,
+    const char *missing_tooltip)
+{
+    g_autofree gchar *path = find_trusted_system_program(program);
+    HomeProgramAction *action;
+
+    if (button == NULL || path == NULL) {
+        if (button != NULL) {
+            gtk_widget_set_sensitive(button, FALSE);
+            gtk_widget_set_tooltip_text(
+                button,
+                missing_tooltip != NULL
+                    ? missing_tooltip
+                    : "This application is not installed.");
+        }
+        return false;
+    }
+
+    action = g_new0(HomeProgramAction, 1);
+    action->program = g_strdup(path);
+    action->argument = g_strdup(argument);
+    g_signal_connect_data(
+        button,
+        "clicked",
+        G_CALLBACK(launch_external_program),
+        action,
+        home_program_action_free,
+        0);
+    return true;
 }
 
 static GtkWidget *make_quick_action(
@@ -222,21 +276,12 @@ static GtkWidget *make_program_action(
     const char *argument)
 {
     GtkWidget *button = make_quick_action(icon_name, title, copy);
-    g_autofree gchar *path = find_trusted_system_program(program);
 
-    g_object_set_data_full(
-        G_OBJECT(button), "action-program", g_strdup(path), g_free);
-    g_object_set_data_full(
-        G_OBJECT(button), "action-argument", g_strdup(argument), g_free);
-
-    if (path == NULL) {
-        gtk_widget_set_sensitive(button, FALSE);
-        gtk_widget_set_tooltip_text(
-            button, "This application is not installed.");
-    } else {
-        g_signal_connect(
-            button, "clicked", G_CALLBACK(launch_external_program), NULL);
-    }
+    (void)connect_program_action(
+        button,
+        program,
+        argument,
+        "This application is not installed.");
     return button;
 }
 
@@ -245,7 +290,9 @@ static GtkWidget *make_status_card(
     const char *icon_name,
     const char *title,
     const char *value,
-    const char *detail)
+    const char *detail,
+    GtkWidget **value_label_out,
+    GtkWidget **detail_label_out)
 {
     GtkWidget *card = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
     GtkWidget *heading = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 9);
@@ -275,12 +322,15 @@ static GtkWidget *make_status_card(
     gtk_label_set_wrap(GTK_LABEL(detail_label), TRUE);
     gtk_box_append(GTK_BOX(card), value_label);
     gtk_box_append(GTK_BOX(card), detail_label);
-    g_object_set_data(G_OBJECT(card), "status-value-label", value_label);
-    g_object_set_data(G_OBJECT(card), "status-detail-label", detail_label);
+
+    if (value_label_out != NULL) {
+        *value_label_out = value_label;
+    }
+    if (detail_label_out != NULL) {
+        *detail_label_out = detail_label;
+    }
     return card;
 }
-
-
 
 static GtkWidget *make_ui_asset_picture(
     const char *filename,
@@ -389,26 +439,6 @@ static GtkWidget *make_theme_preview(
     return box;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 guint home_layout_columns_for_width(int width)
 {
     return width >= 720 ? 2U : 1U;
@@ -500,6 +530,10 @@ GtkWidget *ss_linux_home_page_new(const SsHomePageContext *context)
     GtkWidget *region_card;
     GtkWidget *appearance_card;
     GtkWidget *network_card;
+    GtkWidget *appearance_value_label;
+    GtkWidget *appearance_detail_label;
+    GtkWidget *network_value_label;
+    GtkWidget *network_detail_label;
     GtkWidget *date_open;
     GtkWidget *date_meta;
     GtkWidget *date_location;
@@ -626,21 +660,11 @@ GtkWidget *ss_linux_home_page_new(const SsHomePageContext *context)
     gtk_widget_set_hexpand(overview_spacer, TRUE);
     gtk_box_append(GTK_BOX(overview_heading), overview_spacer);
     gtk_widget_add_css_class(updates_button, "overview-link-button");
-    g_autofree gchar *software_path =
-        find_trusted_system_program("infiltrator-software");
-    g_object_set_data_full(
-        G_OBJECT(updates_button),
-        "action-program",
-        g_strdup(software_path),
-        g_free);
-    if (software_path == NULL) {
-        gtk_widget_set_sensitive(updates_button, FALSE);
-        gtk_widget_set_tooltip_text(
-            updates_button, "Infiltrator Software is not installed.");
-    } else {
-        g_signal_connect(
-            updates_button, "clicked", G_CALLBACK(launch_external_program), NULL);
-    }
+    (void)connect_program_action(
+        updates_button,
+        "infiltrator-software",
+        NULL,
+        "Infiltrator Software is not installed.");
     gtk_box_append(GTK_BOX(overview_heading), updates_button);
     gtk_box_append(GTK_BOX(overview), overview_heading);
     gtk_grid_set_column_spacing(GTK_GRID(overview_data), 18);
@@ -854,11 +878,9 @@ GtkWidget *ss_linux_home_page_new(const SsHomePageContext *context)
         "preferences-desktop-theme-symbolic",
         "Display & Appearance",
         status.appearance_value,
-        status.appearance_detail);
-    GtkWidget *appearance_value_label = g_object_get_data(
-        G_OBJECT(appearance_card), "status-value-label");
-    GtkWidget *appearance_detail_label = g_object_get_data(
-        G_OBJECT(appearance_card), "status-detail-label");
+        status.appearance_detail,
+        &appearance_value_label,
+        &appearance_detail_label);
     appearance_previews = gtk_flow_box_new();
     gtk_flow_box_set_selection_mode(
         GTK_FLOW_BOX(appearance_previews), GTK_SELECTION_NONE);
@@ -889,11 +911,9 @@ GtkWidget *ss_linux_home_page_new(const SsHomePageContext *context)
         "network-wired-symbolic",
         "Network",
         status.network_value,
-        status.network_detail);
-    GtkWidget *network_value_label = g_object_get_data(
-        G_OBJECT(network_card), "status-value-label");
-    GtkWidget *network_detail_label = g_object_get_data(
-        G_OBJECT(network_card), "status-detail-label");
+        status.network_detail,
+        &network_value_label,
+        &network_detail_label);
     network_body = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
     GtkWidget *network_visual = make_ui_asset_picture(
         "network-asset.png", 220, 100, "network-visual");
@@ -922,33 +942,6 @@ GtkWidget *ss_linux_home_page_new(const SsHomePageContext *context)
     gtk_widget_set_valign(page, GTK_ALIGN_START);
     gtk_widget_set_vexpand(page, FALSE);
     gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroller), page);
-
-    g_object_set_data(
-        G_OBJECT(scroller), "system-settings-home-hero", hero);
-    g_object_set_data(
-        G_OBJECT(scroller), "system-settings-home-features", features);
-    g_object_set_data(
-        G_OBJECT(scroller), "system-settings-home-grid", grid);
-    g_object_set_data(
-        G_OBJECT(scroller), "system-settings-home-overview", overview);
-    g_object_set_data(
-        G_OBJECT(scroller), "system-settings-home-quick", quick);
-    g_object_set_data(
-        G_OBJECT(scroller), "system-settings-home-status-grid", status_grid);
-    g_object_set_data(
-        G_OBJECT(scroller), "system-settings-home-date-card", date_card);
-    g_object_set_data(
-        G_OBJECT(scroller), "system-settings-home-region-card", region_card);
-    g_object_set_data(
-        G_OBJECT(scroller),
-        "system-settings-home-appearance-card",
-        appearance_card);
-    g_object_set_data(
-        G_OBJECT(scroller), "system-settings-home-network-card", network_card);
-    g_object_set_data(
-        G_OBJECT(scroller),
-        "system-settings-home-appearance-previews",
-        appearance_previews);
 
     HomeAdaptiveLayout *adaptive_layout = g_new0(HomeAdaptiveLayout, 1);
     adaptive_layout->hero = hero;
