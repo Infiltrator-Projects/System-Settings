@@ -22,6 +22,7 @@ typedef struct ShellSearchState {
     GtkListBoxRow *home_row;
     SsBuiltinModuleHost *module_host;
     GHashTable *module_pages;
+    gchar *primary_module_page_id;
     gchar *query;
 } ShellSearchState;
 

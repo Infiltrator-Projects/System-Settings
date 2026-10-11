@@ -115,8 +115,15 @@ static void exercise_window(GtkApplication *app)
         find_widget_tooltip(GTK_WIDGET(window), "Maximize / Restore"));
     g_assert_nonnull(find_widget_tooltip(GTK_WIDGET(window), "Close"));
 
-    GtkListBoxRow *date_row = find_row_with_label(root, "Date & Time");
+    /*
+     * The test manifest intentionally renames the navigation entry. This is a
+     * black-box regression proving the shell no longer hard-codes Date & Time
+     * presentation metadata while the same built-in implementation still
+     * loads behind the registry page ID.
+     */
+    GtkListBoxRow *date_row = find_row_with_label(root, "Temporal Test Module");
     g_assert_nonnull(date_row);
+    g_assert_true(subtree_has_label(GTK_WIDGET(date_row), "Manifest-driven test module"));
     GtkWidget *parent = gtk_widget_get_parent(GTK_WIDGET(date_row));
     while (parent != NULL && !GTK_IS_LIST_BOX(parent)) {
         parent = gtk_widget_get_parent(parent);
@@ -145,8 +152,30 @@ static void exercise_window(GtkApplication *app)
 
 int main(void)
 {
+    static const char manifest[] =
+        "[Module]\n"
+        "Id=org.infiltrator.settings.date-time\n"
+        "ApiVersion=1\n"
+        "Library=date-time\n"
+        "Category=system\n"
+        "Order=40\n"
+        "Title=Temporal Test Module\n"
+        "Summary=Manifest-driven test module\n"
+        "Icon=preferences-system-time\n"
+        "\n"
+        "[Search]\n"
+        "Keywords=temporal;manifest;clock\n";
     g_autofree gchar *root = g_dir_make_tmp("ss-shell-XXXXXX", NULL);
+    g_autofree gchar *module_dir = NULL;
+    g_autofree gchar *manifest_path = NULL;
+
     g_assert_nonnull(root);
+    module_dir = g_build_filename(root, "modules", NULL);
+    g_assert_cmpint(g_mkdir_with_parents(module_dir, 0700), ==, 0);
+    manifest_path = g_build_filename(
+        module_dir, "date-time.settings-module", NULL);
+    g_assert_true(g_file_set_contents(manifest_path, manifest, -1, NULL));
+
     g_setenv("XDG_CONFIG_HOME", root, TRUE);
     g_setenv("GSETTINGS_BACKEND", "memory", TRUE);
     g_setenv(
@@ -159,7 +188,7 @@ int main(void)
         TRUE);
     g_setenv(
         "SYSTEM_SETTINGS_MODULE_DIR_OVERRIDE",
-        SYSTEM_SETTINGS_MODULE_SOURCE_DIR,
+        module_dir,
         TRUE);
 
     gtk_init();

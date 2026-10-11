@@ -6,7 +6,7 @@
  * This unit owns application lifecycle, framing, navigation and search. Built-
  * in module pages are registered by logical page ID and routed through the
  * generic module host; the shell does not retain module-private controller
- * state.
+ * state or module-specific navigation metadata.
  */
 
 #include "shell-window-private.h"
@@ -32,7 +32,6 @@
 #endif
 
 #define SS_HOME_PAGE_ID "home"
-#define SS_DATE_TIME_PAGE_ID "date-time"
 
 static void show_about(GtkButton *button, gpointer user_data);
 static GtkWidget *build_unavailable_panel(
@@ -107,6 +106,7 @@ static void shell_search_state_free(gpointer data)
         return;
     }
     g_clear_pointer(&state->module_pages, g_hash_table_unref);
+    g_free(state->primary_module_page_id);
     g_free(state->query);
     g_free(state);
 }
@@ -352,6 +352,42 @@ static GtkWidget *make_about_navigation_row(void)
     return row;
 }
 
+static GKeyFile *load_module_manifest(const char *manifest_filename)
+{
+    const char *override_dir =
+        g_getenv("SYSTEM_SETTINGS_MODULE_DIR_OVERRIDE");
+    const bool override_active =
+        override_dir != NULL && override_dir[0] != '\0';
+    const char *directories[] = {
+        override_active ? override_dir : SYSTEM_SETTINGS_MODULE_SOURCE_DIR,
+        override_active ? NULL : SYSTEM_SETTINGS_MODULE_DIR,
+        NULL
+    };
+
+    if (manifest_filename == NULL || manifest_filename[0] == '\0') {
+        return NULL;
+    }
+
+    for (size_t directory_index = 0U;
+         directories[directory_index] != NULL;
+         ++directory_index) {
+        g_autofree gchar *path = NULL;
+        g_autoptr(GKeyFile) key_file = NULL;
+
+        if (directories[directory_index][0] == '\0') {
+            continue;
+        }
+        path = g_build_filename(
+            directories[directory_index], manifest_filename, NULL);
+        key_file = g_key_file_new();
+        if (g_key_file_load_from_file(
+                key_file, path, G_KEY_FILE_NONE, NULL)) {
+            return g_steal_pointer(&key_file);
+        }
+    }
+    return NULL;
+}
+
 static void append_manifest_value(
     GString *search,
     GKeyFile *key_file,
@@ -370,66 +406,53 @@ static void append_manifest_value(
     }
 }
 
-static gchar *module_search_text(
-    const char *manifest_filename,
+static gchar *manifest_string_or_fallback(
+    GKeyFile *key_file,
+    const char *key,
     const char *fallback)
 {
-    const char *override_dir =
-        g_getenv("SYSTEM_SETTINGS_MODULE_DIR_OVERRIDE");
-    const bool override_active =
-        override_dir != NULL && override_dir[0] != '\0';
-    const char *directories[] = {
-        override_active ? override_dir : SYSTEM_SETTINGS_MODULE_SOURCE_DIR,
-        override_active ? NULL : SYSTEM_SETTINGS_MODULE_DIR,
-        NULL
-    };
+    g_autofree gchar *value = NULL;
 
-    if (manifest_filename == NULL || manifest_filename[0] == '\0') {
+    if (key_file != NULL && key != NULL) {
+        value = g_key_file_get_string(key_file, "Module", key, NULL);
+        if (value != NULL && value[0] != '\0') {
+            return g_steal_pointer(&value);
+        }
+    }
+    return g_strdup(fallback != NULL ? fallback : "");
+}
+
+static gchar *module_search_text_from_manifest(
+    GKeyFile *key_file,
+    const char *fallback)
+{
+    g_auto(GStrv) groups = NULL;
+    gsize group_count = 0U;
+    GString *search;
+
+    if (key_file == NULL) {
         return g_strdup(fallback != NULL ? fallback : "");
     }
 
-    for (size_t directory_index = 0U;
-         directories[directory_index] != NULL;
-         ++directory_index) {
-        g_autofree gchar *path = NULL;
-        g_autoptr(GKeyFile) key_file = NULL;
-        g_auto(GStrv) groups = NULL;
-        gsize group_count = 0U;
-        g_autoptr(GError) error = NULL;
-        GString *search = NULL;
-
-        if (directories[directory_index][0] == '\0') {
-            continue;
+    search = g_string_new("");
+    append_manifest_value(search, key_file, "Module", "Title");
+    append_manifest_value(search, key_file, "Module", "Summary");
+    append_manifest_value(search, key_file, "Search", "Keywords");
+    groups = g_key_file_get_groups(key_file, &group_count);
+    for (gsize group_index = 0U;
+         group_index < group_count;
+         ++group_index) {
+        if (g_str_has_prefix(groups[group_index], "Target ")) {
+            append_manifest_value(
+                search, key_file, groups[group_index], "Title");
+            append_manifest_value(
+                search, key_file, groups[group_index], "Keywords");
         }
-        path = g_build_filename(
-            directories[directory_index], manifest_filename, NULL);
-        key_file = g_key_file_new();
-        if (!g_key_file_load_from_file(
-                key_file, path, G_KEY_FILE_NONE, &error)) {
-            continue;
-        }
-
-        search = g_string_new("");
-        append_manifest_value(search, key_file, "Module", "Title");
-        append_manifest_value(search, key_file, "Module", "Summary");
-        append_manifest_value(search, key_file, "Search", "Keywords");
-        groups = g_key_file_get_groups(key_file, &group_count);
-        for (gsize group_index = 0U;
-             group_index < group_count;
-             ++group_index) {
-            if (g_str_has_prefix(groups[group_index], "Target ")) {
-                append_manifest_value(
-                    search, key_file, groups[group_index], "Title");
-                append_manifest_value(
-                    search, key_file, groups[group_index], "Keywords");
-            }
-        }
-        if (search->len > 0U) {
-            return g_string_free(search, FALSE);
-        }
-        g_string_free(search, TRUE);
     }
-
+    if (search->len > 0U) {
+        return g_string_free(search, FALSE);
+    }
+    g_string_free(search, TRUE);
     return g_strdup(fallback != NULL ? fallback : "");
 }
 
@@ -554,23 +577,100 @@ static GtkWidget *build_header(GtkWindow *parent, GtkSearchEntry **search_out)
     return header;
 }
 
+static GtkWidget *make_module_scroller(void)
+{
+    GtkWidget *scroller = gtk_scrolled_window_new();
+
+    gtk_scrolled_window_set_policy(
+        GTK_SCROLLED_WINDOW(scroller),
+        GTK_POLICY_NEVER,
+        GTK_POLICY_AUTOMATIC);
+    gtk_scrolled_window_set_overlay_scrolling(
+        GTK_SCROLLED_WINDOW(scroller), FALSE);
+    gtk_scrolled_window_set_kinetic_scrolling(
+        GTK_SCROLLED_WINDOW(scroller), TRUE);
+    gtk_widget_set_hexpand(scroller, TRUE);
+    gtk_widget_set_vexpand(scroller, TRUE);
+    return scroller;
+}
+
+static void append_builtin_module_rows(
+    GtkListBox *list,
+    GtkStack *stack,
+    ShellSearchState *search_state)
+{
+    const size_t module_count = ss_builtin_module_host_module_count();
+
+    if (list == NULL || stack == NULL || search_state == NULL) {
+        return;
+    }
+
+    for (size_t index = 0U; index < module_count; ++index) {
+        const char *page_id =
+            ss_builtin_module_host_module_page_id(index);
+        const char *manifest_filename =
+            ss_builtin_module_host_module_manifest(index);
+        g_autoptr(GKeyFile) manifest =
+            load_module_manifest(manifest_filename);
+        g_autofree gchar *title = NULL;
+        g_autofree gchar *summary = NULL;
+        g_autofree gchar *icon = NULL;
+        g_autofree gchar *fallback_search = NULL;
+        g_autofree gchar *search_text = NULL;
+        GtkWidget *row;
+        GtkWidget *scroller;
+
+        if (page_id == NULL || page_id[0] == '\0') {
+            continue;
+        }
+
+        title = manifest_string_or_fallback(manifest, "Title", page_id);
+        summary = manifest_string_or_fallback(
+            manifest, "Summary", "Settings module");
+        icon = manifest_string_or_fallback(
+            manifest, "Icon", "preferences-system-symbolic");
+        fallback_search = g_strdup_printf(
+            "%s %s", title, summary);
+        search_text = module_search_text_from_manifest(
+            manifest, fallback_search);
+
+        row = make_navigation_row(
+            icon,
+            title,
+            summary,
+            page_id,
+            search_text);
+        gtk_list_box_append(list, row);
+        shell_register_module_page(
+            search_state,
+            page_id,
+            title,
+            GTK_LIST_BOX_ROW(row));
+
+        scroller = make_module_scroller();
+        shell_set_module_container(
+            search_state,
+            page_id,
+            GTK_SCROLLED_WINDOW(scroller));
+        gtk_stack_add_named(stack, scroller, page_id);
+
+        if (search_state->primary_module_page_id == NULL) {
+            search_state->primary_module_page_id = g_strdup(page_id);
+        }
+    }
+}
+
 static GtkWidget *build_sidebar(
     GtkWindow *parent,
     GtkStack *stack,
     GtkSearchEntry *search_entry,
     ShellSearchState *search_state)
 {
-    static const char date_fallback[] =
-        "date time clock calendar location timezone seconds precision "
-        "12 hour 24 hour decimal internet ntp network time unix binary "
-        "hexadecimal julian sidereal solar roman chinese japanese gregorian "
-        "hebrew islamic persian mayan french republican first day week";
     const InfiltratrProjectInfo *info = ss_project_info();
     GtkWidget *sidebar = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
     GtkWidget *list = gtk_list_box_new();
     GtkWidget *nav_scroller = gtk_scrolled_window_new();
     GtkWidget *home_row;
-    GtkWidget *date_row;
     GtkWidget *region_row;
     GtkWidget *appearance_row;
     GtkWidget *sound_row;
@@ -584,8 +684,6 @@ static GtkWidget *build_sidebar(
     GtkWidget *about_row;
     GtkWidget *footer = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
     g_autofree gchar *version = g_strdup_printf("Version %s", info->version);
-    g_autofree gchar *date_search = module_search_text(
-        "date-time.settings-module", date_fallback);
 
     gtk_widget_set_size_request(sidebar, 205, -1);
     gtk_widget_set_hexpand(sidebar, FALSE);
@@ -600,12 +698,6 @@ static GtkWidget *build_sidebar(
         "Overview & quick access",
         SS_HOME_PAGE_ID,
         "home overview quick access system");
-    date_row = make_navigation_row(
-        "preferences-system-time-symbolic",
-        "Date & Time",
-        "Clock, calendar & location",
-        SS_DATE_TIME_PAGE_ID,
-        date_search);
     region_row = make_external_navigation_row(
         "preferences-desktop-locale-symbolic",
         "Region & Language",
@@ -678,8 +770,16 @@ static GtkWidget *build_sidebar(
         NULL);
     about_row = make_about_navigation_row();
 
+    if (search_state != NULL) {
+        search_state->list = GTK_LIST_BOX(list);
+        search_state->parent = parent;
+        search_state->stack = stack;
+        search_state->home_row = GTK_LIST_BOX_ROW(home_row);
+    }
+
     gtk_list_box_append(GTK_LIST_BOX(list), home_row);
-    gtk_list_box_append(GTK_LIST_BOX(list), date_row);
+    append_builtin_module_rows(
+        GTK_LIST_BOX(list), stack, search_state);
     gtk_list_box_append(GTK_LIST_BOX(list), region_row);
     gtk_list_box_append(GTK_LIST_BOX(list), appearance_row);
     gtk_list_box_append(GTK_LIST_BOX(list), sound_row);
@@ -705,15 +805,6 @@ static GtkWidget *build_sidebar(
         search_state);
 
     if (search_state != NULL) {
-        search_state->list = GTK_LIST_BOX(list);
-        search_state->parent = parent;
-        search_state->stack = stack;
-        search_state->home_row = GTK_LIST_BOX_ROW(home_row);
-        shell_register_module_page(
-            search_state,
-            SS_DATE_TIME_PAGE_ID,
-            "Date & Time",
-            GTK_LIST_BOX_ROW(date_row));
         gtk_list_box_set_filter_func(
             GTK_LIST_BOX(list), navigation_filter, search_state, NULL);
         if (search_entry != NULL) {
@@ -752,8 +843,8 @@ static void open_home_primary_page(gpointer user_data)
 {
     ShellSearchState *state = user_data;
 
-    if (state != NULL) {
-        (void)shell_open_page(state, SS_DATE_TIME_PAGE_ID);
+    if (state != NULL && state->primary_module_page_id != NULL) {
+        (void)shell_open_page(state, state->primary_module_page_id);
     }
 }
 
@@ -914,7 +1005,6 @@ void ss_shell_window_activate(GtkApplication *application, gpointer user_data)
     GtkWidget *root;
     GtkWidget *stack_widget;
     GtkStack *stack;
-    GtkWidget *module_scroller;
     GtkWidget *home_scroller;
     GtkSearchEntry *search_entry = NULL;
     ShellSearchState *search_state;
@@ -1003,22 +1093,6 @@ void ss_shell_window_activate(GtkApplication *application, gpointer user_data)
         "system-settings-navigation-list",
         search_state->list);
 
-    module_scroller = gtk_scrolled_window_new();
-    gtk_scrolled_window_set_policy(
-        GTK_SCROLLED_WINDOW(module_scroller),
-        GTK_POLICY_NEVER,
-        GTK_POLICY_AUTOMATIC);
-    gtk_scrolled_window_set_overlay_scrolling(
-        GTK_SCROLLED_WINDOW(module_scroller), FALSE);
-    gtk_scrolled_window_set_kinetic_scrolling(
-        GTK_SCROLLED_WINDOW(module_scroller), TRUE);
-    gtk_widget_set_hexpand(module_scroller, TRUE);
-    gtk_widget_set_vexpand(module_scroller, TRUE);
-    shell_set_module_container(
-        search_state,
-        SS_DATE_TIME_PAGE_ID,
-        GTK_SCROLLED_WINDOW(module_scroller));
-
     home_context = (SsHomePageContext){
         .temporal_provider = home_temporal_provider,
         .navigate = open_home_primary_page,
@@ -1028,7 +1102,6 @@ void ss_shell_window_activate(GtkApplication *application, gpointer user_data)
     g_object_set_data(
         G_OBJECT(stack), "system-settings-home-scroller", home_scroller);
     gtk_stack_add_named(stack, home_scroller, SS_HOME_PAGE_ID);
-    gtk_stack_add_named(stack, module_scroller, SS_DATE_TIME_PAGE_ID);
     (void)shell_open_page(search_state, SS_HOME_PAGE_ID);
     g_object_set_data(
         G_OBJECT(window), "system-settings-stack", stack);
