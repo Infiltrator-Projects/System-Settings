@@ -10,9 +10,14 @@
 #error "Locality must use linux-date-time-location-private.h, not the complete Date & Time panel controller."
 #endif
 
+#ifdef SYSTEM_SETTINGS_DATE_TIME_SYSTEM_TIME_BOUNDARY
+#error "System time must use linux-date-time-system-time-private.h, not the complete Date & Time panel controller."
+#endif
+
 #include "linux-date-time-panel.h"
 #include "linux-date-time-location-private.h"
 #include "linux-date-time-preview-private.h"
+#include "linux-date-time-system-time-private.h"
 #include "policy-file-observer.h"
 
 #include "system-settings/date-time-model.h"
@@ -33,29 +38,6 @@ void ss_linux_date_time_lifetime_invalidate(
  * Locality has its own compiler-visible private boundary and cannot include
  * this header when built as linux-date-time-location.c.
  */
-typedef struct SsLinuxDateTimeSystemTimeState {
-    GtkWidget *overview_timezone;
-    GtkWidget *overview_sync;
-    GtkDropDown *timezone;
-    GtkSwitch *network_time;
-    GtkEntry *manual_date;
-    GtkEntry *manual_time;
-    GtkButton *manual_set_time;
-    GtkWidget *manual_row;
-    GtkWidget *manual_unavailable;
-
-    SsSystemTimeService *service;
-    GPtrArray *timezone_ids;
-    GCancellable *service_cancellable;
-    GCancellable *timezone_cancellable;
-    GCancellable *ntp_cancellable;
-    GCancellable *manual_time_cancellable;
-    guint timezone_generation;
-    guint ntp_generation;
-    guint manual_time_generation;
-    bool updating_controls;
-    bool manual_dirty;
-} SsLinuxDateTimeSystemTimeState;
 
 struct SsLinuxDateTimePanel {
     GtkWindow *window;
@@ -79,6 +61,7 @@ struct SsLinuxDateTimePanel {
     SsLinuxDateTimePreviewState preview;
 
     bool updating_controls;
+    bool native_format_updating;
 };
 
 GtkWidget *ss_linux_date_time_panel_build_ui(
@@ -89,6 +72,16 @@ void ss_linux_date_time_panel_set_status(
     SsLinuxDateTimePanel *state,
     const char *message,
     bool error);
+void ss_linux_date_time_panel_refresh_location_authority_state(
+    SsLinuxDateTimePanel *state);
+void ss_linux_date_time_system_time_sync(
+    SsLinuxDateTimePanel *state);
+void ss_linux_date_time_system_time_start(
+    SsLinuxDateTimePanel *state);
+void ss_linux_date_time_system_time_dispose(
+    SsLinuxDateTimePanel *state);
+void ss_linux_date_time_system_time_invalidate_manual_draft(
+    SsLinuxDateTimePanel *state);
 void ss_linux_date_time_panel_sync_controls(
     SsLinuxDateTimePanel *state);
 void ss_linux_date_time_panel_policy_saved(
@@ -102,10 +95,6 @@ bool ss_linux_date_time_panel_desktop_uses_24h(
 void on_clock_changed(GObject *object, GParamSpec *pspec, gpointer user_data);
 void on_calendar_changed(GObject *object, GParamSpec *pspec, gpointer user_data);
 void on_seconds_changed(GObject *object, GParamSpec *pspec, gpointer user_data);
-void on_timezone_changed(GObject *object, GParamSpec *pspec, gpointer user_data);
-void on_network_time_changed(GObject *object, GParamSpec *pspec, gpointer user_data);
-void on_manual_set_time_clicked(GtkButton *button, gpointer user_data);
-void on_manual_entry_changed(GtkEditable *editable, gpointer user_data);
 void on_show_date_changed(GObject *object, GParamSpec *pspec, gpointer user_data);
 void on_first_day_changed(GObject *object, GParamSpec *pspec, gpointer user_data);
 

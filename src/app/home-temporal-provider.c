@@ -20,6 +20,12 @@ SsHomeTemporalProvider *ss_home_temporal_provider_new(void)
     return g_new0(SsHomeTemporalProvider, 1);
 }
 
+const char *ss_home_temporal_provider_page_id(
+    const SsHomeTemporalProvider *provider)
+{
+    return provider != NULL ? "date-time" : NULL;
+}
+
 void ss_home_temporal_provider_free(SsHomeTemporalProvider *provider)
 {
     if (provider == NULL) {

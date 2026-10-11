@@ -182,7 +182,6 @@ static void shell_search_state_free(gpointer data)
         return;
     }
     g_clear_pointer(&state->module_pages, g_hash_table_unref);
-    g_free(state->primary_module_page_id);
     g_free(state->query);
     g_free(state);
 }
@@ -635,9 +634,6 @@ static void append_builtin_module_rows(
             GTK_SCROLLED_WINDOW(scroller));
         gtk_stack_add_named(stack, scroller, page_id);
 
-        if (search_state->primary_module_page_id == NULL) {
-            search_state->primary_module_page_id = g_strdup(page_id);
-        }
         ss_shell_module_metadata_clear(&metadata);
     }
 }
@@ -817,12 +813,12 @@ static GtkWidget *build_sidebar(
     return sidebar;
 }
 
-static void open_home_primary_page(gpointer user_data)
+static void open_home_page(const char *page_id, gpointer user_data)
 {
     ShellSearchState *state = user_data;
 
-    if (state != NULL && state->primary_module_page_id != NULL) {
-        (void)shell_open_page(state, state->primary_module_page_id);
+    if (state != NULL && page_id != NULL && page_id[0] != '\0') {
+        (void)shell_open_page(state, page_id);
     }
 }
 
@@ -1072,7 +1068,7 @@ void ss_shell_window_activate(GtkApplication *application, gpointer user_data)
 
     home_context = (SsHomePageContext){
         .temporal_provider = home_temporal_provider,
-        .navigate = open_home_primary_page,
+        .navigate = open_home_page,
         .navigate_data = search_state
     };
     home_scroller = ss_linux_home_page_new(&home_context);

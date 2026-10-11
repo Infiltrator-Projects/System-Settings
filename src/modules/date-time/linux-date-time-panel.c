@@ -3,8 +3,10 @@
  * @file linux-date-time-panel.c
  * @brief Built-in Linux Date & Time settings module.
  *
- * Domain state, native backend reconciliation and asynchronous operations
- * live here. GTK construction is isolated in linux-date-time-panel-ui.c.
+ * Cross-domain policy reconciliation and panel composition live here.
+ * Protected system-time operations are isolated in
+ * linux-date-time-system-time.c; GTK construction remains isolated in
+ * linux-date-time-panel-ui.c.
  * The GTK-facing header is private to the current built-in integration and is
  * not the future public module ABI.
  */
@@ -29,18 +31,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-
-typedef enum SsSystemTimeOperation {
-    SS_SYSTEM_TIME_OPERATION_TIMEZONE,
-    SS_SYSTEM_TIME_OPERATION_NTP,
-    SS_SYSTEM_TIME_OPERATION_MANUAL
-} SsSystemTimeOperation;
-
-typedef struct SystemTimeUiRequest {
-    SsLinuxDateTimeLifetime *lifetime;
-    guint generation;
-    SsSystemTimeOperation operation;
-} SystemTimeUiRequest;
 
 struct SsLinuxDateTimeLifetime {
     gint references;
@@ -177,6 +167,210 @@ static void refresh_location_authority_state(
         (policy == NULL ||
          !policy->location_configured ||
          ss_linux_date_time_location_policy_matches_reference(state));
+}
+
+
+void ss_linux_date_time_panel_refresh_location_authority_state(
+    SsLinuxDateTimePanel *state)
+{
+    refresh_location_authority_state(state);
+}
+
+void ss_linux_date_time_panel_reconcile_system_time_change(
+    SsLinuxDateTimePanel *state,
+    const SsSystemTimeState *system_state)
+{
+
+    if (state == NULL || system_state == NULL) {
+        return;
+    }
+
+    if (!system_state->available) {
+        ss_linux_date_time_system_time_sync(state);
+        ss_linux_date_time_panel_set_status(state, "The operating-system date/time service is unavailable.", true);
+        return;
+    }
+
+    const bool timezone_changed =
+        system_state->timezone[0] != '\0' &&
+        g_strcmp0(
+            state->regional_context.timezone_id,
+            system_state->timezone) != 0;
+    (void)ss_regional_context_detect(&state->regional_context);
+
+    if (timezone_changed || system_state->ntp_enabled) {
+        /*
+         * Typed wall time is meaningful only in the context in which it was
+         * entered. A time-zone or NTP authority change invalidates that draft.
+         */
+        ss_linux_date_time_system_time_invalidate_manual_draft(state);
+    }
+
+    /*
+     * Time-zone reconciliation and automatic reference-coordinate publication
+     * are locality writers too. Serialize them with explicit locality changes
+     * and reload both policy and metadata after taking the locality lock, so a
+     * second System Settings process cannot overwrite a freshly selected place
+     * with stale metadata or stale time-zone reference coordinates.
+     */
+    if ((timezone_changed || state->location.follows_timezone_reference) &&
+        ss_location_metadata_transaction_begin()) {
+        SsLocationMetadata authoritative_metadata = {0};
+        SsSystemTimeState locked_system = {0};
+        const bool locked_system_ok =
+            ss_linux_date_time_panel_read_system_time(
+                state, &locked_system);
+        const bool regional_reloaded =
+            ss_regional_context_detect(&state->regional_context);
+        const bool regional_matches_system =
+            locked_system_ok &&
+            regional_reloaded &&
+            locked_system.timezone[0] != '\0' &&
+            g_strcmp0(
+                state->regional_context.timezone_id,
+                locked_system.timezone) == 0;
+        const bool policy_reloaded =
+            ss_date_time_model_reload(&state->model);
+        const SsLocationMetadataLoadStatus metadata_status =
+            ss_location_metadata_load_status(&authoritative_metadata);
+
+        if (metadata_status == SS_LOCATION_METADATA_LOAD_OK) {
+            state->location.metadata = authoritative_metadata;
+            state->location.metadata_present = true;
+        } else if (metadata_status == SS_LOCATION_METADATA_LOAD_MISSING) {
+            memset(&state->location.metadata, 0, sizeof(state->location.metadata));
+            state->location.metadata_present = false;
+        }
+        if (policy_reloaded) {
+            ss_linux_date_time_panel_refresh_location_authority_state(state);
+        }
+
+        if (policy_reloaded &&
+            ss_linux_date_time_location_metadata_matches_policy(
+                state, ss_date_time_model_policy(&state->model)) &&
+            locked_system_ok &&
+            locked_system.timezone[0] != '\0' &&
+            g_strcmp0(
+                state->location.metadata.timezone_id,
+                locked_system.timezone) != 0) {
+            SsLocationMetadata candidate = state->location.metadata;
+            (void)g_strlcpy(
+                candidate.timezone_id,
+                locked_system.timezone,
+                sizeof(candidate.timezone_id));
+            if (ss_location_metadata_save(&candidate)) {
+                state->location.metadata = candidate;
+                ss_linux_date_time_panel_set_status(
+                    state,
+                    "Operating-system time zone and locality metadata reconciled.",
+                    false);
+            } else {
+                ss_linux_date_time_panel_set_status(
+                    state,
+                    "The operating-system time zone changed, but the locality metadata could not be updated on disk.",
+                    true);
+            }
+        }
+
+        if (policy_reloaded &&
+            state->location.follows_timezone_reference &&
+            regional_matches_system &&
+            state->regional_context.has_reference_coordinates) {
+            const InfiltratrTemporalPolicyV3 *policy =
+                ss_date_time_model_policy(&state->model);
+            const bool already_matches =
+                policy != NULL &&
+                policy->location_configured &&
+                ss_linux_date_time_location_coordinate_close(
+                    policy->latitude,
+                    state->regional_context.reference_latitude) &&
+                ss_linux_date_time_location_coordinate_close(
+                    policy->longitude,
+                    state->regional_context.reference_longitude);
+
+            if (!already_matches &&
+                !ss_date_time_model_set_location(
+                    &state->model,
+                    true,
+                    state->regional_context.reference_latitude,
+                    state->regional_context.reference_longitude)) {
+                ss_linux_date_time_panel_set_status(
+                    state,
+                    "The system time zone changed, but its reference coordinates could not be persisted to the temporal policy.",
+                    true);
+            } else {
+                state->location.updating_controls = true;
+                gtk_spin_button_set_value(
+                    state->location.latitude,
+                    state->regional_context.reference_latitude);
+                gtk_spin_button_set_value(
+                    state->location.longitude,
+                    state->regional_context.reference_longitude);
+                if (state->location.search_entry != NULL &&
+                    state->regional_context.timezone_city[0] != '\0') {
+                    gtk_editable_set_text(
+                        GTK_EDITABLE(state->location.search_entry),
+                        state->regional_context.timezone_city);
+                }
+                state->location.updating_controls = false;
+            }
+        }
+
+        ss_location_metadata_transaction_end();
+    } else if (timezone_changed ||
+               state->location.follows_timezone_reference) {
+        ss_linux_date_time_panel_set_status(
+            state,
+            "The system time changed, but the locality transaction lock could not be acquired.",
+            true);
+    }
+
+    ss_linux_date_time_system_time_sync(state);
+    ss_linux_date_time_location_update_summary(state);
+    (void)ss_linux_date_time_preview_refresh(state);
+}
+
+
+bool ss_linux_date_time_panel_system_time_operation_applied(
+    SsLinuxDateTimePanel *state,
+    bool timezone_operation,
+    const char *observed_timezone)
+{
+    if (state == NULL) {
+        return false;
+    }
+
+    (void)ss_regional_context_detect(&state->regional_context);
+    ss_linux_date_time_system_time_sync(state);
+    ss_linux_date_time_location_update_summary(state);
+    return timezone_operation &&
+        state->location.metadata_present &&
+        observed_timezone != NULL && observed_timezone[0] != '\0' &&
+        g_strcmp0(
+            state->location.metadata.timezone_id,
+            observed_timezone) != 0;
+}
+
+
+void ss_linux_date_time_panel_system_time_service_ready(
+    SsLinuxDateTimePanel *state)
+{
+    if (state == NULL) {
+        return;
+    }
+    if (state->location.recovery_failed) {
+        ss_linux_date_time_panel_set_status(
+            state,
+            "Date & Time is available, but interrupted locality metadata could not yet be recovered. The journal has been preserved for retry.",
+            true);
+    } else {
+        ss_linux_date_time_panel_set_status(
+            state,
+            state->model.persisted_policy_present
+                ? "Using the saved system-wide temporal policy. Native Mint/Linux date and time controls are live."
+                : "Using Mint/Cinnamon temporal preferences as the initial policy. Native Mint/Linux date and time controls are live.",
+            false);
+    }
 }
 
 static void location_metadata_file_changed(gpointer user_data)
@@ -316,7 +510,7 @@ static void policy_file_changed(gpointer user_data)
          * how that draft should be interpreted.
          */
         if (manual_context_changed) {
-            state->system_time.manual_dirty = false;
+            ss_linux_date_time_system_time_invalidate_manual_draft(state);
         }
         if (recovered_metadata_present) {
             state->location.metadata = recovered_metadata;
@@ -354,37 +548,6 @@ static void policy_file_changed(gpointer user_data)
     }
 }
 
-bool ss_linux_date_time_panel_read_system_time(
-    const SsLinuxDateTimePanel *state,
-    SsSystemTimeState *out)
-{
-    return state != NULL &&
-           out != NULL &&
-           state->system_time.service != NULL &&
-           ss_system_time_service_read(state->system_time.service, out);
-}
-
-static guint timezone_index_for_id(
-    const SsLinuxDateTimePanel *state,
-    const char *timezone_id)
-{
-    size_t index;
-
-    if (state == NULL || state->system_time.timezone_ids == NULL ||
-        timezone_id == NULL) {
-        return GTK_INVALID_LIST_POSITION;
-    }
-
-    for (index = 0U; index < state->system_time.timezone_ids->len; ++index) {
-        const char *candidate = g_ptr_array_index(
-            state->system_time.timezone_ids, (guint)index);
-        if (g_strcmp0(candidate, timezone_id) == 0) {
-            return (guint)index;
-        }
-    }
-    return GTK_INVALID_LIST_POSITION;
-}
-
 static guint first_day_index(int value)
 {
     if (value == 0) {
@@ -416,7 +579,7 @@ static void sync_native_format_controls(SsLinuxDateTimePanel *state)
         return;
     }
 
-    state->system_time.updating_controls = true;
+    state->native_format_updating = true;
     if (state->show_date != NULL &&
         ss_cinnamon_interface_get_boolean(
             state->cinnamon_interface_settings,
@@ -431,7 +594,7 @@ static void sync_native_format_controls(SsLinuxDateTimePanel *state)
         gtk_drop_down_set_selected(
             state->first_day, first_day_index(first_day));
     }
-    state->system_time.updating_controls = false;
+    state->native_format_updating = false;
 }
 
 bool ss_linux_date_time_panel_desktop_uses_24h(const SsLinuxDateTimePanel *state)
@@ -446,64 +609,6 @@ bool ss_linux_date_time_panel_desktop_uses_24h(const SsLinuxDateTimePanel *state
             &value);
     }
     return value;
-}
-
-static bool manual_representation_supported(
-    const SsLinuxDateTimePanel *state)
-{
-    const InfiltratrTemporalPolicyV3 *policy;
-
-    if (state == NULL) {
-        return false;
-    }
-
-    policy = ss_date_time_model_policy(&state->model);
-    return policy != NULL &&
-           strcmp(policy->calendar, "gregorian") == 0 &&
-           ss_manual_time_mode_supported(policy->clock_mode);
-}
-
-static void fill_manual_time_entries(SsLinuxDateTimePanel *state)
-{
-    const InfiltratrTemporalPolicyV3 *policy;
-    g_autoptr(GDateTime) now = NULL;
-    g_autofree gchar *date = NULL;
-    char time[64];
-    int64_t unix_microseconds;
-    gint64 offset_microseconds;
-
-    if (state == NULL || state->system_time.manual_date == NULL ||
-        state->system_time.manual_time == NULL) {
-        return;
-    }
-
-    policy = ss_date_time_model_policy(&state->model);
-    now = g_date_time_new_now_local();
-    if (policy == NULL || now == NULL ||
-        !manual_representation_supported(state)) {
-        return;
-    }
-
-    date = g_date_time_format(now, "%Y-%m-%d");
-    unix_microseconds = g_date_time_to_unix(now) * G_USEC_PER_SEC +
-        g_date_time_get_microsecond(now);
-    offset_microseconds = g_date_time_get_utc_offset(now);
-
-    if (date != NULL) {
-        gtk_editable_set_text(
-            GTK_EDITABLE(state->system_time.manual_date), date);
-    }
-    if (ss_manual_time_format(
-            policy->clock_mode,
-            ss_linux_date_time_panel_desktop_uses_24h(state),
-            unix_microseconds,
-            (int32_t)(offset_microseconds / G_USEC_PER_SEC),
-            policy->show_seconds,
-            time,
-            sizeof(time))) {
-        gtk_editable_set_text(
-            GTK_EDITABLE(state->system_time.manual_time), time);
-    }
 }
 
 static void update_overview_policy(SsLinuxDateTimePanel *state)
@@ -534,133 +639,6 @@ static void update_overview_policy(SsLinuxDateTimePanel *state)
             GTK_LABEL(state->preview.overview_calendar),
             calendar != NULL ? calendar->name : policy->calendar);
     }
-}
-
-static void sync_system_time_controls(SsLinuxDateTimePanel *state)
-{
-    SsSystemTimeState system_state;
-    guint zone_index;
-    bool manual_supported;
-    bool manual_visible;
-
-    if (state == NULL) {
-        return;
-    }
-
-    if (state->system_time.service == NULL ||
-        !ss_system_time_service_read(
-            state->system_time.service, &system_state)) {
-        if (state->system_time.timezone != NULL) {
-            gtk_widget_set_sensitive(
-                GTK_WIDGET(state->system_time.timezone), FALSE);
-        }
-        if (state->system_time.network_time != NULL) {
-            gtk_widget_set_sensitive(
-                GTK_WIDGET(state->system_time.network_time), FALSE);
-        }
-        if (state->system_time.manual_row != NULL) {
-            gtk_widget_set_visible(state->system_time.manual_row, FALSE);
-        }
-        if (state->system_time.manual_unavailable != NULL) {
-            gtk_widget_set_visible(
-                state->system_time.manual_unavailable, FALSE);
-        }
-        if (state->system_time.overview_timezone != NULL) {
-            gtk_label_set_text(GTK_LABEL(state->system_time.overview_timezone), "Unavailable");
-        }
-        if (state->system_time.overview_sync != NULL) {
-            gtk_label_set_text(GTK_LABEL(state->system_time.overview_sync), "Unavailable");
-        }
-        return;
-    }
-
-    state->system_time.updating_controls = true;
-
-    if (state->system_time.overview_timezone != NULL) {
-        gtk_label_set_text(
-            GTK_LABEL(state->system_time.overview_timezone),
-            system_state.timezone[0] != '\0'
-                ? system_state.timezone
-                : "Unknown");
-    }
-    if (state->system_time.overview_sync != NULL) {
-        gtk_label_set_text(
-            GTK_LABEL(state->system_time.overview_sync),
-            system_state.ntp_enabled ? "Automatic" : "Manual");
-    }
-
-    if (state->system_time.timezone != NULL) {
-        zone_index = timezone_index_for_id(
-            state, system_state.timezone);
-        if (zone_index == GTK_INVALID_LIST_POSITION) {
-            GtkStringList *strings = GTK_STRING_LIST(gtk_drop_down_get_model(state->system_time.timezone));
-            g_ptr_array_add(state->system_time.timezone_ids, g_strdup(system_state.timezone));
-            gtk_string_list_append(strings, system_state.timezone);
-            zone_index = state->system_time.timezone_ids->len - 1U;
-        }
-        if (zone_index != GTK_INVALID_LIST_POSITION) {
-            gtk_drop_down_set_selected(
-                state->system_time.timezone, zone_index);
-        }
-        gtk_widget_set_sensitive(
-            GTK_WIDGET(state->system_time.timezone), TRUE);
-    }
-
-    if (state->system_time.network_time != NULL) {
-        gtk_switch_set_active(
-            state->system_time.network_time, system_state.ntp_enabled);
-        gtk_widget_set_sensitive(
-            GTK_WIDGET(state->system_time.network_time),
-            system_state.can_ntp);
-    }
-
-    manual_supported = manual_representation_supported(state);
-    manual_visible = !system_state.ntp_enabled && manual_supported;
-
-    if (state->system_time.manual_row != NULL) {
-        gtk_widget_set_visible(state->system_time.manual_row, manual_visible);
-    }
-    if (state->system_time.manual_unavailable != NULL) {
-        gtk_widget_set_visible(
-            state->system_time.manual_unavailable,
-            !system_state.ntp_enabled && !manual_supported);
-    }
-
-    const bool protected_operation_active =
-        state->system_time.timezone_cancellable != NULL ||
-        state->system_time.ntp_cancellable != NULL ||
-        state->system_time.manual_time_cancellable != NULL;
-
-    if (!manual_visible) {
-        /*
-         * A hidden editor must never retain text authored under a different
-         * clock/calendar/NTP context. Re-seed it when manual mode becomes
-         * meaningful again.
-         */
-        state->system_time.manual_dirty = false;
-    } else {
-        gtk_widget_set_sensitive(
-            GTK_WIDGET(state->system_time.manual_date), !protected_operation_active);
-        gtk_widget_set_sensitive(
-            GTK_WIDGET(state->system_time.manual_time), !protected_operation_active);
-        gtk_widget_set_sensitive(
-            GTK_WIDGET(state->system_time.manual_set_time), !protected_operation_active);
-        if (!state->system_time.manual_dirty) {
-            fill_manual_time_entries(state);
-        }
-    }
-
-    if (state->system_time.timezone != NULL) {
-        gtk_widget_set_sensitive(
-            GTK_WIDGET(state->system_time.timezone), !protected_operation_active);
-    }
-    if (state->system_time.network_time != NULL) {
-        gtk_widget_set_sensitive(
-            GTK_WIDGET(state->system_time.network_time),
-            system_state.can_ntp && !protected_operation_active);
-    }
-
-    state->system_time.updating_controls = false;
 }
 
 static guint clock_index_for_id(
@@ -759,7 +737,7 @@ static void update_control_capabilities(SsLinuxDateTimePanel *state)
     ss_linux_date_time_location_update_summary(state);
     update_overview_policy(state);
     sync_native_format_controls(state);
-    sync_system_time_controls(state);
+    ss_linux_date_time_system_time_sync(state);
 
     if (mode != NULL &&
         (mode->requires_latitude || mode->requires_longitude) &&
@@ -976,7 +954,7 @@ void on_clock_changed(GObject *object,
         sync_controls(state);
         return;
     }
-    state->system_time.manual_dirty = false;
+    ss_linux_date_time_system_time_invalidate_manual_draft(state);
     policy_saved(state);
 }
 
@@ -1000,7 +978,7 @@ void on_calendar_changed(GObject *object,
         sync_controls(state);
         return;
     }
-    state->system_time.manual_dirty = false;
+    ss_linux_date_time_system_time_invalidate_manual_draft(state);
     policy_saved(state);
 }
 
@@ -1026,540 +1004,6 @@ void on_seconds_changed(GObject *object,
     policy_saved(state);
 }
 
-static void system_time_changed(
-    SsSystemTimeService *service G_GNUC_UNUSED,
-    const SsSystemTimeState *system_state,
-    gpointer user_data)
-{
-    SsLinuxDateTimePanel *state = user_data;
-
-    if (state == NULL || system_state == NULL) {
-        return;
-    }
-
-    if (!system_state->available) {
-        sync_system_time_controls(state);
-        set_status(state, "The operating-system date/time service is unavailable.", true);
-        return;
-    }
-
-    const bool timezone_changed =
-        system_state->timezone[0] != '\0' &&
-        g_strcmp0(
-            state->regional_context.timezone_id,
-            system_state->timezone) != 0;
-    (void)ss_regional_context_detect(&state->regional_context);
-
-    if (timezone_changed || system_state->ntp_enabled) {
-        /*
-         * Typed wall time is meaningful only in the context in which it was
-         * entered. A time-zone or NTP authority change invalidates that draft.
-         */
-        state->system_time.manual_dirty = false;
-    }
-
-    /*
-     * Time-zone reconciliation and automatic reference-coordinate publication
-     * are locality writers too. Serialize them with explicit locality changes
-     * and reload both policy and metadata after taking the locality lock, so a
-     * second System Settings process cannot overwrite a freshly selected place
-     * with stale metadata or stale time-zone reference coordinates.
-     */
-    if ((timezone_changed || state->location.follows_timezone_reference) &&
-        ss_location_metadata_transaction_begin()) {
-        SsLocationMetadata authoritative_metadata = {0};
-        SsSystemTimeState locked_system = {0};
-        const bool locked_system_ok =
-            state->system_time.service != NULL &&
-            ss_system_time_service_read(
-                state->system_time.service, &locked_system);
-        const bool regional_reloaded =
-            ss_regional_context_detect(&state->regional_context);
-        const bool regional_matches_system =
-            locked_system_ok &&
-            regional_reloaded &&
-            locked_system.timezone[0] != '\0' &&
-            g_strcmp0(
-                state->regional_context.timezone_id,
-                locked_system.timezone) == 0;
-        const bool policy_reloaded =
-            ss_date_time_model_reload(&state->model);
-        const SsLocationMetadataLoadStatus metadata_status =
-            ss_location_metadata_load_status(&authoritative_metadata);
-
-        if (metadata_status == SS_LOCATION_METADATA_LOAD_OK) {
-            state->location.metadata = authoritative_metadata;
-            state->location.metadata_present = true;
-        } else if (metadata_status == SS_LOCATION_METADATA_LOAD_MISSING) {
-            memset(&state->location.metadata, 0, sizeof(state->location.metadata));
-            state->location.metadata_present = false;
-        }
-        if (policy_reloaded) {
-            refresh_location_authority_state(state);
-        }
-
-        if (policy_reloaded &&
-            ss_linux_date_time_location_metadata_matches_policy(
-                state, ss_date_time_model_policy(&state->model)) &&
-            locked_system_ok &&
-            locked_system.timezone[0] != '\0' &&
-            g_strcmp0(
-                state->location.metadata.timezone_id,
-                locked_system.timezone) != 0) {
-            SsLocationMetadata candidate = state->location.metadata;
-            (void)g_strlcpy(
-                candidate.timezone_id,
-                locked_system.timezone,
-                sizeof(candidate.timezone_id));
-            if (ss_location_metadata_save(&candidate)) {
-                state->location.metadata = candidate;
-                set_status(
-                    state,
-                    "Operating-system time zone and locality metadata reconciled.",
-                    false);
-            } else {
-                set_status(
-                    state,
-                    "The operating-system time zone changed, but the locality metadata could not be updated on disk.",
-                    true);
-            }
-        }
-
-        if (policy_reloaded &&
-            state->location.follows_timezone_reference &&
-            regional_matches_system &&
-            state->regional_context.has_reference_coordinates) {
-            const InfiltratrTemporalPolicyV3 *policy =
-                ss_date_time_model_policy(&state->model);
-            const bool already_matches =
-                policy != NULL &&
-                policy->location_configured &&
-                ss_linux_date_time_location_coordinate_close(
-                    policy->latitude,
-                    state->regional_context.reference_latitude) &&
-                ss_linux_date_time_location_coordinate_close(
-                    policy->longitude,
-                    state->regional_context.reference_longitude);
-
-            if (!already_matches &&
-                !ss_date_time_model_set_location(
-                    &state->model,
-                    true,
-                    state->regional_context.reference_latitude,
-                    state->regional_context.reference_longitude)) {
-                set_status(
-                    state,
-                    "The system time zone changed, but its reference coordinates could not be persisted to the temporal policy.",
-                    true);
-            } else {
-                state->location.updating_controls = true;
-                gtk_spin_button_set_value(
-                    state->location.latitude,
-                    state->regional_context.reference_latitude);
-                gtk_spin_button_set_value(
-                    state->location.longitude,
-                    state->regional_context.reference_longitude);
-                if (state->location.search_entry != NULL &&
-                    state->regional_context.timezone_city[0] != '\0') {
-                    gtk_editable_set_text(
-                        GTK_EDITABLE(state->location.search_entry),
-                        state->regional_context.timezone_city);
-                }
-                state->location.updating_controls = false;
-            }
-        }
-
-        ss_location_metadata_transaction_end();
-    } else if (timezone_changed ||
-               state->location.follows_timezone_reference) {
-        set_status(
-            state,
-            "The system time changed, but the locality transaction lock could not be acquired.",
-            true);
-    }
-
-    sync_system_time_controls(state);
-    ss_linux_date_time_location_update_summary(state);
-    (void)ss_linux_date_time_preview_refresh(state);
-}
-
-static void system_time_ui_request_free(SystemTimeUiRequest *request)
-{
-    if (request == NULL) {
-        return;
-    }
-    ss_linux_date_time_lifetime_unref(request->lifetime);
-    g_free(request);
-}
-
-static guint *operation_generation(
-    SsLinuxDateTimePanel *state,
-    SsSystemTimeOperation operation)
-{
-    if (state == NULL) {
-        return NULL;
-    }
-    switch (operation) {
-    case SS_SYSTEM_TIME_OPERATION_TIMEZONE:
-        return &state->system_time.timezone_generation;
-    case SS_SYSTEM_TIME_OPERATION_NTP:
-        return &state->system_time.ntp_generation;
-    case SS_SYSTEM_TIME_OPERATION_MANUAL:
-        return &state->system_time.manual_time_generation;
-    default:
-        return NULL;
-    }
-}
-
-static GCancellable **operation_cancellable(
-    SsLinuxDateTimePanel *state,
-    SsSystemTimeOperation operation)
-{
-    if (state == NULL) {
-        return NULL;
-    }
-    switch (operation) {
-    case SS_SYSTEM_TIME_OPERATION_TIMEZONE:
-        return &state->system_time.timezone_cancellable;
-    case SS_SYSTEM_TIME_OPERATION_NTP:
-        return &state->system_time.ntp_cancellable;
-    case SS_SYSTEM_TIME_OPERATION_MANUAL:
-        return &state->system_time.manual_time_cancellable;
-    default:
-        return NULL;
-    }
-}
-
-static SystemTimeUiRequest *begin_system_time_operation(
-    SsLinuxDateTimePanel *state,
-    SsSystemTimeOperation operation)
-{
-    SystemTimeUiRequest *request;
-    GCancellable **cancellable = operation_cancellable(state, operation);
-    guint *generation = operation_generation(state, operation);
-
-    if (state == NULL || cancellable == NULL || generation == NULL) {
-        return NULL;
-    }
-
-    /*
-     * Time-zone, NTP and manual-clock changes are separate D-Bus operations,
-     * but their user-visible semantics overlap. Do not compute/apply a wall
-     * time while a zone or NTP transition is unresolved, and vice versa.
-     * A repeated request of the same kind may still supersede its predecessor.
-     */
-    if ((operation != SS_SYSTEM_TIME_OPERATION_TIMEZONE &&
-         state->system_time.timezone_cancellable != NULL) ||
-        (operation != SS_SYSTEM_TIME_OPERATION_NTP &&
-         state->system_time.ntp_cancellable != NULL) ||
-        (operation != SS_SYSTEM_TIME_OPERATION_MANUAL &&
-         state->system_time.manual_time_cancellable != NULL)) {
-        return NULL;
-    }
-
-    if (*cancellable != NULL) {
-        g_cancellable_cancel(*cancellable);
-        g_clear_object(cancellable);
-    }
-    *cancellable = g_cancellable_new();
-    ++(*generation);
-
-    request = g_new0(SystemTimeUiRequest, 1);
-    request->lifetime =
-        ss_linux_date_time_lifetime_ref(state->lifetime);
-    request->generation = *generation;
-    request->operation = operation;
-    return request;
-}
-
-static void system_time_operation_complete(
-    SsSystemTimeService *service G_GNUC_UNUSED,
-    bool success,
-    const char *error_message,
-    gpointer user_data)
-{
-    SystemTimeUiRequest *request = user_data;
-    SsLinuxDateTimePanel *state = request != NULL
-        ? ss_linux_date_time_lifetime_get_panel(request->lifetime)
-        : NULL;
-
-    /*
-     * A later timezone/NTP/manual-time request invalidates every older
-     * completion. Cancellation alone is insufficient because D-Bus replies
-     * can race with the cancellation notification.
-     */
-    guint *generation = state != NULL
-        ? operation_generation(state, request->operation)
-        : NULL;
-
-    if (state != NULL && generation != NULL &&
-        request->generation == *generation) {
-        GCancellable **cancellable =
-            operation_cancellable(state, request->operation);
-        if (cancellable != NULL) {
-            g_clear_object(cancellable);
-        }
-        if (success) {
-            bool metadata_out_of_sync = false;
-            state->system_time.manual_dirty = false;
-            (void)ss_regional_context_detect(&state->regional_context);
-            sync_system_time_controls(state);
-            ss_linux_date_time_location_update_summary(state);
-
-            if (request->operation == SS_SYSTEM_TIME_OPERATION_TIMEZONE &&
-                state->location.metadata_present) {
-                SsSystemTimeState observed;
-                if (ss_system_time_service_read(
-                        state->system_time.service, &observed) &&
-                    observed.timezone[0] != '\0' &&
-                    g_strcmp0(
-                        state->location.metadata.timezone_id,
-                        observed.timezone) != 0) {
-                    metadata_out_of_sync = true;
-                }
-            }
-
-            set_status(
-                state,
-                metadata_out_of_sync
-                    ? "The operating-system time zone changed, but locality metadata is not yet synchronized."
-                    : "Operating-system date/time settings updated.",
-                metadata_out_of_sync);
-        } else {
-            sync_system_time_controls(state);
-            set_status(
-                state,
-                error_message != NULL
-                    ? error_message
-                    : "The operating-system date/time setting could not be changed.",
-                true);
-        }
-    }
-
-    system_time_ui_request_free(request);
-}
-
-static void request_system_timezone(
-    SsLinuxDateTimePanel *state,
-    const char *timezone_id)
-{
-    if (state == NULL || state->system_time.service == NULL ||
-        timezone_id == NULL || timezone_id[0] == '\0') {
-        return;
-    }
-
-    SystemTimeUiRequest *request =
-        begin_system_time_operation(
-            state, SS_SYSTEM_TIME_OPERATION_TIMEZONE);
-
-    if (request == NULL) {
-        sync_system_time_controls(state);
-        set_status(
-            state,
-            "Another protected date/time change is still being applied.",
-            true);
-        return;
-    }
-    sync_system_time_controls(state);
-    set_status(state, "Updating the operating-system time zone…", false);
-    ss_system_time_service_set_timezone_async(
-        state->system_time.service,
-        timezone_id,
-        state->system_time.timezone_cancellable,
-        system_time_operation_complete,
-        request);
-}
-
-void on_timezone_changed(GObject *object G_GNUC_UNUSED,
-                                GParamSpec *pspec G_GNUC_UNUSED,
-                                gpointer user_data)
-{
-    SsLinuxDateTimePanel *state = user_data;
-    guint selected;
-    const char *timezone_id;
-
-    if (state == NULL || state->system_time.updating_controls ||
-        state->system_time.timezone_ids == NULL) {
-        return;
-    }
-
-    selected = gtk_drop_down_get_selected(state->system_time.timezone);
-    if (selected >= state->system_time.timezone_ids->len) {
-        return;
-    }
-    timezone_id = g_ptr_array_index(state->system_time.timezone_ids, selected);
-    request_system_timezone(state, timezone_id);
-}
-
-void on_network_time_changed(GObject *object,
-                                    GParamSpec *pspec G_GNUC_UNUSED,
-                                    gpointer user_data)
-{
-    SsLinuxDateTimePanel *state = user_data;
-    bool enabled;
-
-    if (state == NULL || state->system_time.updating_controls ||
-        state->system_time.service == NULL) {
-        return;
-    }
-
-    SystemTimeUiRequest *request;
-
-    enabled = gtk_switch_get_active(GTK_SWITCH(object)) != FALSE;
-    request = begin_system_time_operation(
-        state, SS_SYSTEM_TIME_OPERATION_NTP);
-    if (request == NULL) {
-        sync_system_time_controls(state);
-        set_status(
-            state,
-            "Another protected date/time change is still being applied.",
-            true);
-        return;
-    }
-    sync_system_time_controls(state);
-    set_status(
-        state,
-        enabled ? "Enabling network time…" : "Disabling network time…",
-        false);
-    ss_system_time_service_set_ntp_async(
-        state->system_time.service,
-        enabled,
-        state->system_time.ntp_cancellable,
-        system_time_operation_complete,
-        request);
-}
-
-static bool parse_manual_datetime(
-    const SsLinuxDateTimePanel *state,
-    const char *date_text,
-    const char *time_text,
-    int64_t *unix_time_usec)
-{
-    const InfiltratrTemporalPolicyV3 *policy;
-    int year;
-    int month;
-    int day;
-    char trailing;
-    int64_t microseconds_of_day;
-    int64_t whole_seconds;
-    int hour;
-    int minute;
-    double seconds;
-    g_autoptr(GDateTime) value = NULL;
-
-    if (state == NULL || date_text == NULL || time_text == NULL ||
-        unix_time_usec == NULL ||
-        !manual_representation_supported(state) ||
-        strlen(date_text) != 10U || date_text[4] != '-' || date_text[7] != '-' ||
-        strspn(date_text, "0123456789-") != 10U ||
-        sscanf(date_text,
-               "%4d-%2d-%2d%c",
-               &year, &month, &day, &trailing) != 3) {
-        return false;
-    }
-
-    policy = ss_date_time_model_policy(&state->model);
-    if (policy == NULL ||
-        !ss_manual_time_parse(
-            policy->clock_mode,
-            ss_linux_date_time_panel_desktop_uses_24h(state),
-            time_text,
-            &microseconds_of_day)) {
-        return false;
-    }
-
-    if (year < 1970 || year > 9999 ||
-        month < 1 || month > 12 ||
-        day < 1 || day > 31) {
-        return false;
-    }
-
-    whole_seconds = microseconds_of_day / G_USEC_PER_SEC;
-    hour = (int)(whole_seconds / INT64_C(3600));
-    minute = (int)((whole_seconds % INT64_C(3600)) / INT64_C(60));
-    seconds =
-        (double)(whole_seconds % INT64_C(60)) +
-        (double)(microseconds_of_day % G_USEC_PER_SEC) /
-            (double)G_USEC_PER_SEC;
-
-    value = g_date_time_new_local(
-        year, month, day, hour, minute, seconds);
-    /* GLib normalises nonexistent DST wall times. A protected clock write
-     * must reject that adjustment instead of setting a different time. Folds
-     * follow GLib's documented standard-time choice. */
-    if (value == NULL || g_date_time_get_year(value) != year ||
-        g_date_time_get_month(value) != month || g_date_time_get_day_of_month(value) != day ||
-        g_date_time_get_hour(value) != hour || g_date_time_get_minute(value) != minute ||
-        g_date_time_get_second(value) != (int)(whole_seconds % 60)) {
-        return false;
-    }
-    *unix_time_usec =
-        (int64_t)g_date_time_to_unix(value) * G_USEC_PER_SEC +
-        (microseconds_of_day % G_USEC_PER_SEC);
-    return true;
-}
-
-void on_manual_entry_changed(
-    GtkEditable *editable G_GNUC_UNUSED,
-    gpointer user_data)
-{
-    SsLinuxDateTimePanel *state = user_data;
-
-    if (state != NULL && !state->system_time.updating_controls) {
-        state->system_time.manual_dirty = true;
-    }
-}
-
-void on_manual_set_time_clicked(
-    GtkButton *button G_GNUC_UNUSED,
-    gpointer user_data)
-{
-    SsLinuxDateTimePanel *state = user_data;
-    int64_t unix_time_usec;
-    const char *date_text;
-    const char *time_text;
-
-    if (state == NULL || state->system_time.service == NULL) {
-        return;
-    }
-
-    date_text = gtk_editable_get_text(GTK_EDITABLE(state->system_time.manual_date));
-    time_text = gtk_editable_get_text(GTK_EDITABLE(state->system_time.manual_time));
-    if (!parse_manual_datetime(
-            state, date_text, time_text, &unix_time_usec)) {
-        set_status(
-            state,
-            "Enter a valid Gregorian date and a time in the selected clock system.",
-            true);
-        return;
-    }
-
-    {
-        SystemTimeUiRequest *request =
-            begin_system_time_operation(
-                state, SS_SYSTEM_TIME_OPERATION_MANUAL);
-
-        if (request == NULL) {
-            set_status(
-                state,
-                "Another protected date/time change is still being applied.",
-                true);
-            return;
-        }
-        sync_system_time_controls(state);
-        set_status(
-            state,
-            "Setting the operating-system date and time…",
-            false);
-        ss_system_time_service_set_time_async(
-            state->system_time.service,
-            unix_time_usec,
-            state->system_time.manual_time_cancellable,
-            system_time_operation_complete,
-            request);
-    }
-}
-
 void on_show_date_changed(GObject *object,
                                  GParamSpec *pspec G_GNUC_UNUSED,
                                  gpointer user_data)
@@ -1567,7 +1011,7 @@ void on_show_date_changed(GObject *object,
     SsLinuxDateTimePanel *state = user_data;
     bool value;
 
-    if (state == NULL || state->system_time.updating_controls ||
+    if (state == NULL || state->native_format_updating ||
         state->cinnamon_interface_settings == NULL) {
         return;
     }
@@ -1590,7 +1034,7 @@ void on_first_day_changed(GObject *object G_GNUC_UNUSED,
     SsLinuxDateTimePanel *state = user_data;
     int value;
 
-    if (state == NULL || state->system_time.updating_controls ||
+    if (state == NULL || state->native_format_updating ||
         state->cinnamon_interface_settings == NULL) {
         return;
     }
@@ -1604,60 +1048,6 @@ void on_first_day_changed(GObject *object G_GNUC_UNUSED,
         return;
     }
     set_status(state, "First day of week updated.", false);
-}
-
-static void system_time_service_ready(
-    SsSystemTimeService *service,
-    const char *error_message,
-    gpointer user_data)
-{
-    SsLinuxDateTimeLifetime *lifetime = user_data;
-    SsLinuxDateTimePanel *state =
-        ss_linux_date_time_lifetime_get_panel(lifetime);
-
-    if (state == NULL) {
-        ss_system_time_service_free(service);
-        ss_linux_date_time_lifetime_unref(lifetime);
-        return;
-    }
-
-    if (service == NULL) {
-        set_status(
-            state,
-            error_message != NULL
-                ? error_message
-                : "The operating-system date/time service is unavailable.",
-            true);
-        ss_linux_date_time_lifetime_unref(lifetime);
-        return;
-    }
-
-    state->system_time.service = service;
-    ss_system_time_service_set_changed_callback(
-        state->system_time.service,
-        system_time_changed,
-        state);
-    sync_system_time_controls(state);
-    SsSystemTimeState initial;
-    if (!ss_system_time_service_read(service, &initial)) {
-        set_status(state, "The operating-system date/time service is unavailable.", true);
-        ss_linux_date_time_lifetime_unref(lifetime);
-        return;
-    }
-    if (state->location.recovery_failed) {
-        set_status(
-            state,
-            "Date & Time is available, but interrupted locality metadata could not yet be recovered. The journal has been preserved for retry.",
-            true);
-    } else {
-        set_status(
-            state,
-            state->model.persisted_policy_present
-                ? "Using the saved system-wide temporal policy. Native Mint/Linux date and time controls are live."
-                : "Using Mint/Cinnamon temporal preferences as the initial policy. Native Mint/Linux date and time controls are live.",
-            false);
-    }
-    ss_linux_date_time_lifetime_unref(lifetime);
 }
 
 static bool migrate_legacy_native_clock(
@@ -1750,8 +1140,6 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
     }
     refresh_location_authority_state(state);
 
-    state->system_time.service_cancellable = g_cancellable_new();
-
     {
         g_autofree gchar *policy_path = temporal_policy_path();
         state->policy_observer = ss_policy_file_observer_new(
@@ -1764,7 +1152,6 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
                 G_IO_ERROR,
                 G_IO_ERROR_FAILED,
                 "Unable to observe the temporal policy.");
-            g_clear_object(&state->system_time.service_cancellable);
             ss_linux_date_time_preview_dispose(state);
             g_free(state);
             return NULL;
@@ -1786,7 +1173,6 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
                 "Unable to observe locality metadata.");
             ss_policy_file_observer_free(state->policy_observer);
             state->policy_observer = NULL;
-            g_clear_object(&state->system_time.service_cancellable);
             ss_linux_date_time_preview_dispose(state);
             g_free(state);
             return NULL;
@@ -1838,10 +1224,7 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
      * window before either external-service work path runs.
      */
     state->lifetime = ss_linux_date_time_lifetime_new(state);
-    ss_system_time_service_new_async(
-        state->system_time.service_cancellable,
-        system_time_service_ready,
-        ss_linux_date_time_lifetime_ref(state->lifetime));
+    ss_linux_date_time_system_time_start(state);
     ss_linux_date_time_preview_schedule_initial(state);
     return state;
 }
@@ -1887,27 +1270,9 @@ void ss_linux_date_time_panel_free(gpointer data)
         g_cancellable_cancel(state->location.search_cancellable);
         g_clear_object(&state->location.search_cancellable);
     }
-    if (state->system_time.service_cancellable != NULL) {
-        g_cancellable_cancel(state->system_time.service_cancellable);
-        g_clear_object(&state->system_time.service_cancellable);
-    }
-    if (state->system_time.timezone_cancellable != NULL) {
-        g_cancellable_cancel(state->system_time.timezone_cancellable);
-        g_clear_object(&state->system_time.timezone_cancellable);
-    }
-    if (state->system_time.ntp_cancellable != NULL) {
-        g_cancellable_cancel(state->system_time.ntp_cancellable);
-        g_clear_object(&state->system_time.ntp_cancellable);
-    }
-    if (state->system_time.manual_time_cancellable != NULL) {
-        g_cancellable_cancel(state->system_time.manual_time_cancellable);
-        g_clear_object(&state->system_time.manual_time_cancellable);
-    }
+    ss_linux_date_time_system_time_dispose(state);
 
     g_clear_pointer(&state->clock_mode_ids, g_ptr_array_unref);
-    g_clear_pointer(&state->system_time.timezone_ids, g_ptr_array_unref);
-    ss_system_time_service_free(state->system_time.service);
-    state->system_time.service = NULL;
     g_clear_object(&state->cinnamon_interface_settings);
     if (state->root != NULL) {
         disconnect_panel_widgets(state->root, state);
