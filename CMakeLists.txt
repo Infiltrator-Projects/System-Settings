@@ -251,30 +251,6 @@ endforeach()
 unset(SS_LINUX_SHELL_SOURCE)
 unset(SS_LINUX_SHELL_SOURCES)
 
-# The locality implementation may coordinate through the panel's narrow
-# private services, but it must not reach into unrelated mutable sub-domains.
-# Keep that ownership boundary executable so a later edit cannot silently
-# recreate the shared-controller coupling this split removes.
-set(SS_DATE_TIME_LOCATION_SOURCE_FILE
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/modules/date-time/linux-date-time-location.c")
-file(READ "${SS_DATE_TIME_LOCATION_SOURCE_FILE}" SS_DATE_TIME_LOCATION_SOURCE)
-foreach(SS_FORBIDDEN_LOCATION_TOKEN
-        "state->system_time"
-        "state->preview"
-        "state->updating_controls")
-    string(FIND "${SS_DATE_TIME_LOCATION_SOURCE}"
-        "${SS_FORBIDDEN_LOCATION_TOKEN}"
-        SS_FORBIDDEN_LOCATION_INDEX)
-    if(NOT SS_FORBIDDEN_LOCATION_INDEX EQUAL -1)
-        message(FATAL_ERROR
-            "Date & Time locality regained unrelated controller ownership: "
-            "${SS_FORBIDDEN_LOCATION_TOKEN}")
-    endif()
-endforeach()
-unset(SS_FORBIDDEN_LOCATION_INDEX)
-unset(SS_DATE_TIME_LOCATION_SOURCE)
-unset(SS_DATE_TIME_LOCATION_SOURCE_FILE)
-
 if(WIN32)
     add_library(system-settings-platform STATIC
         src/platform/windows/temporal-policy-store.c)
@@ -311,9 +287,17 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         src/modules/date-time/home-temporal-presentation.c
         src/modules/date-time/policy-file-observer.c
         src/modules/date-time/linux-date-time-panel.c
+        src/modules/date-time/linux-date-time-location-boundary.c
         src/modules/date-time/linux-date-time-location.c
         src/modules/date-time/linux-date-time-panel-ui.c
         src/platform/linux/location-search.c)
+    # Locality is protected by the C type system rather than by grepping its
+    # source. The complete panel-private header rejects inclusion whenever this
+    # source-specific marker is present.
+    set_source_files_properties(
+        src/modules/date-time/linux-date-time-location.c
+        PROPERTIES COMPILE_DEFINITIONS
+            SYSTEM_SETTINGS_DATE_TIME_LOCATION_BOUNDARY=1)
     ss_configure(system-settings-date-time-linux)
     target_include_directories(system-settings-date-time-linux PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/modules/date-time")
