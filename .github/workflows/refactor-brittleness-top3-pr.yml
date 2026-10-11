@@ -30,6 +30,9 @@ jobs:
           end_marker = '      - name: Commit refactor result\n'
           run_end = workflow.index(end_marker, run_start)
           script = textwrap.dedent(workflow[run_start:run_end])
+          script = script.replace(
+              'shell = replace_once(shell, host_block, provider_block, "home provider ownership")',
+              'shell = replace_once(shell, "    root = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);\\n", provider_block[len(host_block):] + "    root = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);\\n", "home provider ownership")')
           exec(compile(script, 'refactor-brittleness-top3', 'exec'), {'__name__': '__main__'})
 
       - name: Commit refactor result
