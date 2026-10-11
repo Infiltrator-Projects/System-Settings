@@ -59,12 +59,8 @@ const SsRegionalContext *ss_linux_date_time_location_regional_context_const(
 SsLinuxDateTimeLifetime *ss_linux_date_time_location_lifetime(
     SsLinuxDateTimePanel *panel);
 
-/* Explicit asynchronous lifetime contract shared with locality requests. */
-SsLinuxDateTimeLifetime *ss_linux_date_time_lifetime_new(
-    SsLinuxDateTimePanel *panel);
+/* Only the lifetime operations locality itself requires are exposed here. */
 SsLinuxDateTimeLifetime *ss_linux_date_time_lifetime_ref(
-    SsLinuxDateTimeLifetime *lifetime);
-void ss_linux_date_time_lifetime_invalidate(
     SsLinuxDateTimeLifetime *lifetime);
 void ss_linux_date_time_lifetime_unref(
     SsLinuxDateTimeLifetime *lifetime);
