@@ -74,7 +74,12 @@ jobs:
               location,
               '''    if (state->system_time.service != NULL &&\n        ss_system_time_service_read(\n            state->system_time.service, &current_system) &&\n        current_system.timezone[0] != '\\0') {\n''',
               '''    if (ss_linux_date_time_panel_read_system_time(\n            state, &current_system) &&\n        current_system.timezone[0] != '\\0') {\n''',
-              'locality system-time bridge')
+              'selected locality system-time bridge')
+          replace_once(
+              location,
+              '''    if (state->system_time.service != NULL) {\n        SsSystemTimeState current_system;\n        if (ss_system_time_service_read(\n                state->system_time.service, &current_system) &&\n            current_system.timezone[0] != '\\0') {\n            (void)g_strlcpy(\n                state->location.metadata.timezone_id,\n                current_system.timezone,\n                sizeof(state->location.metadata.timezone_id));\n        }\n    }\n''',
+              '''    {\n        SsSystemTimeState current_system;\n        if (ss_linux_date_time_panel_read_system_time(\n                state, &current_system) &&\n            current_system.timezone[0] != '\\0') {\n            (void)g_strlcpy(\n                state->location.metadata.timezone_id,\n                current_system.timezone,\n                sizeof(state->location.metadata.timezone_id));\n        }\n    }\n''',
+              'custom coordinate system-time bridge')
           replace_once(
               location,
               '''    state->location.follows_timezone_reference = false;\n    state->updating_controls = true;\n    gtk_editable_set_text(\n''',
@@ -105,7 +110,6 @@ jobs:
               '''The application presents its existing window on repeated activation. On close,\nthe host releases its module instances before the window is destroyed. Panel cleanup removes\n''',
               'architecture host teardown wording')
 
-          # Verify the locality translation unit no longer knows foreign mutable fields.
           location_text = Path(location).read_text()
           for forbidden in ('state->system_time', 'state->preview', 'state->updating_controls'):
               if forbidden in location_text:
