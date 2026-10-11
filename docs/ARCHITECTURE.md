@@ -111,8 +111,11 @@ Linux shell
           v
 Date & Time module
   linux-date-time-panel.c
-    policy reconciliation / protected system-time composition
-    async lifetime/cancellation
+    policy reconciliation / cross-domain composition
+    async lifetime anchor
+  linux-date-time-system-time.c
+    protected timezone/NTP/manual-time lifecycle and cancellation
+    compiler-enforced narrow panel projection
   linux-date-time-preview.c
     isolated live clock/calendar preview lifecycle
   linux-date-time-location.c

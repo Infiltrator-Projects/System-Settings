@@ -184,10 +184,14 @@ static void home_temporal_ticker_free(gpointer data)
 static void open_date_time_from_home(GtkButton *button, gpointer user_data)
 {
     SsHomePageContext *context = user_data;
+    const char *page_id = context != NULL
+        ? ss_home_temporal_provider_page_id(context->temporal_provider)
+        : NULL;
 
     (void)button;
-    if (context != NULL && context->navigate != NULL) {
-        context->navigate(context->navigate_data);
+    if (context != NULL && context->navigate != NULL &&
+        page_id != NULL && page_id[0] != '\0') {
+        context->navigate(page_id, context->navigate_data);
     }
 }
 

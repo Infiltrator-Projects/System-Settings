@@ -6,7 +6,7 @@
 
 #include <gtk/gtk.h>
 
-typedef void (*SsHomeNavigateFunc)(gpointer user_data);
+typedef void (*SsHomeNavigateFunc)(const char *page_id, gpointer user_data);
 
 typedef struct SsHomePageContext {
     SsHomeTemporalProvider *temporal_provider;

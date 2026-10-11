@@ -14,6 +14,8 @@ typedef struct SsHomeTemporalSnapshot {
 } SsHomeTemporalSnapshot;
 
 SsHomeTemporalProvider *ss_home_temporal_provider_new(void);
+const char *ss_home_temporal_provider_page_id(
+    const SsHomeTemporalProvider *provider);
 void ss_home_temporal_provider_free(SsHomeTemporalProvider *provider);
 
 void ss_home_temporal_snapshot_init(SsHomeTemporalSnapshot *snapshot);

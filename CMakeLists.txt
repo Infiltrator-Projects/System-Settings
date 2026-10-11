@@ -263,6 +263,8 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         src/modules/date-time/home-temporal-presentation.c
         src/modules/date-time/policy-file-observer.c
         src/modules/date-time/linux-date-time-panel.c
+        src/modules/date-time/linux-date-time-system-time.c
+        src/modules/date-time/linux-date-time-system-time-boundary.c
         src/modules/date-time/linux-date-time-preview.c
         src/modules/date-time/linux-date-time-preview-boundary.c
         src/modules/date-time/linux-date-time-location-boundary.c
@@ -280,6 +282,10 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         src/modules/date-time/linux-date-time-preview.c
         PROPERTIES COMPILE_DEFINITIONS
             SYSTEM_SETTINGS_DATE_TIME_PREVIEW_BOUNDARY=1)
+    set_source_files_properties(
+        src/modules/date-time/linux-date-time-system-time.c
+        PROPERTIES COMPILE_DEFINITIONS
+            SYSTEM_SETTINGS_DATE_TIME_SYSTEM_TIME_BOUNDARY=1)
     ss_configure(system-settings-date-time-linux)
     target_include_directories(system-settings-date-time-linux PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/modules/date-time")
@@ -543,6 +549,16 @@ if(BUILD_TESTING)
             PkgConfig::GIO2)
         add_test(NAME policy-file-observer
             COMMAND policy-file-observer-test)
+
+        add_executable(home-temporal-provider-test
+            tests/home-temporal-provider-test.c)
+        ss_configure(home-temporal-provider-test)
+        target_include_directories(home-temporal-provider-test PRIVATE
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux")
+        target_link_libraries(home-temporal-provider-test PRIVATE
+            system-settings-linux-modules PkgConfig::GTK4)
+        add_test(NAME home-temporal-provider
+            COMMAND home-temporal-provider-test)
 
         add_executable(home-temporal-presentation-test
             tests/home-temporal-presentation-test.c)
