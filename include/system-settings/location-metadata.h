@@ -10,6 +10,10 @@
 #ifndef SYSTEM_SETTINGS_LOCATION_METADATA_H
 #define SYSTEM_SETTINGS_LOCATION_METADATA_H
 
+#if defined(SYSTEM_SETTINGS_GENERIC_SHELL)
+#error "Generic Linux shell must not include Date & Time domain contracts."
+#endif
+
 #include <stdbool.h>
 #include <stddef.h>
 
