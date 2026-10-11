@@ -51,6 +51,7 @@ typedef struct SsLinuxDateTimeLocationState {
     bool metadata_uncertain;
     bool follows_timezone_reference;
     bool recovery_failed;
+    bool updating_controls;
 } SsLinuxDateTimeLocationState;
 
 typedef struct SsLinuxDateTimeSystemTimeState {
@@ -131,6 +132,9 @@ void ss_linux_date_time_panel_policy_saved(
     SsLinuxDateTimePanel *state);
 guint ss_linux_date_time_panel_preview_interval_ms(
     const SsLinuxDateTimePanel *state);
+bool ss_linux_date_time_panel_read_system_time(
+    const SsLinuxDateTimePanel *state,
+    SsSystemTimeState *out);
 
 bool ss_linux_date_time_location_coordinate_close(
     double left,

@@ -368,6 +368,16 @@ static void policy_file_changed(gpointer user_data)
     }
 }
 
+bool ss_linux_date_time_panel_read_system_time(
+    const SsLinuxDateTimePanel *state,
+    SsSystemTimeState *out)
+{
+    return state != NULL &&
+           out != NULL &&
+           state->system_time.service != NULL &&
+           ss_system_time_service_read(state->system_time.service, out);
+}
+
 static guint timezone_index_for_id(
     const SsLinuxDateTimePanel *state,
     const char *timezone_id)
@@ -1063,6 +1073,7 @@ static void sync_controls(SsLinuxDateTimePanel *state)
     }
 
     state->updating_controls = true;
+    state->location.updating_controls = true;
     gtk_drop_down_set_selected(
         state->clock_mode, clock_index_for_id(state, policy->clock_mode));
     gtk_drop_down_set_selected(
@@ -1094,6 +1105,7 @@ static void sync_controls(SsLinuxDateTimePanel *state)
                 state->regional_context.timezone_city);
         }
     }
+    state->location.updating_controls = false;
     state->updating_controls = false;
     update_control_capabilities(state);
 }
@@ -1414,7 +1426,7 @@ static void system_time_changed(
                     "The system time zone changed, but its reference coordinates could not be persisted to the temporal policy.",
                     true);
             } else {
-                state->updating_controls = true;
+                state->location.updating_controls = true;
                 gtk_spin_button_set_value(
                     state->location.latitude,
                     state->regional_context.reference_latitude);
@@ -1427,7 +1439,7 @@ static void system_time_changed(
                         GTK_EDITABLE(state->location.search_entry),
                         state->regional_context.timezone_city);
                 }
-                state->updating_controls = false;
+                state->location.updating_controls = false;
             }
         }
 

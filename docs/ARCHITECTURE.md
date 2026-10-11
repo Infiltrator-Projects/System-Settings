@@ -181,7 +181,7 @@ on first selection. Time-zone catalogue parsing, policy observers and timedated
 proxy setup therefore do not participate in shell first paint.
 
 The application presents its existing window on repeated activation. On close,
-the host removes its panel data before destroying widgets. Panel cleanup removes
+the host releases its module instances before the window is destroyed. Panel cleanup removes
 sources, cancels requests, disconnects widget callbacks and releases its retained
 root. Pending UI requests retain a small ref-counted lifetime anchor rather than a
 window/controller side channel. Panel teardown invalidates that anchor before

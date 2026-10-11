@@ -267,9 +267,8 @@ void on_location_result_activated(
     state->location.metadata.latitude = result->latitude;
     state->location.metadata.longitude = result->longitude;
 
-    if (state->system_time.service != NULL &&
-        ss_system_time_service_read(
-            state->system_time.service, &current_system) &&
+    if (ss_linux_date_time_panel_read_system_time(
+            state, &current_system) &&
         current_system.timezone[0] != '\0') {
         (void)g_strlcpy(
             state->location.metadata.timezone_id,
@@ -362,7 +361,7 @@ void on_location_result_activated(
 
     ss_location_metadata_transaction_end();
     state->location.follows_timezone_reference = false;
-    state->updating_controls = true;
+    state->location.updating_controls = true;
     gtk_editable_set_text(
         GTK_EDITABLE(state->location.search_entry),
         result->display_name);
@@ -370,7 +369,7 @@ void on_location_result_activated(
         state->location.latitude, result->latitude);
     gtk_spin_button_set_value(
         state->location.longitude, result->longitude);
-    state->updating_controls = false;
+    state->location.updating_controls = false;
     clear_location_results(state);
     ss_linux_date_time_location_update_summary(state);
     ss_linux_date_time_panel_policy_saved(state);
@@ -549,7 +548,7 @@ static gboolean commit_location_coordinates(gpointer user_data)
         return G_SOURCE_REMOVE;
     }
     state->location.coordinate_commit_id = 0U;
-    if (state->updating_controls) {
+    if (state->location.updating_controls) {
         return G_SOURCE_REMOVE;
     }
 
@@ -605,10 +604,10 @@ static gboolean commit_location_coordinates(gpointer user_data)
     state->location.metadata.latitude = latitude;
     state->location.metadata.longitude = longitude;
 
-    if (state->system_time.service != NULL) {
+    {
         SsSystemTimeState current_system;
-        if (ss_system_time_service_read(
-                state->system_time.service, &current_system) &&
+        if (ss_linux_date_time_panel_read_system_time(
+                state, &current_system) &&
             current_system.timezone[0] != '\0') {
             (void)g_strlcpy(
                 state->location.metadata.timezone_id,
@@ -696,7 +695,7 @@ void on_location_coordinate_changed(
 {
     SsLinuxDateTimePanel *state = user_data;
 
-    if (state == NULL || state->updating_controls) {
+    if (state == NULL || state->location.updating_controls) {
         return;
     }
 
