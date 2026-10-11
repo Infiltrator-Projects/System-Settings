@@ -1,0 +1,70 @@
+name: validate-brittleness-next3
+
+on:
+  push:
+    branches:
+      - fix/brittleness-next3
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: Linux build, test and package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out source and pinned Common
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          submodules: recursive
+      - name: Install Linux UI dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev libgeocode-glib-dev pkg-config xvfb dbus-x11
+      - name: Configure
+        run: cmake -S . -B build -DBUILD_TESTING=ON -DSYSTEM_SETTINGS_WARNINGS_AS_ERRORS=ON
+      - name: Build
+        run: cmake --build build --config Release --parallel "$(($(nproc)>1?$(nproc)-1:1))"
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+      - name: Package
+        run: |
+          cd build
+          cpack -G DEB
+
+  sanitizers:
+    name: Linux ASan and UBSan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out source and pinned Common
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          submodules: recursive
+      - name: Install Linux UI dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev libgeocode-glib-dev pkg-config xvfb dbus-x11
+      - name: Configure sanitized build
+        run: |
+          cmake -S . -B build-sanitized \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_TESTING=ON \
+            -DSYSTEM_SETTINGS_WARNINGS_AS_ERRORS=ON \
+            -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
+            -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address,undefined"
+      - name: Build sanitized targets
+        run: cmake --build build-sanitized --parallel "$(($(nproc)>1?$(nproc)-1:1))"
+      - name: Test non-GTK code
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: ctest --test-dir build-sanitized --output-on-failure -E linux-shell
+      - name: Test GTK shell
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          LSAN_OPTIONS: suppressions=${{ github.workspace }}/tests/lsan.supp:print_suppressions=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: ctest --test-dir build-sanitized --output-on-failure -R linux-shell
