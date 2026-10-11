@@ -1,0 +1,39 @@
+name: fix-brittleness-substitution
+
+on:
+  push:
+    branches:
+      - fix/brittleness-next3
+
+permissions:
+  contents: write
+
+jobs:
+  correct:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Correct substitution and self-remove
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('src/modules/date-time/linux-date-time-panel.c')
+          text = path.read_text()
+          bad = 'system_state->system_time.timezone'
+          count = text.count(bad)
+          if count != 2:
+              raise SystemExit(f'Expected exactly two accidental substitutions, found {count}')
+          text = text.replace(bad, 'system_state->timezone')
+          if 'system_state->system_time' in text:
+              raise SystemExit('A stale accidental system_state nesting remains')
+          path.write_text(text)
+          Path('.github/workflows/fix-brittleness-substitution.yml').unlink()
+          PY
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Correct system-time state substitution"
+          git push origin HEAD:fix/brittleness-next3
