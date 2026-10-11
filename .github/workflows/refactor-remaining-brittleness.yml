@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-name: Apply remaining brittleness refactor
+name: Validate remaining brittleness refactor
 
 on:
   push:
@@ -10,47 +10,99 @@ permissions:
   contents: write
 
 jobs:
-  refactor:
-    if: ${{ !contains(github.event.head_commit.message, 'Apply remaining brittleness refactor output') }}
+  validate:
+    if: ${{ !contains(github.event.head_commit.message, 'Validate remaining brittleness fixes') }}
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - name: Check out refactor branch
+      - name: Check out refactor branch and pinned Common
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: fix/remaining-brittleness-2026-10-12
           fetch-depth: 0
+          submodules: recursive
 
-      - name: Preserve separators between extracted C functions
+      - name: Correct inspected extraction defects
         shell: bash
         run: |
+          set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
-          path = Path('tools/refactor_remaining_brittleness.py')
-          text = path.read_text(encoding='utf-8')
-          old = '''        end = _matching_brace(text, brace) + 1\n        start = match.start()\n        while start > 0 and text[start - 1] == "\\n":\n            start -= 1\n            if start > 0 and text[start - 1] != "\\n":\n                break\n        while end < len(text) and text[end] == "\\n":\n            end += 1\n        return start, end\n'''
-          new = '''        end = _matching_brace(text, brace) + 1\n        start = match.start()\n        return start, end\n'''
+
+          def replace_once(path, old, new, label):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              if text.count(old) != 1:
+                  raise SystemExit(f'{label}: expected exactly one match, got {text.count(old)}')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          preview = Path('src/modules/date-time/linux-date-time-preview.c')
+          text = preview.read_text(encoding='utf-8')
+          count = text.count('            refresh_preview,\n')
+          if count != 2:
+              raise SystemExit(f'preview callback rename: expected 2, got {count}')
+          text = text.replace(
+              '            refresh_preview,\n',
+              '            ss_linux_date_time_preview_refresh,\n')
+          old = 'static bool preview_coordinates(\n    const SsLinuxDateTimePanel *state,\n'
+          new = 'static bool preview_coordinates(\n    SsLinuxDateTimePanel *state,\n'
           if text.count(old) != 1:
-              raise SystemExit('function-span separator patch did not match exactly once')
-          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+              raise SystemExit('preview const correction did not match exactly once')
+          text = text.replace(old, new, 1)
+          old = 'guint ss_linux_date_time_panel_preview_interval_ms(\n    const SsLinuxDateTimePanel *state)\n'
+          new = 'guint ss_linux_date_time_panel_preview_interval_ms(\n    SsLinuxDateTimePanel *state)\n'
+          if text.count(old) != 1:
+              raise SystemExit('preview interval source signature did not match exactly once')
+          preview.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          replace_once(
+              'src/modules/date-time/linux-date-time-preview-private.h',
+              'guint ss_linux_date_time_panel_preview_interval_ms(\n    const SsLinuxDateTimePanel *panel);\n',
+              'guint ss_linux_date_time_panel_preview_interval_ms(\n    SsLinuxDateTimePanel *panel);\n',
+              'preview interval header signature')
+
+          replace_once(
+              'src/shell/linux/shell-module-catalog.c',
+              '#include "shell-module-catalog.h"\n\n',
+              '#include "shell-module-catalog.h"\n\n#include <stdbool.h>\n\n',
+              'manifest bool include')
+
+          replace_once(
+              'src/shell/linux/home-page.c',
+              '    const char *architecture = uname_result == 0 ? uts.machine : "Unknown";\n    SsHomeStatusSnapshot status;\n',
+              '    const char *architecture = uname_result == 0 ? uts.machine : "Unknown";\n    SsHomeTemporalSnapshot temporal;\n    SsHomeStatusSnapshot status;\n',
+              'Home temporal snapshot declaration')
           PY
 
-      - name: Apply deterministic structural refactor
-        run: python3 tools/refactor_remaining_brittleness.py
+      - name: Install Linux UI dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-4-dev libgeocode-glib-dev pkg-config xvfb dbus-x11
 
-      - name: Validate patch shape
+      - name: Strict configure and build
+        run: |
+          cmake -S . -B build -DBUILD_TESTING=ON -DSYSTEM_SETTINGS_WARNINGS_AS_ERRORS=ON
+          cmake --build build --config Release --parallel "$(($(nproc)>1?$(nproc)-1:1))"
+
+      - name: Run tests
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Validate packaging
+        run: |
+          set -euo pipefail
+          cd build
+          cpack -G DEB
+          test -n "$(find . -maxdepth 1 -type f -name 'infiltrator-system-settings_*.deb' -print -quit)"
+
+      - name: Commit validated source corrections
         run: |
           set -euo pipefail
           git diff --check
-          test -f src/modules/date-time/linux-date-time-preview.c
-          test -f src/modules/date-time/linux-date-time-preview-boundary.c
-          test -f src/shell/linux/home-status.c
-          test -f src/shell/linux/shell-module-catalog.c
-
-      - name: Commit generated source changes
-        run: |
-          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add CMakeLists.txt docs/ARCHITECTURE.md src/modules/date-time src/shell/linux
-          git commit -m "Apply remaining brittleness refactor output"
+          git add src/modules/date-time/linux-date-time-preview.c \
+                  src/modules/date-time/linux-date-time-preview-private.h \
+                  src/shell/linux/home-page.c \
+                  src/shell/linux/shell-module-catalog.c
+          git commit -m "Validate remaining brittleness fixes"
           git push origin HEAD:fix/remaining-brittleness-2026-10-12
