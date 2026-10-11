@@ -3,18 +3,26 @@
  * @file linux-date-time-location.c
  * @brief Locality search, coordinate transactions and location presentation.
  *
- * The Date & Time controller delegates the complete locality workflow here:
- * asynchronous geocoding, durable metadata pairing, rollback, advisory
- * time-zone inference and debounced coordinate publication.
+ * Locality compiles against a deliberately narrow facade. It owns its mutable
+ * state and may coordinate with the Date & Time composition root only through
+ * explicit model, regional-context, lifetime and status/synchronisation APIs.
  */
 
-#include "linux-date-time-panel-private.h"
+#include "linux-date-time-location-private.h"
 #include "linux-ui-helpers.h"
 
 #include "system-settings/location-search.h"
 #include "system-settings/regional-context.h"
 
 #include <string.h>
+
+#define LOCATION(state) (*ss_linux_date_time_location_state((state)))
+#define LOCATION_CONST(state) (*ss_linux_date_time_location_state_const((state)))
+#define MODEL(state) (*ss_linux_date_time_location_model((state)))
+#define MODEL_CONST(state) (*ss_linux_date_time_location_model_const((state)))
+#define REGIONAL(state) (*ss_linux_date_time_location_regional_context((state)))
+#define REGIONAL_CONST(state) \
+    (*ss_linux_date_time_location_regional_context_const((state)))
 
 typedef struct LocationSearchUiRequest {
     SsLinuxDateTimeLifetime *lifetime;
@@ -66,13 +74,13 @@ bool ss_linux_date_time_location_metadata_matches_policy(
     return state != NULL &&
            policy != NULL &&
            policy->location_configured &&
-           state->location.metadata_present &&
+           LOCATION_CONST(state).metadata_present &&
            ss_linux_date_time_location_coordinate_close(
                policy->latitude,
-               state->location.metadata.latitude) &&
+               LOCATION_CONST(state).metadata.latitude) &&
            ss_linux_date_time_location_coordinate_close(
                policy->longitude,
-               state->location.metadata.longitude);
+               LOCATION_CONST(state).metadata.longitude);
 }
 
 static gchar *format_coordinate_pair(
@@ -97,11 +105,11 @@ void ss_linux_date_time_location_update_summary(
     g_autofree gchar *coordinates = NULL;
     g_autofree gchar *summary = NULL;
 
-    if (state == NULL || state->location.summary == NULL) {
+    if (state == NULL || LOCATION(state).summary == NULL) {
         return;
     }
 
-    policy = ss_date_time_model_policy(&state->model);
+    policy = ss_date_time_model_policy(&MODEL(state));
     if (policy == NULL) {
         return;
     }
@@ -111,36 +119,36 @@ void ss_linux_date_time_location_update_summary(
             policy->latitude, policy->longitude);
         if (ss_linux_date_time_location_metadata_matches_policy(
                 state, policy) &&
-            state->location.metadata.display_name[0] != '\0') {
+            LOCATION(state).metadata.display_name[0] != '\0') {
             summary = g_strdup_printf(
                 "%s • %s",
-                state->location.metadata.display_name,
+                LOCATION(state).metadata.display_name,
                 coordinates);
         } else {
             summary = g_strdup_printf(
                 "Selected geographic coordinates • %s",
                 coordinates);
         }
-    } else if (state->regional_context.has_reference_coordinates) {
+    } else if (REGIONAL(state).has_reference_coordinates) {
         const char *city =
-            state->regional_context.timezone_city[0] != '\0'
-                ? state->regional_context.timezone_city
-                : state->regional_context.timezone_id;
+            REGIONAL(state).timezone_city[0] != '\0'
+                ? REGIONAL(state).timezone_city
+                : REGIONAL(state).timezone_id;
         coordinates = format_coordinate_pair(
-            state->regional_context.reference_latitude,
-            state->regional_context.reference_longitude);
+            REGIONAL(state).reference_latitude,
+            REGIONAL(state).reference_longitude);
         summary = g_strdup_printf(
             "%s is the current approximation from system time zone %s • %s. "
             "Search for your actual locality to refine it.",
             city,
-            state->regional_context.timezone_id,
+            REGIONAL(state).timezone_id,
             coordinates);
     } else {
         summary = g_strdup(
             "Search for a locality to establish geographic coordinates.");
     }
 
-    gtk_label_set_text(GTK_LABEL(state->location.summary), summary);
+    gtk_label_set_text(GTK_LABEL(LOCATION(state).summary), summary);
 }
 
 bool ss_linux_date_time_location_policy_matches_reference(
@@ -149,27 +157,27 @@ bool ss_linux_date_time_location_policy_matches_reference(
     const InfiltratrTemporalPolicyV3 *policy;
 
     if (state == NULL ||
-        !state->regional_context.has_reference_coordinates) {
+        !REGIONAL_CONST(state).has_reference_coordinates) {
         return false;
     }
 
-    policy = ss_date_time_model_policy(&state->model);
+    policy = ss_date_time_model_policy(&MODEL_CONST(state));
     return policy != NULL &&
            policy->location_configured &&
            ss_linux_date_time_location_coordinate_close(
                policy->latitude,
-               state->regional_context.reference_latitude) &&
+               REGIONAL_CONST(state).reference_latitude) &&
            ss_linux_date_time_location_coordinate_close(
                policy->longitude,
-               state->regional_context.reference_longitude);
+               REGIONAL_CONST(state).reference_longitude);
 }
 
 void ss_linux_date_time_location_cancel_coordinate_commit(
     SsLinuxDateTimePanel *state)
 {
-    if (state != NULL && state->location.coordinate_commit_id != 0U) {
-        g_source_remove(state->location.coordinate_commit_id);
-        state->location.coordinate_commit_id = 0U;
+    if (state != NULL && LOCATION(state).coordinate_commit_id != 0U) {
+        g_source_remove(LOCATION(state).coordinate_commit_id);
+        LOCATION(state).coordinate_commit_id = 0U;
     }
 }
 
@@ -177,19 +185,19 @@ static void clear_location_results(SsLinuxDateTimePanel *state)
 {
     GtkWidget *child;
 
-    if (state == NULL || state->location.results == NULL) {
+    if (state == NULL || LOCATION(state).results == NULL) {
         return;
     }
 
     child = gtk_widget_get_first_child(
-        GTK_WIDGET(state->location.results));
+        GTK_WIDGET(LOCATION(state).results));
     while (child != NULL) {
         GtkWidget *next = gtk_widget_get_next_sibling(child);
-        gtk_list_box_remove(state->location.results, child);
+        gtk_list_box_remove(LOCATION(state).results, child);
         child = next;
     }
     gtk_widget_set_visible(
-        GTK_WIDGET(state->location.results), FALSE);
+        GTK_WIDGET(LOCATION(state).results), FALSE);
 }
 
 void on_location_result_activated(
@@ -223,7 +231,7 @@ void on_location_result_activated(
             true);
         return;
     }
-    if (!ss_date_time_model_reload(&state->model)) {
+    if (!ss_date_time_model_reload(&MODEL(state))) {
         ss_location_metadata_transaction_end();
         ss_linux_date_time_panel_set_status(
             state,
@@ -242,10 +250,10 @@ void on_location_result_activated(
             true);
         return;
     }
-    state->location.metadata = previous_metadata;
-    state->location.metadata_present = previous_metadata_present;
+    LOCATION(state).metadata = previous_metadata;
+    LOCATION(state).metadata_present = previous_metadata_present;
 
-    policy = ss_date_time_model_policy(&state->model);
+    policy = ss_date_time_model_policy(&MODEL(state));
     if (policy == NULL) {
         ss_location_metadata_transaction_end();
         return;
@@ -253,27 +261,27 @@ void on_location_result_activated(
     previous_policy = *policy;
 
     memset(
-        &state->location.metadata,
+        &LOCATION(state).metadata,
         0,
-        sizeof(state->location.metadata));
+        sizeof(LOCATION(state).metadata));
     (void)g_strlcpy(
-        state->location.metadata.display_name,
+        LOCATION(state).metadata.display_name,
         result->display_name,
-        sizeof(state->location.metadata.display_name));
+        sizeof(LOCATION(state).metadata.display_name));
     (void)g_strlcpy(
-        state->location.metadata.country_code,
+        LOCATION(state).metadata.country_code,
         result->country_code,
-        sizeof(state->location.metadata.country_code));
-    state->location.metadata.latitude = result->latitude;
-    state->location.metadata.longitude = result->longitude;
+        sizeof(LOCATION(state).metadata.country_code));
+    LOCATION(state).metadata.latitude = result->latitude;
+    LOCATION(state).metadata.longitude = result->longitude;
 
     if (ss_linux_date_time_panel_read_system_time(
             state, &current_system) &&
         current_system.timezone[0] != '\0') {
         (void)g_strlcpy(
-            state->location.metadata.timezone_id,
+            LOCATION(state).metadata.timezone_id,
             current_system.timezone,
-            sizeof(state->location.metadata.timezone_id));
+            sizeof(LOCATION(state).metadata.timezone_id));
     }
 
     if (result->country_code[0] != '\0') {
@@ -290,9 +298,9 @@ void on_location_result_activated(
      * after the policy commit but before metadata publication, startup can
      * finish the exact staged record rather than exposing a mismatched pair.
      */
-    if (!ss_location_metadata_stage(&state->location.metadata)) {
-        state->location.metadata = previous_metadata;
-        state->location.metadata_present = previous_metadata_present;
+    if (!ss_location_metadata_stage(&LOCATION(state).metadata)) {
+        LOCATION(state).metadata = previous_metadata;
+        LOCATION(state).metadata_present = previous_metadata_present;
         ss_location_metadata_transaction_end();
         ss_linux_date_time_panel_set_status(
             state,
@@ -302,13 +310,13 @@ void on_location_result_activated(
     }
 
     if (!ss_date_time_model_set_location(
-            &state->model,
+            &MODEL(state),
             true,
             result->latitude,
             result->longitude)) {
         ss_location_metadata_discard_staged();
-        state->location.metadata = previous_metadata;
-        state->location.metadata_present = previous_metadata_present;
+        LOCATION(state).metadata = previous_metadata;
+        LOCATION(state).metadata_present = previous_metadata_present;
         ss_location_metadata_transaction_end();
         ss_linux_date_time_panel_set_status(
             state,
@@ -322,28 +330,28 @@ void on_location_result_activated(
      * Persist only the authoritative timedated value above; this inference is
      * user guidance and never an implicit system-time mutation.
      */
-    state->location.metadata_present =
+    LOCATION(state).metadata_present =
         ss_location_metadata_finish_staged();
-    if (!state->location.metadata_present) {
+    if (!LOCATION(state).metadata_present) {
         const bool restored = ss_date_time_model_set_location(
-            &state->model,
+            &MODEL(state),
             previous_policy.location_configured,
             previous_policy.latitude,
             previous_policy.longitude);
         const bool reloaded = restored
             ? true
-            : ss_date_time_model_reload(&state->model);
+            : ss_date_time_model_reload(&MODEL(state));
 
         if (restored) {
             ss_location_metadata_discard_staged();
         }
-        state->location.metadata = previous_metadata;
-        state->location.metadata_present = previous_metadata_present;
+        LOCATION(state).metadata = previous_metadata;
+        LOCATION(state).metadata_present = previous_metadata_present;
         if (!previous_metadata_present) {
             memset(
-                &state->location.metadata,
+                &LOCATION(state).metadata,
                 0,
-                sizeof(state->location.metadata));
+                sizeof(LOCATION(state).metadata));
         }
 
         ss_linux_date_time_panel_set_status(
@@ -360,16 +368,16 @@ void on_location_result_activated(
     }
 
     ss_location_metadata_transaction_end();
-    state->location.follows_timezone_reference = false;
-    state->location.updating_controls = true;
+    LOCATION(state).follows_timezone_reference = false;
+    LOCATION(state).updating_controls = true;
     gtk_editable_set_text(
-        GTK_EDITABLE(state->location.search_entry),
+        GTK_EDITABLE(LOCATION(state).search_entry),
         result->display_name);
     gtk_spin_button_set_value(
-        state->location.latitude, result->latitude);
+        LOCATION(state).latitude, result->latitude);
     gtk_spin_button_set_value(
-        state->location.longitude, result->longitude);
-    state->location.updating_controls = false;
+        LOCATION(state).longitude, result->longitude);
+    LOCATION(state).updating_controls = false;
     clear_location_results(state);
     ss_linux_date_time_location_update_summary(state);
     ss_linux_date_time_panel_policy_saved(state);
@@ -412,7 +420,7 @@ static void location_search_complete(
 
     state = ss_linux_date_time_lifetime_get_panel(request->lifetime);
     if (state == NULL ||
-        request->generation != state->location.search_generation) {
+        request->generation != LOCATION(state).search_generation) {
         if (results != NULL) {
             g_ptr_array_unref(results);
         }
@@ -465,11 +473,11 @@ static void location_search_complete(
         gtk_box_append(GTK_BOX(box), coordinates);
         gtk_widget_add_css_class(row, "location-result-row");
         gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), box);
-        gtk_list_box_append(state->location.results, row);
+        gtk_list_box_append(LOCATION(state).results, row);
     }
 
     gtk_widget_set_visible(
-        GTK_WIDGET(state->location.results), TRUE);
+        GTK_WIDGET(LOCATION(state).results), TRUE);
     ss_linux_date_time_panel_set_status(
         state,
         "Select the matching locality. Its coordinates will become the system geographic location; any nearest IANA time zone is advisory and must be chosen explicitly.",
@@ -483,24 +491,24 @@ static void begin_location_search(SsLinuxDateTimePanel *state)
 {
     const char *query;
 
-    if (state == NULL || state->location.search_entry == NULL) {
+    if (state == NULL || LOCATION(state).search_entry == NULL) {
         return;
     }
 
     query = gtk_editable_get_text(
-        GTK_EDITABLE(state->location.search_entry));
+        GTK_EDITABLE(LOCATION(state).search_entry));
     if (query == NULL || query[0] == '\0') {
         ss_linux_date_time_panel_set_status(
             state, "Enter a locality or place name.", true);
         return;
     }
 
-    if (state->location.search_cancellable != NULL) {
-        g_cancellable_cancel(state->location.search_cancellable);
-        g_clear_object(&state->location.search_cancellable);
+    if (LOCATION(state).search_cancellable != NULL) {
+        g_cancellable_cancel(LOCATION(state).search_cancellable);
+        g_clear_object(&LOCATION(state).search_cancellable);
     }
-    state->location.search_cancellable = g_cancellable_new();
-    state->location.search_generation++;
+    LOCATION(state).search_cancellable = g_cancellable_new();
+    LOCATION(state).search_generation++;
 
     clear_location_results(state);
     ss_linux_date_time_panel_set_status(
@@ -509,12 +517,12 @@ static void begin_location_search(SsLinuxDateTimePanel *state)
     {
         LocationSearchUiRequest *request =
             g_new0(LocationSearchUiRequest, 1);
-        request->lifetime =
-            ss_linux_date_time_lifetime_ref(state->lifetime);
-        request->generation = state->location.search_generation;
+        request->lifetime = ss_linux_date_time_lifetime_ref(
+            ss_linux_date_time_location_lifetime(state));
+        request->generation = LOCATION(state).search_generation;
         ss_location_search_async(
             query,
-            state->location.search_cancellable,
+            LOCATION(state).search_cancellable,
             location_search_complete,
             request);
     }
@@ -547,13 +555,13 @@ static gboolean commit_location_coordinates(gpointer user_data)
     if (state == NULL) {
         return G_SOURCE_REMOVE;
     }
-    state->location.coordinate_commit_id = 0U;
-    if (state->location.updating_controls) {
+    LOCATION(state).coordinate_commit_id = 0U;
+    if (LOCATION(state).updating_controls) {
         return G_SOURCE_REMOVE;
     }
 
-    latitude = gtk_spin_button_get_value(state->location.latitude);
-    longitude = gtk_spin_button_get_value(state->location.longitude);
+    latitude = gtk_spin_button_get_value(LOCATION(state).latitude);
+    longitude = gtk_spin_button_get_value(LOCATION(state).longitude);
     if (!ss_location_metadata_transaction_begin()) {
         ss_linux_date_time_panel_set_status(
             state,
@@ -562,7 +570,7 @@ static gboolean commit_location_coordinates(gpointer user_data)
         ss_linux_date_time_panel_sync_controls(state);
         return G_SOURCE_REMOVE;
     }
-    if (!ss_date_time_model_reload(&state->model)) {
+    if (!ss_date_time_model_reload(&MODEL(state))) {
         ss_location_metadata_transaction_end();
         ss_linux_date_time_panel_set_status(
             state,
@@ -583,10 +591,10 @@ static gboolean commit_location_coordinates(gpointer user_data)
         ss_linux_date_time_panel_sync_controls(state);
         return G_SOURCE_REMOVE;
     }
-    state->location.metadata = previous_metadata;
-    state->location.metadata_present = previous_metadata_present;
+    LOCATION(state).metadata = previous_metadata;
+    LOCATION(state).metadata_present = previous_metadata_present;
 
-    policy = ss_date_time_model_policy(&state->model);
+    policy = ss_date_time_model_policy(&MODEL(state));
     if (policy == NULL) {
         ss_location_metadata_transaction_end();
         return G_SOURCE_REMOVE;
@@ -594,15 +602,15 @@ static gboolean commit_location_coordinates(gpointer user_data)
     previous_policy = *policy;
 
     memset(
-        &state->location.metadata,
+        &LOCATION(state).metadata,
         0,
-        sizeof(state->location.metadata));
+        sizeof(LOCATION(state).metadata));
     (void)g_strlcpy(
-        state->location.metadata.display_name,
+        LOCATION(state).metadata.display_name,
         "Custom coordinates",
-        sizeof(state->location.metadata.display_name));
-    state->location.metadata.latitude = latitude;
-    state->location.metadata.longitude = longitude;
+        sizeof(LOCATION(state).metadata.display_name));
+    LOCATION(state).metadata.latitude = latitude;
+    LOCATION(state).metadata.longitude = longitude;
 
     {
         SsSystemTimeState current_system;
@@ -610,15 +618,15 @@ static gboolean commit_location_coordinates(gpointer user_data)
                 state, &current_system) &&
             current_system.timezone[0] != '\0') {
             (void)g_strlcpy(
-                state->location.metadata.timezone_id,
+                LOCATION(state).metadata.timezone_id,
                 current_system.timezone,
-                sizeof(state->location.metadata.timezone_id));
+                sizeof(LOCATION(state).metadata.timezone_id));
         }
     }
 
-    if (!ss_location_metadata_stage(&state->location.metadata)) {
-        state->location.metadata = previous_metadata;
-        state->location.metadata_present = previous_metadata_present;
+    if (!ss_location_metadata_stage(&LOCATION(state).metadata)) {
+        LOCATION(state).metadata = previous_metadata;
+        LOCATION(state).metadata_present = previous_metadata_present;
         ss_location_metadata_transaction_end();
         ss_linux_date_time_panel_set_status(
             state,
@@ -629,10 +637,10 @@ static gboolean commit_location_coordinates(gpointer user_data)
     }
 
     if (!ss_date_time_model_set_location(
-            &state->model, true, latitude, longitude)) {
+            &MODEL(state), true, latitude, longitude)) {
         ss_location_metadata_discard_staged();
-        state->location.metadata = previous_metadata;
-        state->location.metadata_present = previous_metadata_present;
+        LOCATION(state).metadata = previous_metadata;
+        LOCATION(state).metadata_present = previous_metadata_present;
         ss_location_metadata_transaction_end();
         ss_linux_date_time_panel_set_status(
             state,
@@ -642,28 +650,28 @@ static gboolean commit_location_coordinates(gpointer user_data)
         return G_SOURCE_REMOVE;
     }
 
-    state->location.metadata_present =
+    LOCATION(state).metadata_present =
         ss_location_metadata_finish_staged();
-    if (!state->location.metadata_present) {
+    if (!LOCATION(state).metadata_present) {
         const bool restored = ss_date_time_model_set_location(
-            &state->model,
+            &MODEL(state),
             previous_policy.location_configured,
             previous_policy.latitude,
             previous_policy.longitude);
         const bool reloaded = restored
             ? true
-            : ss_date_time_model_reload(&state->model);
+            : ss_date_time_model_reload(&MODEL(state));
 
         if (restored) {
             ss_location_metadata_discard_staged();
         }
-        state->location.metadata = previous_metadata;
-        state->location.metadata_present = previous_metadata_present;
+        LOCATION(state).metadata = previous_metadata;
+        LOCATION(state).metadata_present = previous_metadata_present;
         if (!previous_metadata_present) {
             memset(
-                &state->location.metadata,
+                &LOCATION(state).metadata,
                 0,
-                sizeof(state->location.metadata));
+                sizeof(LOCATION(state).metadata));
         }
 
         ss_linux_date_time_panel_set_status(
@@ -680,9 +688,9 @@ static gboolean commit_location_coordinates(gpointer user_data)
     }
 
     ss_location_metadata_transaction_end();
-    state->location.follows_timezone_reference = false;
+    LOCATION(state).follows_timezone_reference = false;
     gtk_editable_set_text(
-        GTK_EDITABLE(state->location.search_entry),
+        GTK_EDITABLE(LOCATION(state).search_entry),
         "Custom coordinates");
     ss_linux_date_time_panel_policy_saved(state);
     return G_SOURCE_REMOVE;
@@ -695,16 +703,16 @@ void on_location_coordinate_changed(
 {
     SsLinuxDateTimePanel *state = user_data;
 
-    if (state == NULL || state->location.updating_controls) {
+    if (state == NULL || LOCATION(state).updating_controls) {
         return;
     }
 
     ss_linux_date_time_location_cancel_coordinate_commit(state);
-    state->location.coordinate_commit_id = g_timeout_add(
+    LOCATION(state).coordinate_commit_id = g_timeout_add(
         300U,
         commit_location_coordinates,
         state);
     g_source_set_name_by_id(
-        state->location.coordinate_commit_id,
+        LOCATION(state).coordinate_commit_id,
         "[system-settings] coordinate transaction debounce");
 }
