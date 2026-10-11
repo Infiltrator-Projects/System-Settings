@@ -1,0 +1,42 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Apply remaining brittleness refactor
+
+on:
+  push:
+    branches:
+      - fix/remaining-brittleness-2026-10-12
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    if: ${{ !contains(github.event.head_commit.message, 'Apply remaining brittleness refactor output') }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out refactor branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: fix/remaining-brittleness-2026-10-12
+          fetch-depth: 0
+
+      - name: Apply deterministic structural refactor
+        run: python3 tools/refactor_remaining_brittleness.py
+
+      - name: Validate patch shape
+        run: |
+          set -euo pipefail
+          git diff --check
+          test -f src/modules/date-time/linux-date-time-preview.c
+          test -f src/modules/date-time/linux-date-time-preview-boundary.c
+          test -f src/shell/linux/home-status.c
+          test -f src/shell/linux/shell-module-catalog.c
+
+      - name: Commit generated source changes
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CMakeLists.txt docs/ARCHITECTURE.md src/modules/date-time src/shell/linux
+          git commit -m "Apply remaining brittleness refactor output"
+          git push origin HEAD:fix/remaining-brittleness-2026-10-12
