@@ -15,6 +15,7 @@
 #include "linux-theme.h"
 #include "linux-ui-helpers.h"
 #include "shell-command.h"
+#include "shell-module-catalog.h"
 
 #include "system-settings/project-info.h"
 
@@ -352,109 +353,13 @@ static GtkWidget *make_about_navigation_row(void)
     return row;
 }
 
-static GKeyFile *load_module_manifest(const char *manifest_filename)
-{
-    const char *override_dir =
-        g_getenv("SYSTEM_SETTINGS_MODULE_DIR_OVERRIDE");
-    const bool override_active =
-        override_dir != NULL && override_dir[0] != '\0';
-    const char *directories[] = {
-        override_active ? override_dir : SYSTEM_SETTINGS_MODULE_SOURCE_DIR,
-        override_active ? NULL : SYSTEM_SETTINGS_MODULE_DIR,
-        NULL
-    };
 
-    if (manifest_filename == NULL || manifest_filename[0] == '\0') {
-        return NULL;
-    }
 
-    for (size_t directory_index = 0U;
-         directories[directory_index] != NULL;
-         ++directory_index) {
-        g_autofree gchar *path = NULL;
-        g_autoptr(GKeyFile) key_file = NULL;
 
-        if (directories[directory_index][0] == '\0') {
-            continue;
-        }
-        path = g_build_filename(
-            directories[directory_index], manifest_filename, NULL);
-        key_file = g_key_file_new();
-        if (g_key_file_load_from_file(
-                key_file, path, G_KEY_FILE_NONE, NULL)) {
-            return g_steal_pointer(&key_file);
-        }
-    }
-    return NULL;
-}
 
-static void append_manifest_value(
-    GString *search,
-    GKeyFile *key_file,
-    const char *group,
-    const char *key)
-{
-    g_autofree gchar *value = NULL;
 
-    if (search == NULL || key_file == NULL || group == NULL || key == NULL) {
-        return;
-    }
-    value = g_key_file_get_string(key_file, group, key, NULL);
-    if (value != NULL && value[0] != '\0') {
-        g_string_append_c(search, ' ');
-        g_string_append(search, value);
-    }
-}
 
-static gchar *manifest_string_or_fallback(
-    GKeyFile *key_file,
-    const char *key,
-    const char *fallback)
-{
-    g_autofree gchar *value = NULL;
 
-    if (key_file != NULL && key != NULL) {
-        value = g_key_file_get_string(key_file, "Module", key, NULL);
-        if (value != NULL && value[0] != '\0') {
-            return g_steal_pointer(&value);
-        }
-    }
-    return g_strdup(fallback != NULL ? fallback : "");
-}
-
-static gchar *module_search_text_from_manifest(
-    GKeyFile *key_file,
-    const char *fallback)
-{
-    g_auto(GStrv) groups = NULL;
-    gsize group_count = 0U;
-    GString *search;
-
-    if (key_file == NULL) {
-        return g_strdup(fallback != NULL ? fallback : "");
-    }
-
-    search = g_string_new("");
-    append_manifest_value(search, key_file, "Module", "Title");
-    append_manifest_value(search, key_file, "Module", "Summary");
-    append_manifest_value(search, key_file, "Search", "Keywords");
-    groups = g_key_file_get_groups(key_file, &group_count);
-    for (gsize group_index = 0U;
-         group_index < group_count;
-         ++group_index) {
-        if (g_str_has_prefix(groups[group_index], "Target ")) {
-            append_manifest_value(
-                search, key_file, groups[group_index], "Title");
-            append_manifest_value(
-                search, key_file, groups[group_index], "Keywords");
-        }
-    }
-    if (search->len > 0U) {
-        return g_string_free(search, FALSE);
-    }
-    g_string_free(search, TRUE);
-    return g_strdup(fallback != NULL ? fallback : "");
-}
 
 static void minimize_window(GtkButton *button, gpointer user_data)
 {
@@ -610,13 +515,7 @@ static void append_builtin_module_rows(
             ss_builtin_module_host_module_page_id(index);
         const char *manifest_filename =
             ss_builtin_module_host_module_manifest(index);
-        g_autoptr(GKeyFile) manifest =
-            load_module_manifest(manifest_filename);
-        g_autofree gchar *title = NULL;
-        g_autofree gchar *summary = NULL;
-        g_autofree gchar *icon = NULL;
-        g_autofree gchar *fallback_search = NULL;
-        g_autofree gchar *search_text = NULL;
+        SsShellModuleMetadata metadata = {0};
         GtkWidget *row;
         GtkWidget *scroller;
 
@@ -624,27 +523,20 @@ static void append_builtin_module_rows(
             continue;
         }
 
-        title = manifest_string_or_fallback(manifest, "Title", page_id);
-        summary = manifest_string_or_fallback(
-            manifest, "Summary", "Settings module");
-        icon = manifest_string_or_fallback(
-            manifest, "Icon", "preferences-system-symbolic");
-        fallback_search = g_strdup_printf(
-            "%s %s", title, summary);
-        search_text = module_search_text_from_manifest(
-            manifest, fallback_search);
+        ss_shell_module_metadata_load(
+            manifest_filename, page_id, &metadata);
 
         row = make_navigation_row(
-            icon,
-            title,
-            summary,
+            metadata.icon,
+            metadata.title,
+            metadata.summary,
             page_id,
-            search_text);
+            metadata.search_text);
         gtk_list_box_append(list, row);
         shell_register_module_page(
             search_state,
             page_id,
-            title,
+            metadata.title,
             GTK_LIST_BOX_ROW(row));
 
         scroller = make_module_scroller();
@@ -657,6 +549,7 @@ static void append_builtin_module_rows(
         if (search_state->primary_module_page_id == NULL) {
             search_state->primary_module_page_id = g_strdup(page_id);
         }
+        ss_shell_module_metadata_clear(&metadata);
     }
 }
 
