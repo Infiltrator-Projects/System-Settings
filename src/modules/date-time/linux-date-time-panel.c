@@ -1306,10 +1306,10 @@ static void system_time_changed(
     }
 
     const bool timezone_changed =
-        system_state->system_time.timezone[0] != '\0' &&
+        system_state->timezone[0] != '\0' &&
         g_strcmp0(
             state->regional_context.timezone_id,
-            system_state->system_time.timezone) != 0;
+            system_state->timezone) != 0;
     (void)ss_regional_context_detect(&state->regional_context);
 
     if (timezone_changed || system_state->ntp_enabled) {
