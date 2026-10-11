@@ -17,7 +17,7 @@
 #include <string.h>
 
 typedef struct LocationSearchUiRequest {
-    GtkWindow *window;
+    SsLinuxDateTimeLifetime *lifetime;
     guint generation;
 } LocationSearchUiRequest;
 
@@ -97,7 +97,7 @@ void ss_linux_date_time_location_update_summary(
     g_autofree gchar *coordinates = NULL;
     g_autofree gchar *summary = NULL;
 
-    if (state == NULL || state->location_summary == NULL) {
+    if (state == NULL || state->location.summary == NULL) {
         return;
     }
 
@@ -140,7 +140,7 @@ void ss_linux_date_time_location_update_summary(
             "Search for a locality to establish geographic coordinates.");
     }
 
-    gtk_label_set_text(GTK_LABEL(state->location_summary), summary);
+    gtk_label_set_text(GTK_LABEL(state->location.summary), summary);
 }
 
 bool ss_linux_date_time_location_policy_matches_reference(
@@ -177,19 +177,19 @@ static void clear_location_results(SsLinuxDateTimePanel *state)
 {
     GtkWidget *child;
 
-    if (state == NULL || state->location_results == NULL) {
+    if (state == NULL || state->location.results == NULL) {
         return;
     }
 
     child = gtk_widget_get_first_child(
-        GTK_WIDGET(state->location_results));
+        GTK_WIDGET(state->location.results));
     while (child != NULL) {
         GtkWidget *next = gtk_widget_get_next_sibling(child);
-        gtk_list_box_remove(state->location_results, child);
+        gtk_list_box_remove(state->location.results, child);
         child = next;
     }
     gtk_widget_set_visible(
-        GTK_WIDGET(state->location_results), FALSE);
+        GTK_WIDGET(state->location.results), FALSE);
 }
 
 void on_location_result_activated(
@@ -364,12 +364,12 @@ void on_location_result_activated(
     state->location.follows_timezone_reference = false;
     state->updating_controls = true;
     gtk_editable_set_text(
-        GTK_EDITABLE(state->location_search),
+        GTK_EDITABLE(state->location.search_entry),
         result->display_name);
     gtk_spin_button_set_value(
-        state->latitude, result->latitude);
+        state->location.latitude, result->latitude);
     gtk_spin_button_set_value(
-        state->longitude, result->longitude);
+        state->location.longitude, result->longitude);
     state->updating_controls = false;
     clear_location_results(state);
     ss_linux_date_time_location_update_summary(state);
@@ -390,7 +390,7 @@ static void location_search_request_free(
     if (request == NULL) {
         return;
     }
-    g_clear_object(&request->window);
+    ss_linux_date_time_lifetime_unref(request->lifetime);
     g_free(request);
 }
 
@@ -403,7 +403,7 @@ static void location_search_complete(
     SsLinuxDateTimePanel *state;
     size_t index;
 
-    if (request == NULL || request->window == NULL) {
+    if (request == NULL || request->lifetime == NULL) {
         if (results != NULL) {
             g_ptr_array_unref(results);
         }
@@ -411,9 +411,7 @@ static void location_search_complete(
         return;
     }
 
-    state = g_object_get_data(
-        G_OBJECT(request->window),
-        "system-settings-date-time-panel");
+    state = ss_linux_date_time_lifetime_get_panel(request->lifetime);
     if (state == NULL ||
         request->generation != state->location.search_generation) {
         if (results != NULL) {
@@ -468,11 +466,11 @@ static void location_search_complete(
         gtk_box_append(GTK_BOX(box), coordinates);
         gtk_widget_add_css_class(row, "location-result-row");
         gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), box);
-        gtk_list_box_append(state->location_results, row);
+        gtk_list_box_append(state->location.results, row);
     }
 
     gtk_widget_set_visible(
-        GTK_WIDGET(state->location_results), TRUE);
+        GTK_WIDGET(state->location.results), TRUE);
     ss_linux_date_time_panel_set_status(
         state,
         "Select the matching locality. Its coordinates will become the system geographic location; any nearest IANA time zone is advisory and must be chosen explicitly.",
@@ -486,12 +484,12 @@ static void begin_location_search(SsLinuxDateTimePanel *state)
 {
     const char *query;
 
-    if (state == NULL || state->location_search == NULL) {
+    if (state == NULL || state->location.search_entry == NULL) {
         return;
     }
 
     query = gtk_editable_get_text(
-        GTK_EDITABLE(state->location_search));
+        GTK_EDITABLE(state->location.search_entry));
     if (query == NULL || query[0] == '\0') {
         ss_linux_date_time_panel_set_status(
             state, "Enter a locality or place name.", true);
@@ -512,7 +510,8 @@ static void begin_location_search(SsLinuxDateTimePanel *state)
     {
         LocationSearchUiRequest *request =
             g_new0(LocationSearchUiRequest, 1);
-        request->window = g_object_ref(state->window);
+        request->lifetime =
+            ss_linux_date_time_lifetime_ref(state->lifetime);
         request->generation = state->location.search_generation;
         ss_location_search_async(
             query,
@@ -554,8 +553,8 @@ static gboolean commit_location_coordinates(gpointer user_data)
         return G_SOURCE_REMOVE;
     }
 
-    latitude = gtk_spin_button_get_value(state->latitude);
-    longitude = gtk_spin_button_get_value(state->longitude);
+    latitude = gtk_spin_button_get_value(state->location.latitude);
+    longitude = gtk_spin_button_get_value(state->location.longitude);
     if (!ss_location_metadata_transaction_begin()) {
         ss_linux_date_time_panel_set_status(
             state,
@@ -684,7 +683,7 @@ static gboolean commit_location_coordinates(gpointer user_data)
     ss_location_metadata_transaction_end();
     state->location.follows_timezone_reference = false;
     gtk_editable_set_text(
-        GTK_EDITABLE(state->location_search),
+        GTK_EDITABLE(state->location.search_entry),
         "Custom coordinates");
     ss_linux_date_time_panel_policy_saved(state);
     return G_SOURCE_REMOVE;
