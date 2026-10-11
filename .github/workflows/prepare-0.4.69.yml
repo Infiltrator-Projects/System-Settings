@@ -1,0 +1,56 @@
+name: prepare-0.4.69
+
+on:
+  push:
+    branches: [release/0.4.69]
+
+permissions:
+  contents: write
+
+jobs:
+  prepare:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: release/0.4.69
+          fetch-depth: 0
+
+      - name: Prepare release metadata
+        shell: python
+        run: |
+          from pathlib import Path
+
+          version = Path("VERSION")
+          current = version.read_text().strip()
+          if current != "0.4.68":
+              raise SystemExit(f"expected 0.4.68, found {current}")
+          version.write_text("0.4.69\n")
+
+          changelog = Path("CHANGELOG.md")
+          existing = changelog.read_text()
+          heading = "## 0.4.69 — 2026-10-11\n"
+          if existing.startswith(heading):
+              raise SystemExit("0.4.69 changelog already present")
+          entry = (
+              heading
+              + "\n"
+              + "- Finish the Date & Time ownership split: location, protected system-time operations and preview state now use their canonical bounded state objects instead of anonymous compatibility overlays and flat aliases.\n"
+              + "- Replace the Linux shell white-box regression with a black-box lifecycle/UI contract so internal refactoring no longer requires preserving private controller fields, source inclusion or test-only compatibility wrappers.\n"
+              + "- Keep the built-in module host lifecycle-only by moving Home temporal presentation behind a dedicated composition provider; remove the last shell geometry compatibility key.\n"
+              + "- Revalidate the reduced architecture across Linux, Windows, ASan/UBSan, reproducible packaging, native release assets and Debian integration.\n\n"
+          )
+          changelog.write_text(entry + existing)
+
+      - name: Commit prepared metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/prepare-0.4.69.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "Prepare 0.4.69 release metadata"
+          git push origin HEAD:release/0.4.69
