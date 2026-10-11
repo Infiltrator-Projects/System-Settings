@@ -1,0 +1,457 @@
+name: refactor-brittleness-top3
+
+on:
+  push:
+    branches:
+      - fix/brittleness-top3
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/brittleness-top3
+          fetch-depth: 0
+
+      - name: Apply bounded architectural cleanup
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          def read(path):
+              return Path(path).read_text()
+
+          def write(path, text):
+              Path(path).write_text(text)
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected exactly one match, found {count}")
+              return text.replace(old, new, 1)
+
+          # 1. Finish the Date & Time state split. The three owner objects become
+          # the only storage; the anonymous compatibility aliases disappear.
+          header_path = "src/modules/date-time/linux-date-time-panel-private.h"
+          header = read(header_path)
+          start_marker = "    /*\n     * The anonymous compatibility views preserve current translation-unit and\n"
+          end_marker = "    bool updating_controls;\n"
+          start = header.find(start_marker)
+          end = header.find(end_marker, start)
+          if start < 0 or end < 0:
+              raise SystemExit("Date & Time compatibility-union block not found")
+          canonical = (
+              "    SsLinuxDateTimeLocationState location;\n"
+              "    SsLinuxDateTimeSystemTimeState system_time;\n"
+              "    SsLinuxDateTimePreviewState preview;\n\n"
+          )
+          header = header[:start] + canonical + header[end:]
+          write(header_path, header)
+
+          field_map = [
+              ("->locality_recovery_retry_seconds", "->location.recovery_retry_seconds"),
+              ("->location_follows_timezone_reference", "->location.follows_timezone_reference"),
+              ("->location_metadata_observer", "->location.metadata_observer"),
+              ("->location_search_cancellable", "->location.search_cancellable"),
+              ("->locality_recovery_retry_id", "->location.recovery_retry_id"),
+              ("->location_search_generation", "->location.search_generation"),
+              ("->location_metadata_uncertain", "->location.metadata_uncertain"),
+              ("->location_metadata_present", "->location.metadata_present"),
+              ("->calendar_preview_provider", "->preview.calendar_provider"),
+              ("->manual_time_cancellable", "->system_time.manual_time_cancellable"),
+              ("->system_time_service", "->system_time.service"),
+              ("->service_cancellable", "->system_time.service_cancellable"),
+              ("->preview_date_cache_valid", "->preview.date_cache_valid"),
+              ("->preview_date_calendar", "->preview.date_calendar"),
+              ("->preview_date_month", "->preview.date_month"),
+              ("->preview_date_year", "->preview.date_year"),
+              ("->preview_date_day", "->preview.date_day"),
+              ("->preview_idle_id", "->preview.idle_id"),
+              ("->timezone_cancellable", "->location.timezone_cancellable"),
+              ("->timezone_generation", "->location.timezone_generation"),
+              ("->coordinate_commit_id", "->location.coordinate_commit_id"),
+              ("->locality_recovery_failed", "->location.recovery_failed"),
+              ("->location_metadata", "->location.metadata"),
+              ("->timezone_ids", "->location.timezone_ids"),
+              ("->ntp_cancellable", "->system_time.ntp_cancellable"),
+              ("->ntp_generation", "->system_time.ntp_generation"),
+              ("->manual_time_generation", "->system_time.manual_time_generation"),
+              ("->timer_id", "->preview.timer_id"),
+          ]
+          for path in Path("src/modules/date-time").glob("*.c"):
+              text = path.read_text()
+              for old, new in field_map:
+                  text = text.replace(old, new)
+              path.write_text(text)
+
+          # Prove production sources no longer use any compatibility alias.
+          for path in Path("src/modules/date-time").glob("*.c"):
+              text = path.read_text()
+              for old, _ in field_map:
+                  if old in text:
+                      raise SystemExit(f"{path}: legacy Date & Time field remains: {old}")
+
+          # 2. Remove white-box shell-test contracts and expose one stable
+          # activation entry point instead of textually including main.c.
+          shell_header = """// SPDX-License-Identifier: GPL-3.0-or-later
+          #ifndef SYSTEM_SETTINGS_SHELL_WINDOW_H
+          #define SYSTEM_SETTINGS_SHELL_WINDOW_H
+
+          #include <gtk/gtk.h>
+
+          void ss_shell_window_activate(
+              GtkApplication *application,
+              gpointer user_data);
+
+          #endif
+          """
+          write("src/shell/linux/shell-window.h", shell_header.replace("          ", ""))
+
+          main = """// SPDX-License-Identifier: GPL-3.0-or-later
+          /**
+           * @file main.c
+           * @brief Native Linux System Settings process entry point.
+           */
+
+          #include "shell-window.h"
+          #include "system-settings/project-info.h"
+
+          #include <gtk/gtk.h>
+
+          int main(int argc, char **argv)
+          {
+              const InfiltratrProjectInfo *info = ss_project_info();
+              g_autoptr(GtkApplication) application = gtk_application_new(
+                  info->application_id,
+                  G_APPLICATION_DEFAULT_FLAGS);
+
+              g_signal_connect(
+                  application,
+                  "activate",
+                  G_CALLBACK(ss_shell_window_activate),
+                  NULL);
+              return g_application_run(
+                  G_APPLICATION(application), argc, argv);
+          }
+          """
+          write("src/shell/linux/main.c", main.replace("          ", ""))
+
+          private_path = "src/shell/linux/shell-window-private.h"
+          private = read(private_path)
+          private = replace_once(
+              private,
+              '#include "builtin-module-host.h"\n',
+              '#include "builtin-module-host.h"\n#include "shell-window.h"\n',
+              "shell private public include")
+          private = re.sub(
+              r"\n    /\*\n     \* Transitional aliases keep the existing white-box regression test source.*?\n    };\n\n    gchar \*query;",
+              "\n    GtkListBoxRow *primary_module_row;\n    GtkScrolledWindow *primary_module_container;\n    bool primary_module_loaded;\n\n    gchar *query;",
+              private,
+              count=1,
+              flags=re.S)
+          private = private.replace(
+              "\n/* Transitional test/source compatibility wrappers. Runtime routing is generic. */\n"
+              "void ensure_date_time_panel(ShellSearchState *state);\n"
+              "void open_date_time(GtkButton *button, gpointer user_data);\n\n"
+              "void on_activate(GtkApplication *application, gpointer user_data);\n",
+              "\n")
+          if "date_time_loaded" in private or "date_scroller" in private or "date_row" in private:
+              raise SystemExit("shell private compatibility aliases remain")
+          write(private_path, private)
+
+          shell_path = "src/shell/linux/shell-window.c"
+          shell = read(shell_path)
+          wrapper_start = shell.find(
+              "/*\n * These wrappers exist only because the existing white-box shell regression\n")
+          wrapper_end = shell.find("static void on_navigation_selected", wrapper_start)
+          if wrapper_start < 0 or wrapper_end < 0:
+              raise SystemExit("test compatibility wrapper block not found")
+          shell = shell[:wrapper_start] + shell[wrapper_end:]
+          shell = replace_once(
+              shell,
+              "void on_activate(GtkApplication *application, gpointer user_data)",
+              "void ss_shell_window_activate(GtkApplication *application, gpointer user_data)",
+              "shell activation rename")
+          shell = replace_once(
+              shell,
+              "    SsBuiltinModuleHost *module_host;\n    SsHomePageContext home_context;\n",
+              "    SsBuiltinModuleHost *module_host;\n"
+              "    SsHomeTemporalProvider *home_temporal_provider;\n"
+              "    SsHomePageContext home_context;\n",
+              "home provider declaration")
+          host_block = """    g_object_set_data_full(
+              G_OBJECT(window),
+              "system-settings-module-host",
+              module_host,
+              (GDestroyNotify)ss_builtin_module_host_free);
+
+          """.replace("          ", "")
+          provider_block = host_block + """    home_temporal_provider = ss_home_temporal_provider_new();
+          if (home_temporal_provider == NULL) {
+              gtk_window_destroy(window);
+              return;
+          }
+          g_object_set_data_full(
+              G_OBJECT(window),
+              "system-settings-home-temporal-provider",
+              home_temporal_provider,
+              (GDestroyNotify)ss_home_temporal_provider_free);
+
+          """.replace("          ", "")
+          shell = replace_once(shell, host_block, provider_block, "home provider ownership")
+          shell = replace_once(
+              shell,
+              "        .module_host = module_host,\n",
+              "        .temporal_provider = home_temporal_provider,\n",
+              "home context provider")
+          write(shell_path, shell)
+
+          # Correct the one staging typo made while separating Home temporal
+          # presentation from the module host.
+          home_path = "src/shell/linux/home-page.c"
+          home = read(home_path)
+          home = replace_once(
+              home,
+              "    gtk_image_set_pixel_size(GTK_IMAGE(icon), 22);\n"
+              "    gtk_box_append(GTK_BOX(icon_wrap), icon);\n"
+              "    gtk_box_append(GTK_BOX(box), icon_wrap);\n",
+              "    gtk_image_set_pixel_size(GTK_IMAGE(icon), 22);\n"
+              "    gtk_box_append(GTK_BOX(box), icon);\n",
+              "Home feature icon")
+          write(home_path, home)
+
+          test = r'''// SPDX-License-Identifier: GPL-3.0-or-later
+          #include "shell-window.h"
+
+          #include <gtk/gtk.h>
+
+          static void drain_main_context(void)
+          {
+              while (g_main_context_iteration(NULL, FALSE)) {
+              }
+          }
+
+          static gboolean subtree_has_label(GtkWidget *widget, const char *text)
+          {
+              if (widget == NULL || text == NULL) {
+                  return FALSE;
+              }
+              if (GTK_IS_LABEL(widget) &&
+                  g_strcmp0(gtk_label_get_text(GTK_LABEL(widget)), text) == 0) {
+                  return TRUE;
+              }
+              for (GtkWidget *child = gtk_widget_get_first_child(widget);
+                   child != NULL;
+                   child = gtk_widget_get_next_sibling(child)) {
+                  if (subtree_has_label(child, text)) {
+                      return TRUE;
+                  }
+              }
+              return FALSE;
+          }
+
+          static GtkWidget *find_widget_type(GtkWidget *widget, GType type)
+          {
+              if (widget == NULL) {
+                  return NULL;
+              }
+              if (G_TYPE_CHECK_INSTANCE_TYPE(widget, type)) {
+                  return widget;
+              }
+              for (GtkWidget *child = gtk_widget_get_first_child(widget);
+                   child != NULL;
+                   child = gtk_widget_get_next_sibling(child)) {
+                  GtkWidget *match = find_widget_type(child, type);
+                  if (match != NULL) {
+                      return match;
+                  }
+              }
+              return NULL;
+          }
+
+          static GtkWidget *find_widget_tooltip(GtkWidget *widget, const char *tooltip)
+          {
+              if (widget == NULL || tooltip == NULL) {
+                  return NULL;
+              }
+              if (g_strcmp0(gtk_widget_get_tooltip_text(widget), tooltip) == 0) {
+                  return widget;
+              }
+              for (GtkWidget *child = gtk_widget_get_first_child(widget);
+                   child != NULL;
+                   child = gtk_widget_get_next_sibling(child)) {
+                  GtkWidget *match = find_widget_tooltip(child, tooltip);
+                  if (match != NULL) {
+                      return match;
+                  }
+              }
+              return NULL;
+          }
+
+          static GtkListBoxRow *find_row_with_label(GtkWidget *widget, const char *label)
+          {
+              if (widget == NULL) {
+                  return NULL;
+              }
+              if (GTK_IS_LIST_BOX_ROW(widget) && subtree_has_label(widget, label)) {
+                  return GTK_LIST_BOX_ROW(widget);
+              }
+              for (GtkWidget *child = gtk_widget_get_first_child(widget);
+                   child != NULL;
+                   child = gtk_widget_get_next_sibling(child)) {
+                  GtkListBoxRow *match = find_row_with_label(child, label);
+                  if (match != NULL) {
+                      return match;
+                  }
+              }
+              return NULL;
+          }
+
+          static void exercise_window(GtkApplication *app)
+          {
+              ss_shell_window_activate(app, NULL);
+              drain_main_context();
+
+              GtkWindow *window = gtk_application_get_active_window(app);
+              g_assert_nonnull(window);
+              g_object_ref(window);
+
+              ss_shell_window_activate(app, NULL);
+              drain_main_context();
+              g_assert_cmpuint(g_list_length(gtk_application_get_windows(app)), ==, 1U);
+
+              GtkWidget *root = gtk_window_get_child(window);
+              g_assert_nonnull(root);
+              g_assert_true(subtree_has_label(root, "System Overview"));
+              g_assert_true(subtree_has_label(root, "Quick Actions"));
+              g_assert_true(subtree_has_label(root, "Configure your system, your way."));
+              g_assert_nonnull(find_widget_type(root, GTK_TYPE_SEARCH_ENTRY));
+              g_assert_nonnull(find_widget_tooltip(GTK_WIDGET(window), "Minimize"));
+              g_assert_nonnull(find_widget_tooltip(GTK_WIDGET(window), "Maximize / Restore"));
+              g_assert_nonnull(find_widget_tooltip(GTK_WIDGET(window), "Close"));
+
+              GtkListBoxRow *date_row = find_row_with_label(root, "Date & Time");
+              g_assert_nonnull(date_row);
+              GtkWidget *parent = gtk_widget_get_parent(GTK_WIDGET(date_row));
+              while (parent != NULL && !GTK_IS_LIST_BOX(parent)) {
+                  parent = gtk_widget_get_parent(parent);
+              }
+              g_assert_true(GTK_IS_LIST_BOX(parent));
+              gtk_list_box_select_row(GTK_LIST_BOX(parent), date_row);
+              drain_main_context();
+
+              root = gtk_window_get_child(window);
+              g_assert_true(subtree_has_label(root, "SYSTEM / DATE & TIME"));
+              g_assert_true(subtree_has_label(root, "Location & time zone"));
+              g_assert_true(subtree_has_label(root, "Clock system"));
+              g_assert_true(subtree_has_label(root, "Manual date and time"));
+
+              gtk_window_close(window);
+              for (unsigned int attempt = 0U; attempt < 1000U; ++attempt) {
+                  drain_main_context();
+                  if (g_list_length(gtk_application_get_windows(app)) == 0U) {
+                      break;
+                  }
+                  g_usleep(1000U);
+              }
+              g_assert_cmpuint(g_list_length(gtk_application_get_windows(app)), ==, 0U);
+              g_object_unref(window);
+          }
+
+          int main(void)
+          {
+              g_autofree gchar *root = g_dir_make_tmp("ss-shell-XXXXXX", NULL);
+              g_assert_nonnull(root);
+              g_setenv("XDG_CONFIG_HOME", root, TRUE);
+              g_setenv("GSETTINGS_BACKEND", "memory", TRUE);
+              g_setenv(
+                  "DBUS_SYSTEM_BUS_ADDRESS",
+                  "unix:path=/nonexistent/ss-test-bus",
+                  TRUE);
+              g_setenv(
+                  "SYSTEM_SETTINGS_UI_ASSET_DIR_OVERRIDE",
+                  SYSTEM_SETTINGS_UI_SOURCE_DIR,
+                  TRUE);
+              g_setenv(
+                  "SYSTEM_SETTINGS_MODULE_DIR_OVERRIDE",
+                  SYSTEM_SETTINGS_MODULE_SOURCE_DIR,
+                  TRUE);
+
+              gtk_init();
+              g_autoptr(GtkApplication) app = gtk_application_new(
+                  "org.infiltrator.SystemSettings.Test",
+                  G_APPLICATION_NON_UNIQUE);
+              g_assert_true(g_application_register(G_APPLICATION(app), NULL, NULL));
+
+              exercise_window(app);
+              exercise_window(app);
+              return 0;
+          }
+          '''
+          write("tests/linux-shell-test.c", test.replace("          ", ""))
+
+          # 3. The generic module host owns module lifecycle only. Add the Home
+          # temporal provider beside it in the composition library.
+          cmake_path = "CMakeLists.txt"
+          cmake = read(cmake_path)
+          cmake = replace_once(
+              cmake,
+              "    add_library(system-settings-linux-modules STATIC\n"
+              "        src/app/linux-builtin-module-host.c)\n",
+              "    add_library(system-settings-linux-modules STATIC\n"
+              "        src/app/linux-builtin-module-host.c\n"
+              "        src/app/home-temporal-provider.c)\n",
+              "composition provider source")
+          cmake = replace_once(
+              cmake,
+              "        target_include_directories(linux-shell-test PRIVATE\n"
+              "            \"${CMAKE_CURRENT_SOURCE_DIR}/src/modules/date-time\"\n"
+              "            \"${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux\")\n",
+              "        target_include_directories(linux-shell-test PRIVATE\n"
+              "            \"${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux\")\n",
+              "shell-test private include")
+          cmake = replace_once(
+              cmake,
+              "            system-settings-linux-shell\n"
+              "            system-settings-date-time-linux\n"
+              "            system-settings-linux-ui\n",
+              "            system-settings-linux-shell\n"
+              "            system-settings-linux-ui\n",
+              "shell-test direct module link")
+          write(cmake_path, cmake)
+
+          # Guard the intended boundaries in source as part of the change.
+          test_text = read("tests/linux-shell-test.c")
+          forbidden_test_tokens = [
+              "../src/shell/linux/main.c",
+              "linux-date-time-panel-private.h",
+              "SsLinuxDateTimePanel",
+              "ShellSearchState",
+              "system-settings-date-time-panel",
+          ]
+          for token in forbidden_test_tokens:
+              if token in test_text:
+                  raise SystemExit(f"white-box shell test token remains: {token}")
+
+          host = read("src/app/linux-builtin-module-host.c")
+          for token in ["home-temporal-presenter.h", "SsHomeTemporalPresenter", "home_temporal"]:
+              if token in host:
+                  raise SystemExit(f"module host still owns Home temporal concern: {token}")
+
+      - name: Commit refactor result
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/refactor-brittleness-top3.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --check
+          git commit -m "Finish top-three coupling cleanup"
+          git push origin HEAD:fix/brittleness-top3
