@@ -37,10 +37,60 @@ typedef enum SsSystemTimeOperation {
 } SsSystemTimeOperation;
 
 typedef struct SystemTimeUiRequest {
-    GtkWindow *window;
+    SsLinuxDateTimeLifetime *lifetime;
     guint generation;
     SsSystemTimeOperation operation;
 } SystemTimeUiRequest;
+
+struct SsLinuxDateTimeLifetime {
+    gint references;
+    gpointer panel;
+};
+
+SsLinuxDateTimeLifetime *ss_linux_date_time_lifetime_new(
+    SsLinuxDateTimePanel *panel)
+{
+    SsLinuxDateTimeLifetime *lifetime =
+        g_new0(SsLinuxDateTimeLifetime, 1);
+
+    lifetime->references = 1;
+    g_atomic_pointer_set(&lifetime->panel, panel);
+    return lifetime;
+}
+
+SsLinuxDateTimeLifetime *ss_linux_date_time_lifetime_ref(
+    SsLinuxDateTimeLifetime *lifetime)
+{
+    if (lifetime != NULL) {
+        g_atomic_int_inc(&lifetime->references);
+    }
+    return lifetime;
+}
+
+void ss_linux_date_time_lifetime_invalidate(
+    SsLinuxDateTimeLifetime *lifetime)
+{
+    if (lifetime != NULL) {
+        g_atomic_pointer_set(&lifetime->panel, NULL);
+    }
+}
+
+void ss_linux_date_time_lifetime_unref(
+    SsLinuxDateTimeLifetime *lifetime)
+{
+    if (lifetime != NULL &&
+        g_atomic_int_dec_and_test(&lifetime->references)) {
+        g_free(lifetime);
+    }
+}
+
+SsLinuxDateTimePanel *ss_linux_date_time_lifetime_get_panel(
+    SsLinuxDateTimeLifetime *lifetime)
+{
+    return lifetime != NULL
+        ? g_atomic_pointer_get(&lifetime->panel)
+        : NULL;
+}
 
 static void sync_controls(SsLinuxDateTimePanel *state);
 static gboolean refresh_preview(gpointer user_data);
@@ -280,7 +330,7 @@ static void policy_file_changed(gpointer user_data)
          * how that draft should be interpreted.
          */
         if (manual_context_changed) {
-            state->manual_dirty = false;
+            state->system_time.manual_dirty = false;
         }
         if (recovered_metadata_present) {
             state->location.metadata = recovered_metadata;
@@ -318,20 +368,30 @@ static void policy_file_changed(gpointer user_data)
     }
 }
 
+bool ss_linux_date_time_panel_read_system_time(
+    const SsLinuxDateTimePanel *state,
+    SsSystemTimeState *out)
+{
+    return state != NULL &&
+           out != NULL &&
+           state->system_time.service != NULL &&
+           ss_system_time_service_read(state->system_time.service, out);
+}
+
 static guint timezone_index_for_id(
     const SsLinuxDateTimePanel *state,
     const char *timezone_id)
 {
     size_t index;
 
-    if (state == NULL || state->location.timezone_ids == NULL ||
+    if (state == NULL || state->system_time.timezone_ids == NULL ||
         timezone_id == NULL) {
         return GTK_INVALID_LIST_POSITION;
     }
 
-    for (index = 0U; index < state->location.timezone_ids->len; ++index) {
+    for (index = 0U; index < state->system_time.timezone_ids->len; ++index) {
         const char *candidate = g_ptr_array_index(
-            state->location.timezone_ids, (guint)index);
+            state->system_time.timezone_ids, (guint)index);
         if (g_strcmp0(candidate, timezone_id) == 0) {
             return (guint)index;
         }
@@ -370,7 +430,7 @@ static void sync_native_format_controls(SsLinuxDateTimePanel *state)
         return;
     }
 
-    state->updating_system_controls = true;
+    state->system_time.updating_controls = true;
     if (state->show_date != NULL &&
         ss_cinnamon_interface_get_boolean(
             state->cinnamon_interface_settings,
@@ -385,7 +445,7 @@ static void sync_native_format_controls(SsLinuxDateTimePanel *state)
         gtk_drop_down_set_selected(
             state->first_day, first_day_index(first_day));
     }
-    state->updating_system_controls = false;
+    state->system_time.updating_controls = false;
 }
 
 static bool desktop_uses_24h(const SsLinuxDateTimePanel *state)
@@ -426,8 +486,8 @@ static void fill_manual_time_entries(SsLinuxDateTimePanel *state)
     int64_t unix_microseconds;
     gint64 offset_microseconds;
 
-    if (state == NULL || state->manual_date == NULL ||
-        state->manual_time == NULL) {
+    if (state == NULL || state->system_time.manual_date == NULL ||
+        state->system_time.manual_time == NULL) {
         return;
     }
 
@@ -445,7 +505,7 @@ static void fill_manual_time_entries(SsLinuxDateTimePanel *state)
 
     if (date != NULL) {
         gtk_editable_set_text(
-            GTK_EDITABLE(state->manual_date), date);
+            GTK_EDITABLE(state->system_time.manual_date), date);
     }
     if (ss_manual_time_format(
             policy->clock_mode,
@@ -456,7 +516,7 @@ static void fill_manual_time_entries(SsLinuxDateTimePanel *state)
             time,
             sizeof(time))) {
         gtk_editable_set_text(
-            GTK_EDITABLE(state->manual_time), time);
+            GTK_EDITABLE(state->system_time.manual_time), time);
     }
 }
 
@@ -476,16 +536,16 @@ static void update_overview_policy(SsLinuxDateTimePanel *state)
     }
 
     clock = infiltratr_temporal_clock_mode_find(policy->clock_mode);
-    if (state->overview_clock != NULL) {
+    if (state->preview.overview_clock != NULL) {
         gtk_label_set_text(
-            GTK_LABEL(state->overview_clock),
+            GTK_LABEL(state->preview.overview_clock),
             clock != NULL ? clock->name : policy->clock_mode);
     }
 
     calendar = infiltratr_temporal_calendar_find(policy->calendar);
-    if (state->overview_calendar != NULL) {
+    if (state->preview.overview_calendar != NULL) {
         gtk_label_set_text(
-            GTK_LABEL(state->overview_calendar),
+            GTK_LABEL(state->preview.overview_calendar),
             calendar != NULL ? calendar->name : policy->calendar);
     }
 }
@@ -504,84 +564,84 @@ static void sync_system_time_controls(SsLinuxDateTimePanel *state)
     if (state->system_time.service == NULL ||
         !ss_system_time_service_read(
             state->system_time.service, &system_state)) {
-        if (state->timezone != NULL) {
+        if (state->system_time.timezone != NULL) {
             gtk_widget_set_sensitive(
-                GTK_WIDGET(state->timezone), FALSE);
+                GTK_WIDGET(state->system_time.timezone), FALSE);
         }
-        if (state->network_time != NULL) {
+        if (state->system_time.network_time != NULL) {
             gtk_widget_set_sensitive(
-                GTK_WIDGET(state->network_time), FALSE);
+                GTK_WIDGET(state->system_time.network_time), FALSE);
         }
-        if (state->manual_row != NULL) {
-            gtk_widget_set_visible(state->manual_row, FALSE);
+        if (state->system_time.manual_row != NULL) {
+            gtk_widget_set_visible(state->system_time.manual_row, FALSE);
         }
-        if (state->manual_unavailable != NULL) {
+        if (state->system_time.manual_unavailable != NULL) {
             gtk_widget_set_visible(
-                state->manual_unavailable, FALSE);
+                state->system_time.manual_unavailable, FALSE);
         }
-        if (state->overview_timezone != NULL) {
-            gtk_label_set_text(GTK_LABEL(state->overview_timezone), "Unavailable");
+        if (state->system_time.overview_timezone != NULL) {
+            gtk_label_set_text(GTK_LABEL(state->system_time.overview_timezone), "Unavailable");
         }
-        if (state->overview_sync != NULL) {
-            gtk_label_set_text(GTK_LABEL(state->overview_sync), "Unavailable");
+        if (state->system_time.overview_sync != NULL) {
+            gtk_label_set_text(GTK_LABEL(state->system_time.overview_sync), "Unavailable");
         }
         return;
     }
 
-    state->updating_system_controls = true;
+    state->system_time.updating_controls = true;
 
-    if (state->overview_timezone != NULL) {
+    if (state->system_time.overview_timezone != NULL) {
         gtk_label_set_text(
-            GTK_LABEL(state->overview_timezone),
+            GTK_LABEL(state->system_time.overview_timezone),
             system_state.timezone[0] != '\0'
                 ? system_state.timezone
                 : "Unknown");
     }
-    if (state->overview_sync != NULL) {
+    if (state->system_time.overview_sync != NULL) {
         gtk_label_set_text(
-            GTK_LABEL(state->overview_sync),
+            GTK_LABEL(state->system_time.overview_sync),
             system_state.ntp_enabled ? "Automatic" : "Manual");
     }
 
-    if (state->timezone != NULL) {
+    if (state->system_time.timezone != NULL) {
         zone_index = timezone_index_for_id(
             state, system_state.timezone);
         if (zone_index == GTK_INVALID_LIST_POSITION) {
-            GtkStringList *strings = GTK_STRING_LIST(gtk_drop_down_get_model(state->timezone));
-            g_ptr_array_add(state->location.timezone_ids, g_strdup(system_state.timezone));
+            GtkStringList *strings = GTK_STRING_LIST(gtk_drop_down_get_model(state->system_time.timezone));
+            g_ptr_array_add(state->system_time.timezone_ids, g_strdup(system_state.timezone));
             gtk_string_list_append(strings, system_state.timezone);
-            zone_index = state->location.timezone_ids->len - 1U;
+            zone_index = state->system_time.timezone_ids->len - 1U;
         }
         if (zone_index != GTK_INVALID_LIST_POSITION) {
             gtk_drop_down_set_selected(
-                state->timezone, zone_index);
+                state->system_time.timezone, zone_index);
         }
         gtk_widget_set_sensitive(
-            GTK_WIDGET(state->timezone), TRUE);
+            GTK_WIDGET(state->system_time.timezone), TRUE);
     }
 
-    if (state->network_time != NULL) {
+    if (state->system_time.network_time != NULL) {
         gtk_switch_set_active(
-            state->network_time, system_state.ntp_enabled);
+            state->system_time.network_time, system_state.ntp_enabled);
         gtk_widget_set_sensitive(
-            GTK_WIDGET(state->network_time),
+            GTK_WIDGET(state->system_time.network_time),
             system_state.can_ntp);
     }
 
     manual_supported = manual_representation_supported(state);
     manual_visible = !system_state.ntp_enabled && manual_supported;
 
-    if (state->manual_row != NULL) {
-        gtk_widget_set_visible(state->manual_row, manual_visible);
+    if (state->system_time.manual_row != NULL) {
+        gtk_widget_set_visible(state->system_time.manual_row, manual_visible);
     }
-    if (state->manual_unavailable != NULL) {
+    if (state->system_time.manual_unavailable != NULL) {
         gtk_widget_set_visible(
-            state->manual_unavailable,
+            state->system_time.manual_unavailable,
             !system_state.ntp_enabled && !manual_supported);
     }
 
     const bool protected_operation_active =
-        state->location.timezone_cancellable != NULL ||
+        state->system_time.timezone_cancellable != NULL ||
         state->system_time.ntp_cancellable != NULL ||
         state->system_time.manual_time_cancellable != NULL;
 
@@ -591,30 +651,30 @@ static void sync_system_time_controls(SsLinuxDateTimePanel *state)
          * clock/calendar/NTP context. Re-seed it when manual mode becomes
          * meaningful again.
          */
-        state->manual_dirty = false;
+        state->system_time.manual_dirty = false;
     } else {
         gtk_widget_set_sensitive(
-            GTK_WIDGET(state->manual_date), !protected_operation_active);
+            GTK_WIDGET(state->system_time.manual_date), !protected_operation_active);
         gtk_widget_set_sensitive(
-            GTK_WIDGET(state->manual_time), !protected_operation_active);
+            GTK_WIDGET(state->system_time.manual_time), !protected_operation_active);
         gtk_widget_set_sensitive(
-            GTK_WIDGET(state->manual_set_time), !protected_operation_active);
-        if (!state->manual_dirty) {
+            GTK_WIDGET(state->system_time.manual_set_time), !protected_operation_active);
+        if (!state->system_time.manual_dirty) {
             fill_manual_time_entries(state);
         }
     }
 
-    if (state->timezone != NULL) {
+    if (state->system_time.timezone != NULL) {
         gtk_widget_set_sensitive(
-            GTK_WIDGET(state->timezone), !protected_operation_active);
+            GTK_WIDGET(state->system_time.timezone), !protected_operation_active);
     }
-    if (state->network_time != NULL) {
+    if (state->system_time.network_time != NULL) {
         gtk_widget_set_sensitive(
-            GTK_WIDGET(state->network_time),
+            GTK_WIDGET(state->system_time.network_time),
             system_state.can_ntp && !protected_operation_active);
     }
 
-    state->updating_system_controls = false;
+    state->system_time.updating_controls = false;
 }
 
 static guint clock_index_for_id(
@@ -707,8 +767,8 @@ static void update_control_capabilities(SsLinuxDateTimePanel *state)
     policy = ss_date_time_model_policy(&state->model);
     gtk_widget_set_sensitive(GTK_WIDGET(state->show_seconds),
                              mode == NULL || mode->supports_seconds);
-    gtk_widget_set_sensitive(GTK_WIDGET(state->latitude), TRUE);
-    gtk_widget_set_sensitive(GTK_WIDGET(state->longitude), TRUE);
+    gtk_widget_set_sensitive(GTK_WIDGET(state->location.latitude), TRUE);
+    gtk_widget_set_sensitive(GTK_WIDGET(state->location.longitude), TRUE);
 
     ss_linux_date_time_location_update_summary(state);
     update_overview_policy(state);
@@ -824,8 +884,8 @@ static gboolean refresh_preview(gpointer user_data)
     g_autoptr(GDateTime) now = g_date_time_new_now_local();
     char clock_text[160];
 
-    if (state == NULL || state->clock_preview == NULL ||
-        state->date_preview == NULL || now == NULL) {
+    if (state == NULL || state->preview.clock_label == NULL ||
+        state->preview.date_label == NULL || now == NULL) {
         return G_SOURCE_CONTINUE;
     }
 
@@ -836,9 +896,9 @@ static gboolean refresh_preview(gpointer user_data)
 
     if (format_preview_at(state, now, clock_text, sizeof(clock_text)) &&
         g_strcmp0(
-            gtk_label_get_text(GTK_LABEL(state->clock_preview)),
+            gtk_label_get_text(GTK_LABEL(state->preview.clock_label)),
             clock_text) != 0) {
-        gtk_label_set_text(GTK_LABEL(state->clock_preview), clock_text);
+        gtk_label_set_text(GTK_LABEL(state->preview.clock_label), clock_text);
     }
 
     /*
@@ -898,9 +958,9 @@ static gboolean refresh_preview(gpointer user_data)
 
         if (summary != NULL &&
             g_strcmp0(
-                gtk_label_get_text(GTK_LABEL(state->date_preview)),
+                gtk_label_get_text(GTK_LABEL(state->preview.date_label)),
                 summary) != 0) {
-            gtk_label_set_text(GTK_LABEL(state->date_preview), summary);
+            gtk_label_set_text(GTK_LABEL(state->preview.date_label), summary);
         }
         if (cacheable) {
             state->preview.date_year = year;
@@ -1013,6 +1073,7 @@ static void sync_controls(SsLinuxDateTimePanel *state)
     }
 
     state->updating_controls = true;
+    state->location.updating_controls = true;
     gtk_drop_down_set_selected(
         state->clock_mode, clock_index_for_id(state, policy->clock_mode));
     gtk_drop_down_set_selected(
@@ -1021,29 +1082,30 @@ static void sync_controls(SsLinuxDateTimePanel *state)
     gtk_switch_set_active(state->show_seconds, policy->show_seconds);
     if (policy->location_configured) {
         gtk_spin_button_set_value(
-            state->latitude, policy->latitude);
+            state->location.latitude, policy->latitude);
         gtk_spin_button_set_value(
-            state->longitude, policy->longitude);
-        if (state->location_search != NULL &&
+            state->location.longitude, policy->longitude);
+        if (state->location.search_entry != NULL &&
             ss_linux_date_time_location_metadata_matches_policy(state, policy)) {
             gtk_editable_set_text(
-                GTK_EDITABLE(state->location_search),
+                GTK_EDITABLE(state->location.search_entry),
                 state->location.metadata.display_name);
         }
     } else if (state->regional_context.has_reference_coordinates) {
         gtk_spin_button_set_value(
-            state->latitude,
+            state->location.latitude,
             state->regional_context.reference_latitude);
         gtk_spin_button_set_value(
-            state->longitude,
+            state->location.longitude,
             state->regional_context.reference_longitude);
-        if (state->location_search != NULL &&
+        if (state->location.search_entry != NULL &&
             state->regional_context.timezone_city[0] != '\0') {
             gtk_editable_set_text(
-                GTK_EDITABLE(state->location_search),
+                GTK_EDITABLE(state->location.search_entry),
                 state->regional_context.timezone_city);
         }
     }
+    state->location.updating_controls = false;
     state->updating_controls = false;
     update_control_capabilities(state);
 }
@@ -1188,7 +1250,7 @@ void on_clock_changed(GObject *object,
         sync_controls(state);
         return;
     }
-    state->manual_dirty = false;
+    state->system_time.manual_dirty = false;
     policy_saved(state);
 }
 
@@ -1212,7 +1274,7 @@ void on_calendar_changed(GObject *object,
         sync_controls(state);
         return;
     }
-    state->manual_dirty = false;
+    state->system_time.manual_dirty = false;
     policy_saved(state);
 }
 
@@ -1267,7 +1329,7 @@ static void system_time_changed(
          * Typed wall time is meaningful only in the context in which it was
          * entered. A time-zone or NTP authority change invalidates that draft.
          */
-        state->manual_dirty = false;
+        state->system_time.manual_dirty = false;
     }
 
     /*
@@ -1364,20 +1426,20 @@ static void system_time_changed(
                     "The system time zone changed, but its reference coordinates could not be persisted to the temporal policy.",
                     true);
             } else {
-                state->updating_controls = true;
+                state->location.updating_controls = true;
                 gtk_spin_button_set_value(
-                    state->latitude,
+                    state->location.latitude,
                     state->regional_context.reference_latitude);
                 gtk_spin_button_set_value(
-                    state->longitude,
+                    state->location.longitude,
                     state->regional_context.reference_longitude);
-                if (state->location_search != NULL &&
+                if (state->location.search_entry != NULL &&
                     state->regional_context.timezone_city[0] != '\0') {
                     gtk_editable_set_text(
-                        GTK_EDITABLE(state->location_search),
+                        GTK_EDITABLE(state->location.search_entry),
                         state->regional_context.timezone_city);
                 }
-                state->updating_controls = false;
+                state->location.updating_controls = false;
             }
         }
 
@@ -1400,7 +1462,7 @@ static void system_time_ui_request_free(SystemTimeUiRequest *request)
     if (request == NULL) {
         return;
     }
-    g_clear_object(&request->window);
+    ss_linux_date_time_lifetime_unref(request->lifetime);
     g_free(request);
 }
 
@@ -1413,7 +1475,7 @@ static guint *operation_generation(
     }
     switch (operation) {
     case SS_SYSTEM_TIME_OPERATION_TIMEZONE:
-        return &state->location.timezone_generation;
+        return &state->system_time.timezone_generation;
     case SS_SYSTEM_TIME_OPERATION_NTP:
         return &state->system_time.ntp_generation;
     case SS_SYSTEM_TIME_OPERATION_MANUAL:
@@ -1432,7 +1494,7 @@ static GCancellable **operation_cancellable(
     }
     switch (operation) {
     case SS_SYSTEM_TIME_OPERATION_TIMEZONE:
-        return &state->location.timezone_cancellable;
+        return &state->system_time.timezone_cancellable;
     case SS_SYSTEM_TIME_OPERATION_NTP:
         return &state->system_time.ntp_cancellable;
     case SS_SYSTEM_TIME_OPERATION_MANUAL:
@@ -1461,7 +1523,7 @@ static SystemTimeUiRequest *begin_system_time_operation(
      * A repeated request of the same kind may still supersede its predecessor.
      */
     if ((operation != SS_SYSTEM_TIME_OPERATION_TIMEZONE &&
-         state->location.timezone_cancellable != NULL) ||
+         state->system_time.timezone_cancellable != NULL) ||
         (operation != SS_SYSTEM_TIME_OPERATION_NTP &&
          state->system_time.ntp_cancellable != NULL) ||
         (operation != SS_SYSTEM_TIME_OPERATION_MANUAL &&
@@ -1477,7 +1539,8 @@ static SystemTimeUiRequest *begin_system_time_operation(
     ++(*generation);
 
     request = g_new0(SystemTimeUiRequest, 1);
-    request->window = g_object_ref(state->window);
+    request->lifetime =
+        ss_linux_date_time_lifetime_ref(state->lifetime);
     request->generation = *generation;
     request->operation = operation;
     return request;
@@ -1490,13 +1553,9 @@ static void system_time_operation_complete(
     gpointer user_data)
 {
     SystemTimeUiRequest *request = user_data;
-    SsLinuxDateTimePanel *state = NULL;
-
-    if (request != NULL && request->window != NULL) {
-        state = g_object_get_data(
-            G_OBJECT(request->window),
-            "system-settings-date-time-panel");
-    }
+    SsLinuxDateTimePanel *state = request != NULL
+        ? ss_linux_date_time_lifetime_get_panel(request->lifetime)
+        : NULL;
 
     /*
      * A later timezone/NTP/manual-time request invalidates every older
@@ -1516,7 +1575,7 @@ static void system_time_operation_complete(
         }
         if (success) {
             bool metadata_out_of_sync = false;
-            state->manual_dirty = false;
+            state->system_time.manual_dirty = false;
             (void)ss_regional_context_detect(&state->regional_context);
             sync_system_time_controls(state);
             ss_linux_date_time_location_update_summary(state);
@@ -1580,7 +1639,7 @@ static void request_system_timezone(
     ss_system_time_service_set_timezone_async(
         state->system_time.service,
         timezone_id,
-        state->location.timezone_cancellable,
+        state->system_time.timezone_cancellable,
         system_time_operation_complete,
         request);
 }
@@ -1593,16 +1652,16 @@ void on_timezone_changed(GObject *object G_GNUC_UNUSED,
     guint selected;
     const char *timezone_id;
 
-    if (state == NULL || state->updating_system_controls ||
-        state->location.timezone_ids == NULL) {
+    if (state == NULL || state->system_time.updating_controls ||
+        state->system_time.timezone_ids == NULL) {
         return;
     }
 
-    selected = gtk_drop_down_get_selected(state->timezone);
-    if (selected >= state->location.timezone_ids->len) {
+    selected = gtk_drop_down_get_selected(state->system_time.timezone);
+    if (selected >= state->system_time.timezone_ids->len) {
         return;
     }
-    timezone_id = g_ptr_array_index(state->location.timezone_ids, selected);
+    timezone_id = g_ptr_array_index(state->system_time.timezone_ids, selected);
     request_system_timezone(state, timezone_id);
 }
 
@@ -1613,7 +1672,7 @@ void on_network_time_changed(GObject *object,
     SsLinuxDateTimePanel *state = user_data;
     bool enabled;
 
-    if (state == NULL || state->updating_system_controls ||
+    if (state == NULL || state->system_time.updating_controls ||
         state->system_time.service == NULL) {
         return;
     }
@@ -1720,8 +1779,8 @@ void on_manual_entry_changed(
 {
     SsLinuxDateTimePanel *state = user_data;
 
-    if (state != NULL && !state->updating_system_controls) {
-        state->manual_dirty = true;
+    if (state != NULL && !state->system_time.updating_controls) {
+        state->system_time.manual_dirty = true;
     }
 }
 
@@ -1738,8 +1797,8 @@ void on_manual_set_time_clicked(
         return;
     }
 
-    date_text = gtk_editable_get_text(GTK_EDITABLE(state->manual_date));
-    time_text = gtk_editable_get_text(GTK_EDITABLE(state->manual_time));
+    date_text = gtk_editable_get_text(GTK_EDITABLE(state->system_time.manual_date));
+    time_text = gtk_editable_get_text(GTK_EDITABLE(state->system_time.manual_time));
     if (!parse_manual_datetime(
             state, date_text, time_text, &unix_time_usec)) {
         set_status(
@@ -1782,7 +1841,7 @@ void on_show_date_changed(GObject *object,
     SsLinuxDateTimePanel *state = user_data;
     bool value;
 
-    if (state == NULL || state->updating_system_controls ||
+    if (state == NULL || state->system_time.updating_controls ||
         state->cinnamon_interface_settings == NULL) {
         return;
     }
@@ -1805,7 +1864,7 @@ void on_first_day_changed(GObject *object G_GNUC_UNUSED,
     SsLinuxDateTimePanel *state = user_data;
     int value;
 
-    if (state == NULL || state->updating_system_controls ||
+    if (state == NULL || state->system_time.updating_controls ||
         state->cinnamon_interface_settings == NULL) {
         return;
     }
@@ -1826,13 +1885,13 @@ static void system_time_service_ready(
     const char *error_message,
     gpointer user_data)
 {
-    GtkWindow *window = GTK_WINDOW(user_data);
-    SsLinuxDateTimePanel *state = g_object_get_data(
-        G_OBJECT(window), "system-settings-date-time-panel");
+    SsLinuxDateTimeLifetime *lifetime = user_data;
+    SsLinuxDateTimePanel *state =
+        ss_linux_date_time_lifetime_get_panel(lifetime);
 
     if (state == NULL) {
         ss_system_time_service_free(service);
-        g_object_unref(window);
+        ss_linux_date_time_lifetime_unref(lifetime);
         return;
     }
 
@@ -1843,7 +1902,7 @@ static void system_time_service_ready(
                 ? error_message
                 : "The operating-system date/time service is unavailable.",
             true);
-        g_object_unref(window);
+        ss_linux_date_time_lifetime_unref(lifetime);
         return;
     }
 
@@ -1856,7 +1915,7 @@ static void system_time_service_ready(
     SsSystemTimeState initial;
     if (!ss_system_time_service_read(service, &initial)) {
         set_status(state, "The operating-system date/time service is unavailable.", true);
-        g_object_unref(window);
+        ss_linux_date_time_lifetime_unref(lifetime);
         return;
     }
     if (state->location.recovery_failed) {
@@ -1872,7 +1931,7 @@ static void system_time_service_ready(
                 : "Using Mint/Cinnamon temporal preferences as the initial policy. Native Mint/Linux date and time controls are live.",
             false);
     }
-    g_object_unref(window);
+    ss_linux_date_time_lifetime_unref(lifetime);
 }
 
 static bool migrate_legacy_native_clock(
@@ -2061,10 +2120,11 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
      * deferred until after construction, allowing the host to present the
      * window before either external-service work path runs.
      */
+    state->lifetime = ss_linux_date_time_lifetime_new(state);
     ss_system_time_service_new_async(
         state->system_time.service_cancellable,
         system_time_service_ready,
-        g_object_ref(state->window));
+        ss_linux_date_time_lifetime_ref(state->lifetime));
     state->preview.idle_id =
         g_idle_add(refresh_preview_once, state);
     return state;
@@ -2094,6 +2154,9 @@ void ss_linux_date_time_panel_free(gpointer data)
         return;
     }
 
+    /* Make every outstanding async completion inert before cancellation. */
+    ss_linux_date_time_lifetime_invalidate(state->lifetime);
+
     stop_preview_timer(state);
     ss_linux_date_time_location_cancel_coordinate_commit(state);
     ss_policy_file_observer_free(state->policy_observer);
@@ -2116,9 +2179,9 @@ void ss_linux_date_time_panel_free(gpointer data)
         g_cancellable_cancel(state->system_time.service_cancellable);
         g_clear_object(&state->system_time.service_cancellable);
     }
-    if (state->location.timezone_cancellable != NULL) {
-        g_cancellable_cancel(state->location.timezone_cancellable);
-        g_clear_object(&state->location.timezone_cancellable);
+    if (state->system_time.timezone_cancellable != NULL) {
+        g_cancellable_cancel(state->system_time.timezone_cancellable);
+        g_clear_object(&state->system_time.timezone_cancellable);
     }
     if (state->system_time.ntp_cancellable != NULL) {
         g_cancellable_cancel(state->system_time.ntp_cancellable);
@@ -2130,7 +2193,7 @@ void ss_linux_date_time_panel_free(gpointer data)
     }
 
     g_clear_pointer(&state->clock_mode_ids, g_ptr_array_unref);
-    g_clear_pointer(&state->location.timezone_ids, g_ptr_array_unref);
+    g_clear_pointer(&state->system_time.timezone_ids, g_ptr_array_unref);
     g_clear_pointer(&state->preview.date_calendar, g_free);
     ss_calendar_preview_provider_free(
         state->preview.calendar_provider);
@@ -2142,5 +2205,7 @@ void ss_linux_date_time_panel_free(gpointer data)
         disconnect_panel_widgets(state->root, state);
         g_clear_object(&state->root);
     }
+    ss_linux_date_time_lifetime_unref(state->lifetime);
+    state->lifetime = NULL;
     g_free(state);
 }

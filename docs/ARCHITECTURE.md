@@ -181,11 +181,14 @@ on first selection. Time-zone catalogue parsing, policy observers and timedated
 proxy setup therefore do not participate in shell first paint.
 
 The application presents its existing window on repeated activation. On close,
-the host removes its panel data before destroying widgets. Panel cleanup removes
+the host releases its module instances before the window is destroyed. Panel cleanup removes
 sources, cancels requests, disconnects widget callbacks and releases its retained
-root. Pending UI requests retain a window reference, look up the panel again and
-check their generation before touching it. A removed panel means the reply is
-ignored; cancellation alone is not a lifetime guarantee.
+root. Pending UI requests retain a small ref-counted lifetime anchor rather than a
+window/controller side channel. Panel teardown invalidates that anchor before
+cancelling work; completions resolve the panel through the anchor and then check
+their operation generation before touching state. A removed panel therefore
+makes every late reply inert; cancellation alone is not treated as a lifetime
+guarantee.
 
 Each timedated call separately retains the service until its completion callback
 returns. Releasing caller ownership detaches the state observer immediately.

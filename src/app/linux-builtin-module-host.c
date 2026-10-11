@@ -20,7 +20,6 @@ typedef void (*SsBuiltinModuleDestroyFunc)(gpointer controller);
 
 typedef struct SsBuiltinModuleDescriptor {
     const char *page_id;
-    const char *window_data_key;
     SsBuiltinModuleCreateFunc create;
     SsBuiltinModuleWidgetFunc widget;
     SsBuiltinModuleDestroyFunc destroy;
@@ -54,7 +53,6 @@ static void destroy_date_time_module(gpointer controller)
 static const SsBuiltinModuleDescriptor builtin_modules[] = {
     {
         .page_id = "date-time",
-        .window_data_key = "system-settings-date-time-panel",
         .create = create_date_time_module,
         .widget = date_time_module_widget,
         .destroy = destroy_date_time_module,
@@ -111,35 +109,15 @@ SsBuiltinModuleHost *ss_builtin_module_host_new(GtkWindow *window)
 
 void ss_builtin_module_host_free(SsBuiltinModuleHost *host)
 {
-    GHashTableIter iter;
-    gpointer value;
-
     if (host == NULL) {
         return;
     }
 
-    if (host->window != NULL && host->instances != NULL) {
-        g_hash_table_iter_init(&iter, host->instances);
-        while (g_hash_table_iter_next(&iter, NULL, &value)) {
-            SsBuiltinModuleInstance *instance = value;
-            const char *data_key;
-
-            if (instance == NULL || instance->descriptor == NULL) {
-                continue;
-            }
-            data_key = instance->descriptor->window_data_key;
-            if (data_key != NULL &&
-                g_object_get_data(G_OBJECT(host->window), data_key) ==
-                    instance->controller) {
-                /*
-                 * Pending module replies may retain the window and re-resolve
-                 * this non-owning key. Detach it before controller teardown.
-                 */
-                g_object_set_data(G_OBJECT(host->window), data_key, NULL);
-            }
-        }
-    }
-
+    /*
+     * Async module work owns explicit lifetime anchors. The host therefore
+     * tears modules down directly and does not publish controller pointers
+     * through GtkWindow object-data side channels.
+     */
     g_clear_pointer(&host->instances, g_hash_table_unref);
     g_free(host);
 }
@@ -190,12 +168,6 @@ bool ss_builtin_module_host_ensure_page(
             (gpointer)descriptor->page_id,
             instance);
 
-        if (descriptor->window_data_key != NULL) {
-            g_object_set_data(
-                G_OBJECT(host->window),
-                descriptor->window_data_key,
-                controller);
-        }
     }
 
     panel_widget = descriptor->widget(instance->controller);

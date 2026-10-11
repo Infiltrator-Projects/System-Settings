@@ -84,10 +84,6 @@ static void shell_register_module_page(
         state->module_pages,
         g_strdup(page_id),
         page);
-
-    if (g_strcmp0(page_id, state->home_primary_page_id) == 0) {
-        state->primary_module_row = row;
-    }
 }
 
 static void shell_set_module_container(
@@ -101,9 +97,6 @@ static void shell_set_module_container(
         return;
     }
     page->container = container;
-    if (g_strcmp0(page_id, state->home_primary_page_id) == 0) {
-        state->primary_module_container = container;
-    }
 }
 
 static void shell_search_state_free(gpointer data)
@@ -164,9 +157,6 @@ static bool ensure_module_page(
     }
 
     if (ss_builtin_module_host_is_loaded(state->module_host, page_id)) {
-        if (g_strcmp0(page_id, state->home_primary_page_id) == 0) {
-            state->primary_module_loaded = true;
-        }
         return true;
     }
 
@@ -175,9 +165,6 @@ static bool ensure_module_page(
             page_id,
             page->container,
             &panel_error)) {
-        if (g_strcmp0(page_id, state->home_primary_page_id) == 0) {
-            state->primary_module_loaded = false;
-        }
         gtk_scrolled_window_set_child(
             page->container,
             build_unavailable_panel(
@@ -188,9 +175,6 @@ static bool ensure_module_page(
         return false;
     }
 
-    if (g_strcmp0(page_id, state->home_primary_page_id) == 0) {
-        state->primary_module_loaded = true;
-    }
     return true;
 }
 
@@ -768,10 +752,9 @@ static void open_home_primary_page(gpointer user_data)
 {
     ShellSearchState *state = user_data;
 
-    if (state == NULL || state->home_primary_page_id == NULL) {
-        return;
+    if (state != NULL) {
+        (void)shell_open_page(state, SS_DATE_TIME_PAGE_ID);
     }
-    (void)shell_open_page(state, state->home_primary_page_id);
 }
 
 static gboolean about_close_requested(GtkWindow *window, gpointer user_data)
@@ -867,7 +850,6 @@ static gboolean on_close_requested(GtkWindow *window, gpointer user_data)
         G_OBJECT(window), "system-settings-search-state");
     if (state != NULL) {
         state->module_host = NULL;
-        state->primary_module_loaded = false;
     }
 
     /*
@@ -1003,7 +985,6 @@ void ss_shell_window_activate(GtkApplication *application, gpointer user_data)
 
     search_state = g_new0(ShellSearchState, 1);
     search_state->module_host = module_host;
-    search_state->home_primary_page_id = SS_DATE_TIME_PAGE_ID;
     search_state->module_pages = g_hash_table_new_full(
         g_str_hash,
         g_str_equal,

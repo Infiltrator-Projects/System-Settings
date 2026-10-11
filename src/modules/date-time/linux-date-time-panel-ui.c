@@ -91,18 +91,18 @@ static GtkStringList *timezone_strings(SsLinuxDateTimePanel *state)
         return strings;
     }
 
-    g_clear_pointer(&state->location.timezone_ids, g_ptr_array_unref);
-    state->location.timezone_ids = ss_regional_context_list_timezones(
+    g_clear_pointer(&state->system_time.timezone_ids, g_ptr_array_unref);
+    state->system_time.timezone_ids = ss_regional_context_list_timezones(
         state->regional_context.timezone_id);
 
-    if (state->location.timezone_ids == NULL) {
-        state->location.timezone_ids =
+    if (state->system_time.timezone_ids == NULL) {
+        state->system_time.timezone_ids =
             g_ptr_array_new_with_free_func(g_free);
     }
 
-    for (index = 0U; index < state->location.timezone_ids->len; ++index) {
+    for (index = 0U; index < state->system_time.timezone_ids->len; ++index) {
         const char *zone = g_ptr_array_index(
-            state->location.timezone_ids, (guint)index);
+            state->system_time.timezone_ids, (guint)index);
         gtk_string_list_append(strings, zone);
     }
     return strings;
@@ -210,7 +210,7 @@ static GtkWidget *make_manual_setting_block(
     gtk_label_set_wrap(GTK_LABEL(description), TRUE);
     gtk_box_append(GTK_BOX(block), description);
     gtk_box_append(GTK_BOX(block), controls);
-    state->manual_row = block;
+    state->system_time.manual_row = block;
     return block;
 }
 
@@ -278,12 +278,12 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     gtk_box_append(
         GTK_BOX(hero_copy),
         ss_linux_ui_make_label("LIVE PRESENTATION", "hero-kicker"));
-    state->clock_preview = ss_linux_ui_make_label("--:--", "preview-time");
-    state->date_preview = ss_linux_ui_make_label("", "preview-date");
-    gtk_label_set_wrap(GTK_LABEL(state->clock_preview), TRUE);
-    gtk_label_set_wrap(GTK_LABEL(state->date_preview), TRUE);
-    gtk_box_append(GTK_BOX(hero_copy), state->clock_preview);
-    gtk_box_append(GTK_BOX(hero_copy), state->date_preview);
+    state->preview.clock_label = ss_linux_ui_make_label("--:--", "preview-time");
+    state->preview.date_label = ss_linux_ui_make_label("", "preview-date");
+    gtk_label_set_wrap(GTK_LABEL(state->preview.clock_label), TRUE);
+    gtk_label_set_wrap(GTK_LABEL(state->preview.date_label), TRUE);
+    gtk_box_append(GTK_BOX(hero_copy), state->preview.clock_label);
+    gtk_box_append(GTK_BOX(hero_copy), state->preview.date_label);
     gtk_widget_add_css_class(hero_copy, "hero-live-column");
     gtk_box_append(GTK_BOX(hero_top), hero_copy);
 
@@ -300,28 +300,28 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         make_overview_item(
             "preferences-system-time-symbolic",
             "Clock",
-            &state->overview_clock),
+            &state->preview.overview_clock),
         0, 0, 1, 1);
     gtk_grid_attach(
         GTK_GRID(overview_grid),
         make_overview_item(
             "x-office-calendar-symbolic",
             "Calendar",
-            &state->overview_calendar),
+            &state->preview.overview_calendar),
         1, 0, 1, 1);
     gtk_grid_attach(
         GTK_GRID(overview_grid),
         make_overview_item(
             "mark-location-symbolic",
             "Time zone",
-            &state->overview_timezone),
+            &state->system_time.overview_timezone),
         0, 1, 1, 1);
     gtk_grid_attach(
         GTK_GRID(overview_grid),
         make_overview_item(
             "network-transmit-receive-symbolic",
             "Time sync",
-            &state->overview_sync),
+            &state->system_time.overview_sync),
         1, 1, 1, 1);
     gtk_box_append(GTK_BOX(overview_panel), overview_grid);
     gtk_widget_set_hexpand(overview_panel, TRUE);
@@ -361,39 +361,39 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     gtk_widget_add_css_class(location_strip, "info-strip");
     gtk_image_set_pixel_size(GTK_IMAGE(location_strip_icon), 14);
     gtk_box_append(GTK_BOX(location_strip), location_strip_icon);
-    state->location_summary = ss_linux_ui_make_label("", "accent-note");
-    gtk_label_set_wrap(GTK_LABEL(state->location_summary), TRUE);
-    gtk_widget_set_hexpand(state->location_summary, TRUE);
-    gtk_box_append(GTK_BOX(location_strip), state->location_summary);
+    state->location.summary = ss_linux_ui_make_label("", "accent-note");
+    gtk_label_set_wrap(GTK_LABEL(state->location.summary), TRUE);
+    gtk_widget_set_hexpand(state->location.summary, TRUE);
+    gtk_box_append(GTK_BOX(location_strip), state->location.summary);
     gtk_box_append(GTK_BOX(location_card), location_strip);
 
     search_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, common_control_spacing());
-    state->location_search = GTK_ENTRY(gtk_entry_new());
-    state->location_search_button =
+    state->location.search_entry = GTK_ENTRY(gtk_entry_new());
+    state->location.search_button =
         GTK_BUTTON(gtk_button_new_with_label("Search"));
     gtk_entry_set_placeholder_text(
-        state->location_search,
+        state->location.search_entry,
         "Town, suburb, city or place");
     gtk_accessible_update_property(
-        GTK_ACCESSIBLE(state->location_search),
+        GTK_ACCESSIBLE(state->location.search_entry),
         GTK_ACCESSIBLE_PROPERTY_LABEL,
         "Locality search",
         -1);
     gtk_accessible_update_property(
-        GTK_ACCESSIBLE(state->location_search_button),
+        GTK_ACCESSIBLE(state->location.search_button),
         GTK_ACCESSIBLE_PROPERTY_LABEL,
         "Search for locality",
         -1);
-    gtk_widget_set_hexpand(GTK_WIDGET(state->location_search), TRUE);
+    gtk_widget_set_hexpand(GTK_WIDGET(state->location.search_entry), TRUE);
     gtk_widget_add_css_class(
-        GTK_WIDGET(state->location_search), "setting-entry");
+        GTK_WIDGET(state->location.search_entry), "setting-entry");
     gtk_widget_add_css_class(
-        GTK_WIDGET(state->location_search_button), "setting-button");
+        GTK_WIDGET(state->location.search_button), "setting-button");
     gtk_widget_add_css_class(
-        GTK_WIDGET(state->location_search_button), "primary-button");
-    gtk_box_append(GTK_BOX(search_box), GTK_WIDGET(state->location_search));
+        GTK_WIDGET(state->location.search_button), "primary-button");
+    gtk_box_append(GTK_BOX(search_box), GTK_WIDGET(state->location.search_entry));
     gtk_box_append(
-        GTK_BOX(search_box), GTK_WIDGET(state->location_search_button));
+        GTK_BOX(search_box), GTK_WIDGET(state->location.search_button));
     gtk_box_append(
         GTK_BOX(location_card),
         ss_linux_ui_make_setting_tile(
@@ -402,54 +402,54 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
             "Search by town, suburb, city or place.",
             search_box));
 
-    state->location_results = GTK_LIST_BOX(gtk_list_box_new());
+    state->location.results = GTK_LIST_BOX(gtk_list_box_new());
     gtk_widget_add_css_class(
-        GTK_WIDGET(state->location_results), "location-results");
-    gtk_widget_set_visible(GTK_WIDGET(state->location_results), FALSE);
-    gtk_box_append(GTK_BOX(location_card), GTK_WIDGET(state->location_results));
+        GTK_WIDGET(state->location.results), "location-results");
+    gtk_widget_set_visible(GTK_WIDGET(state->location.results), FALSE);
+    gtk_box_append(GTK_BOX(location_card), GTK_WIDGET(state->location.results));
 
     strings = timezone_strings(state);
-    state->timezone = GTK_DROP_DOWN(
+    state->system_time.timezone = GTK_DROP_DOWN(
         gtk_drop_down_new(G_LIST_MODEL(strings), NULL));
     /* gtk_drop_down_new() consumes the model reference (transfer full). */
     expression = gtk_property_expression_new(
         GTK_TYPE_STRING_OBJECT, NULL, "string");
-    gtk_drop_down_set_expression(state->timezone, expression);
+    gtk_drop_down_set_expression(state->system_time.timezone, expression);
     gtk_expression_unref(expression);
-    gtk_drop_down_set_enable_search(state->timezone, TRUE);
+    gtk_drop_down_set_enable_search(state->system_time.timezone, TRUE);
     gtk_widget_add_css_class(
-        GTK_WIDGET(state->timezone), "setting-dropdown");
-    gtk_widget_set_hexpand(GTK_WIDGET(state->timezone), TRUE);
+        GTK_WIDGET(state->system_time.timezone), "setting-dropdown");
+    gtk_widget_set_hexpand(GTK_WIDGET(state->system_time.timezone), TRUE);
     gtk_box_append(
         GTK_BOX(location_card),
         ss_linux_ui_make_setting_tile(
             "preferences-system-time-symbolic",
             "Time zone",
             "Operating-system IANA time zone.",
-            GTK_WIDGET(state->timezone)));
+            GTK_WIDGET(state->system_time.timezone)));
 
-    state->latitude = GTK_SPIN_BUTTON(
+    state->location.latitude = GTK_SPIN_BUTTON(
         gtk_spin_button_new_with_range(-90.0, 90.0, 0.0001));
-    state->longitude = GTK_SPIN_BUTTON(
+    state->location.longitude = GTK_SPIN_BUTTON(
         gtk_spin_button_new_with_range(-180.0, 180.0, 0.0001));
-    gtk_widget_add_css_class(GTK_WIDGET(state->latitude), "setting-spin");
-    gtk_widget_add_css_class(GTK_WIDGET(state->longitude), "setting-spin");
-    gtk_spin_button_set_digits(state->latitude, 4U);
-    gtk_spin_button_set_digits(state->longitude, 4U);
+    gtk_widget_add_css_class(GTK_WIDGET(state->location.latitude), "setting-spin");
+    gtk_widget_add_css_class(GTK_WIDGET(state->location.longitude), "setting-spin");
+    gtk_spin_button_set_digits(state->location.latitude, 4U);
+    gtk_spin_button_set_digits(state->location.longitude, 4U);
     gtk_accessible_update_property(
-        GTK_ACCESSIBLE(state->latitude),
+        GTK_ACCESSIBLE(state->location.latitude),
         GTK_ACCESSIBLE_PROPERTY_LABEL,
         "Latitude",
         -1);
     gtk_accessible_update_property(
-        GTK_ACCESSIBLE(state->longitude),
+        GTK_ACCESSIBLE(state->location.longitude),
         GTK_ACCESSIBLE_PROPERTY_LABEL,
         "Longitude",
         -1);
-    gtk_widget_set_size_request(GTK_WIDGET(state->latitude), 112, -1);
-    gtk_widget_set_size_request(GTK_WIDGET(state->longitude), 112, -1);
-    gtk_widget_set_hexpand(GTK_WIDGET(state->latitude), FALSE);
-    gtk_widget_set_hexpand(GTK_WIDGET(state->longitude), FALSE);
+    gtk_widget_set_size_request(GTK_WIDGET(state->location.latitude), 112, -1);
+    gtk_widget_set_size_request(GTK_WIDGET(state->location.longitude), 112, -1);
+    gtk_widget_set_hexpand(GTK_WIDGET(state->location.latitude), FALSE);
+    gtk_widget_set_hexpand(GTK_WIDGET(state->location.longitude), FALSE);
 
     /* Coordinates are one paired value. A FlowBox could wrap Longitude onto a
      * second line at ordinary desktop widths, visually separating the pair.
@@ -458,9 +458,9 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     gtk_grid_set_column_spacing(GTK_GRID(coordinate_box), (guint)common_control_spacing());
     gtk_widget_set_hexpand(coordinate_box, FALSE);
     GtkWidget *latitude_field =
-        make_coordinate_field("LATITUDE", state->latitude);
+        make_coordinate_field("LATITUDE", state->location.latitude);
     GtkWidget *longitude_field =
-        make_coordinate_field("LONGITUDE", state->longitude);
+        make_coordinate_field("LONGITUDE", state->location.longitude);
     gtk_grid_attach(GTK_GRID(coordinate_box), latitude_field, 0, 0, 1, 1);
     gtk_grid_attach(GTK_GRID(coordinate_box), longitude_field, 1, 0, 1, 1);
     gtk_box_append(
@@ -577,18 +577,18 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
             "System clock",
             "Network sync and manual time."));
 
-    state->network_time = GTK_SWITCH(gtk_switch_new());
+    state->system_time.network_time = GTK_SWITCH(gtk_switch_new());
     gtk_widget_add_css_class(
-        GTK_WIDGET(state->network_time), "setting-switch");
-    gtk_widget_set_hexpand(GTK_WIDGET(state->network_time), FALSE);
-    gtk_widget_set_size_request(GTK_WIDGET(state->network_time), 38, 20);
+        GTK_WIDGET(state->system_time.network_time), "setting-switch");
+    gtk_widget_set_hexpand(GTK_WIDGET(state->system_time.network_time), FALSE);
+    gtk_widget_set_size_request(GTK_WIDGET(state->system_time.network_time), 38, 20);
     gtk_box_append(
         GTK_BOX(system_card),
         ss_linux_ui_make_setting_tile(
             "network-transmit-receive-symbolic",
             "Network time",
             "Synchronise automatically with the system service.",
-            GTK_WIDGET(state->network_time)));
+            GTK_WIDGET(state->system_time.network_time)));
 
     manual_box = gtk_flow_box_new();
     gtk_flow_box_set_selection_mode(
@@ -599,53 +599,53 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         GTK_FLOW_BOX(manual_box), 3U);
     gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(manual_box), (guint)common_compact_spacing());
     gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(manual_box), (guint)common_compact_spacing());
-    state->manual_date = GTK_ENTRY(gtk_entry_new());
-    state->manual_time = GTK_ENTRY(gtk_entry_new());
-    state->manual_set_time =
+    state->system_time.manual_date = GTK_ENTRY(gtk_entry_new());
+    state->system_time.manual_time = GTK_ENTRY(gtk_entry_new());
+    state->system_time.manual_set_time =
         GTK_BUTTON(gtk_button_new_with_label("Set"));
-    gtk_entry_set_placeholder_text(state->manual_date, "YYYY-MM-DD");
-    gtk_entry_set_placeholder_text(state->manual_time, "Clock time");
-    gtk_entry_set_max_length(state->manual_date, 10);
-    gtk_entry_set_max_length(state->manual_time, 24);
+    gtk_entry_set_placeholder_text(state->system_time.manual_date, "YYYY-MM-DD");
+    gtk_entry_set_placeholder_text(state->system_time.manual_time, "Clock time");
+    gtk_entry_set_max_length(state->system_time.manual_date, 10);
+    gtk_entry_set_max_length(state->system_time.manual_time, 24);
     gtk_accessible_update_property(
-        GTK_ACCESSIBLE(state->manual_date),
+        GTK_ACCESSIBLE(state->system_time.manual_date),
         GTK_ACCESSIBLE_PROPERTY_LABEL,
         "Manual date",
         -1);
     gtk_accessible_update_property(
-        GTK_ACCESSIBLE(state->manual_time),
+        GTK_ACCESSIBLE(state->system_time.manual_time),
         GTK_ACCESSIBLE_PROPERTY_LABEL,
         "Manual time",
         -1);
     gtk_accessible_update_property(
-        GTK_ACCESSIBLE(state->manual_set_time),
+        GTK_ACCESSIBLE(state->system_time.manual_set_time),
         GTK_ACCESSIBLE_PROPERTY_LABEL,
         "Set operating-system date and time",
         -1);
-    gtk_widget_set_size_request(GTK_WIDGET(state->manual_date), 100, -1);
-    gtk_widget_set_size_request(GTK_WIDGET(state->manual_time), 112, -1);
-    gtk_widget_add_css_class(GTK_WIDGET(state->manual_date), "setting-entry");
-    gtk_widget_add_css_class(GTK_WIDGET(state->manual_time), "setting-entry");
+    gtk_widget_set_size_request(GTK_WIDGET(state->system_time.manual_date), 100, -1);
+    gtk_widget_set_size_request(GTK_WIDGET(state->system_time.manual_time), 112, -1);
+    gtk_widget_add_css_class(GTK_WIDGET(state->system_time.manual_date), "setting-entry");
+    gtk_widget_add_css_class(GTK_WIDGET(state->system_time.manual_time), "setting-entry");
     gtk_widget_add_css_class(
-        GTK_WIDGET(state->manual_set_time), "setting-button");
+        GTK_WIDGET(state->system_time.manual_set_time), "setting-button");
     gtk_widget_add_css_class(
-        GTK_WIDGET(state->manual_set_time), "primary-button");
+        GTK_WIDGET(state->system_time.manual_set_time), "primary-button");
     gtk_flow_box_insert(
-        GTK_FLOW_BOX(manual_box), GTK_WIDGET(state->manual_date), -1);
+        GTK_FLOW_BOX(manual_box), GTK_WIDGET(state->system_time.manual_date), -1);
     gtk_flow_box_insert(
-        GTK_FLOW_BOX(manual_box), GTK_WIDGET(state->manual_time), -1);
+        GTK_FLOW_BOX(manual_box), GTK_WIDGET(state->system_time.manual_time), -1);
     gtk_flow_box_insert(
-        GTK_FLOW_BOX(manual_box), GTK_WIDGET(state->manual_set_time), -1);
+        GTK_FLOW_BOX(manual_box), GTK_WIDGET(state->system_time.manual_set_time), -1);
     gtk_box_append(
         GTK_BOX(system_card),
         make_manual_setting_block(state, manual_box));
 
-    state->manual_unavailable = ss_linux_ui_make_label(
+    state->system_time.manual_unavailable = ss_linux_ui_make_label(
         "Manual setting is unavailable for this clock/calendar combination.",
         "accent-note");
-    gtk_label_set_wrap(GTK_LABEL(state->manual_unavailable), TRUE);
-    gtk_widget_set_visible(state->manual_unavailable, FALSE);
-    gtk_box_append(GTK_BOX(system_card), state->manual_unavailable);
+    gtk_label_set_wrap(GTK_LABEL(state->system_time.manual_unavailable), TRUE);
+    gtk_widget_set_visible(state->system_time.manual_unavailable, FALSE);
+    gtk_box_append(GTK_BOX(system_card), state->system_time.manual_unavailable);
 
     state->status_label = ss_linux_ui_make_label("", "status-ok");
     gtk_label_set_wrap(GTK_LABEL(state->status_label), TRUE);
@@ -671,34 +671,34 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         state->show_seconds, "notify::active",
         G_CALLBACK(on_seconds_changed), state);
     g_signal_connect(
-        state->timezone, "notify::selected",
+        state->system_time.timezone, "notify::selected",
         G_CALLBACK(on_timezone_changed), state);
     g_signal_connect(
-        state->network_time, "notify::active",
+        state->system_time.network_time, "notify::active",
         G_CALLBACK(on_network_time_changed), state);
     g_signal_connect(
-        state->manual_set_time, "clicked",
+        state->system_time.manual_set_time, "clicked",
         G_CALLBACK(on_manual_set_time_clicked), state);
     g_signal_connect(
-        state->manual_date, "changed",
+        state->system_time.manual_date, "changed",
         G_CALLBACK(on_manual_entry_changed), state);
     g_signal_connect(
-        state->manual_time, "changed",
+        state->system_time.manual_time, "changed",
         G_CALLBACK(on_manual_entry_changed), state);
     g_signal_connect(
-        state->location_search_button, "clicked",
+        state->location.search_button, "clicked",
         G_CALLBACK(on_location_search_clicked), state);
     g_signal_connect(
-        state->location_search, "activate",
+        state->location.search_entry, "activate",
         G_CALLBACK(on_location_search_activate), state);
     g_signal_connect(
-        state->location_results, "row-activated",
+        state->location.results, "row-activated",
         G_CALLBACK(on_location_result_activated), state);
     g_signal_connect(
-        state->latitude, "notify::value",
+        state->location.latitude, "notify::value",
         G_CALLBACK(on_location_coordinate_changed), state);
     g_signal_connect(
-        state->longitude, "notify::value",
+        state->location.longitude, "notify::value",
         G_CALLBACK(on_location_coordinate_changed), state);
     g_signal_connect(
         state->show_date, "notify::active",

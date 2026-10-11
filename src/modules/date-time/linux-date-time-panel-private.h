@@ -14,38 +14,76 @@
 #include <gio/gio.h>
 #include <gtk/gtk.h>
 
+typedef struct SsLinuxDateTimeLifetime SsLinuxDateTimeLifetime;
+
+SsLinuxDateTimeLifetime *ss_linux_date_time_lifetime_new(
+    SsLinuxDateTimePanel *panel);
+SsLinuxDateTimeLifetime *ss_linux_date_time_lifetime_ref(
+    SsLinuxDateTimeLifetime *lifetime);
+void ss_linux_date_time_lifetime_invalidate(
+    SsLinuxDateTimeLifetime *lifetime);
+void ss_linux_date_time_lifetime_unref(
+    SsLinuxDateTimeLifetime *lifetime);
+SsLinuxDateTimePanel *ss_linux_date_time_lifetime_get_panel(
+    SsLinuxDateTimeLifetime *lifetime);
+
 /*
- * Date & Time used to keep every behavioural field flat in one controller.
- * Keep the GTK widget references on the panel, but split mutable domain state
- * by owner so location, system-time and preview code have explicit boundaries.
+ * Mutable state is grouped by the domain that owns it. The panel remains
+ * the composition root, but locality code no longer shares flat widget or
+ * protected-system-time fields with unrelated presentation concerns.
  */
 typedef struct SsLinuxDateTimeLocationState {
+    GtkEntry *search_entry;
+    GtkButton *search_button;
+    GtkListBox *results;
+    GtkWidget *summary;
+    GtkSpinButton *latitude;
+    GtkSpinButton *longitude;
+
     SsLocationMetadata metadata;
     SsPolicyFileObserver *metadata_observer;
-    GPtrArray *timezone_ids;
     GCancellable *search_cancellable;
-    GCancellable *timezone_cancellable;
     guint coordinate_commit_id;
     guint recovery_retry_id;
     guint recovery_retry_seconds;
     guint search_generation;
-    guint timezone_generation;
     bool metadata_present;
     bool metadata_uncertain;
     bool follows_timezone_reference;
     bool recovery_failed;
+    bool updating_controls;
 } SsLinuxDateTimeLocationState;
 
 typedef struct SsLinuxDateTimeSystemTimeState {
+    GtkWidget *overview_timezone;
+    GtkWidget *overview_sync;
+    GtkDropDown *timezone;
+    GtkSwitch *network_time;
+    GtkEntry *manual_date;
+    GtkEntry *manual_time;
+    GtkButton *manual_set_time;
+    GtkWidget *manual_row;
+    GtkWidget *manual_unavailable;
+
     SsSystemTimeService *service;
+    GPtrArray *timezone_ids;
     GCancellable *service_cancellable;
+    GCancellable *timezone_cancellable;
     GCancellable *ntp_cancellable;
     GCancellable *manual_time_cancellable;
+    guint timezone_generation;
     guint ntp_generation;
     guint manual_time_generation;
+    bool updating_controls;
+    bool manual_dirty;
 } SsLinuxDateTimeSystemTimeState;
 
 typedef struct SsLinuxDateTimePreviewState {
+    GtkWidget *clock_label;
+    GtkWidget *date_label;
+    GtkWidget *overview_clock;
+    GtkWidget *overview_calendar;
+
     SsCalendarPreviewProvider *calendar_provider;
     guint timer_id;
     guint idle_id;
@@ -59,28 +97,9 @@ typedef struct SsLinuxDateTimePreviewState {
 struct SsLinuxDateTimePanel {
     GtkWindow *window;
     GtkWidget *root;
-    GtkWidget *clock_preview;
-    GtkWidget *date_preview;
-    GtkWidget *overview_clock;
-    GtkWidget *overview_calendar;
-    GtkWidget *overview_timezone;
-    GtkWidget *overview_sync;
     GtkDropDown *clock_mode;
     GtkDropDown *calendar;
     GtkSwitch *show_seconds;
-    GtkEntry *location_search;
-    GtkButton *location_search_button;
-    GtkListBox *location_results;
-    GtkWidget *location_summary;
-    GtkSpinButton *latitude;
-    GtkSpinButton *longitude;
-    GtkDropDown *timezone;
-    GtkSwitch *network_time;
-    GtkEntry *manual_date;
-    GtkEntry *manual_time;
-    GtkButton *manual_set_time;
-    GtkWidget *manual_row;
-    GtkWidget *manual_unavailable;
     GtkSwitch *show_date;
     GtkDropDown *first_day;
     GtkWidget *status_label;
@@ -90,14 +109,13 @@ struct SsLinuxDateTimePanel {
     SsRegionalContext regional_context;
     SsPolicyFileObserver *policy_observer;
     GPtrArray *clock_mode_ids;
+    SsLinuxDateTimeLifetime *lifetime;
 
     SsLinuxDateTimeLocationState location;
     SsLinuxDateTimeSystemTimeState system_time;
     SsLinuxDateTimePreviewState preview;
 
     bool updating_controls;
-    bool updating_system_controls;
-    bool manual_dirty;
 };
 
 GtkWidget *ss_linux_date_time_panel_build_ui(
@@ -114,6 +132,9 @@ void ss_linux_date_time_panel_policy_saved(
     SsLinuxDateTimePanel *state);
 guint ss_linux_date_time_panel_preview_interval_ms(
     const SsLinuxDateTimePanel *state);
+bool ss_linux_date_time_panel_read_system_time(
+    const SsLinuxDateTimePanel *state,
+    SsSystemTimeState *out);
 
 bool ss_linux_date_time_location_coordinate_close(
     double left,
