@@ -1,0 +1,51 @@
+name: one-shot-brittleness-next3-retry
+
+on:
+  push:
+    branches:
+      - fix/brittleness-next3
+
+permissions:
+  contents: write
+
+jobs:
+  refactor:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run corrected refactor
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import textwrap
+
+          workflow = Path('.github/workflows/refactor-brittleness-next3.yml').read_text()
+          marker = "          python3 - <<'PY'\n"
+          start = workflow.index(marker) + len(marker)
+          end = workflow.index("\n          PY", start)
+          script = textwrap.dedent(workflow[start:end])
+          strict = '''        if old not in text:\n            raise SystemExit(f"{path}: missing replacement token {old!r}")\n        text = text.replace(old, new)'''
+          permissive = '''        text = text.replace(old, new)'''
+          if strict not in script:
+              raise SystemExit('Could not locate strict replacement helper')
+          script = script.replace(strict, permissive, 1)
+          exec(compile(script, '<brittleness-refactor>', 'exec'), {'__name__': '__main__'})
+          Path('.github/workflows/refactor-brittleness-retry.yml').unlink()
+          PY
+
+          git diff --check
+          git status --short
+
+      - name: Commit refactor
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Finish next structural coupling cleanup"
+          git push origin HEAD:fix/brittleness-next3
