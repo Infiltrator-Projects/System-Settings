@@ -34,10 +34,85 @@
 
 #define SS_HOME_PAGE_ID "home"
 
+typedef enum ShellNavigationAction {
+    SHELL_NAVIGATION_ACTION_NONE,
+    SHELL_NAVIGATION_ACTION_PAGE,
+    SHELL_NAVIGATION_ACTION_EXTERNAL,
+    SHELL_NAVIGATION_ACTION_ABOUT
+} ShellNavigationAction;
+
+typedef struct ShellNavigationData {
+    gchar *page_id;
+    gchar *search_text;
+    gchar *program;
+    gchar *argument;
+    ShellNavigationAction action;
+} ShellNavigationData;
+
+typedef struct ShellWindowOwnedState {
+    SsBuiltinModuleHost *module_host;
+    SsHomeTemporalProvider *home_temporal_provider;
+    ShellSearchState *search_state;
+} ShellWindowOwnedState;
+
 static void show_about(GtkButton *button, gpointer user_data);
 static GtkWidget *build_unavailable_panel(
     const char *title,
     const char *message);
+
+static GQuark shell_navigation_data_quark(void)
+{
+    return g_quark_from_static_string(
+        "system-settings-shell-navigation-data");
+}
+
+static void shell_navigation_data_free(gpointer data)
+{
+    ShellNavigationData *navigation = data;
+
+    if (navigation == NULL) {
+        return;
+    }
+    g_free(navigation->page_id);
+    g_free(navigation->search_text);
+    g_free(navigation->program);
+    g_free(navigation->argument);
+    g_free(navigation);
+}
+
+static ShellNavigationData *shell_navigation_data(
+    GtkListBoxRow *row)
+{
+    return row != NULL
+        ? g_object_get_qdata(
+              G_OBJECT(row), shell_navigation_data_quark())
+        : NULL;
+}
+
+static ShellNavigationData *shell_navigation_data_attach(
+    GtkListBoxRow *row,
+    const char *page_id,
+    const char *search_text)
+{
+    ShellNavigationData *navigation;
+
+    if (row == NULL) {
+        return NULL;
+    }
+
+    navigation = g_new0(ShellNavigationData, 1);
+    navigation->page_id = g_strdup(page_id);
+    navigation->search_text = g_strdup(search_text);
+    navigation->action = page_id != NULL
+        ? SHELL_NAVIGATION_ACTION_PAGE
+        : SHELL_NAVIGATION_ACTION_NONE;
+    g_object_set_qdata_full(
+        G_OBJECT(row),
+        shell_navigation_data_quark(),
+        navigation,
+        shell_navigation_data_free);
+    return navigation;
+}
 
 static void shell_module_page_free(gpointer data)
 {
@@ -112,18 +187,42 @@ static void shell_search_state_free(gpointer data)
     g_free(state);
 }
 
+static void shell_window_owned_state_free(gpointer data)
+{
+    ShellWindowOwnedState *owned = data;
+
+    if (owned == NULL) {
+        return;
+    }
+    if (owned->search_state != NULL) {
+        owned->search_state->module_host = NULL;
+    }
+    g_clear_pointer(
+        &owned->module_host,
+        ss_builtin_module_host_free);
+    g_clear_pointer(
+        &owned->home_temporal_provider,
+        ss_home_temporal_provider_free);
+    g_clear_pointer(
+        &owned->search_state,
+        shell_search_state_free);
+    g_free(owned);
+}
+
 gboolean navigation_filter(GtkListBoxRow *row, gpointer user_data)
 {
     ShellSearchState *state = user_data;
-    const char *search_text;
+    ShellNavigationData *navigation;
 
     if (state == NULL || state->query == NULL || state->query[0] == '\0') {
         return TRUE;
     }
 
-    search_text = g_object_get_data(G_OBJECT(row), "search-text");
-    return search_text != NULL &&
-           infiltratr_ascii_contains_ci(search_text, state->query);
+    navigation = shell_navigation_data(row);
+    return navigation != NULL &&
+           navigation->search_text != NULL &&
+           infiltratr_ascii_contains_ci(
+               navigation->search_text, state->query);
 }
 
 void on_search_changed(GtkSearchEntry *entry, gpointer user_data)
@@ -212,16 +311,18 @@ static void on_navigation_selected(
     gpointer user_data)
 {
     ShellSearchState *state = user_data;
-    const char *page_name;
+    ShellNavigationData *navigation;
 
     (void)box;
     if (row == NULL || state == NULL) {
         return;
     }
 
-    page_name = g_object_get_data(G_OBJECT(row), "page-name");
-    if (page_name != NULL) {
-        (void)shell_open_page(state, page_name);
+    navigation = shell_navigation_data(row);
+    if (navigation != NULL &&
+        navigation->action == SHELL_NAVIGATION_ACTION_PAGE &&
+        navigation->page_id != NULL) {
+        (void)shell_open_page(state, navigation->page_id);
     }
 }
 
@@ -250,24 +351,26 @@ static void on_navigation_activated(
     gpointer user_data)
 {
     ShellSearchState *state = user_data;
-    const char *program;
-    const char *argument;
-    gboolean show_about_row;
+    ShellNavigationData *navigation;
 
     (void)box;
     if (row == NULL || state == NULL) {
         return;
     }
 
-    program = g_object_get_data(G_OBJECT(row), "action-program");
-    argument = g_object_get_data(G_OBJECT(row), "action-argument");
-    show_about_row = GPOINTER_TO_INT(
-        g_object_get_data(G_OBJECT(row), "action-about")) != 0;
+    navigation = shell_navigation_data(row);
+    if (navigation == NULL) {
+        return;
+    }
 
-    if (program != NULL) {
-        (void)launch_command(GTK_WIDGET(row), program, argument);
+    if (navigation->action == SHELL_NAVIGATION_ACTION_EXTERNAL &&
+        navigation->program != NULL) {
+        (void)launch_command(
+            GTK_WIDGET(row),
+            navigation->program,
+            navigation->argument);
         restore_navigation_selection(state);
-    } else if (show_about_row) {
+    } else if (navigation->action == SHELL_NAVIGATION_ACTION_ABOUT) {
         show_about(NULL, state->parent);
         restore_navigation_selection(state);
     }
@@ -309,10 +412,8 @@ static GtkWidget *make_navigation_row(
         GTK_ACCESSIBLE_PROPERTY_DESCRIPTION,
         subtitle,
         -1);
-    g_object_set_data_full(
-        G_OBJECT(row), "page-name", g_strdup(page_name), g_free);
-    g_object_set_data_full(
-        G_OBJECT(row), "search-text", g_strdup(search_text), g_free);
+    (void)shell_navigation_data_attach(
+        GTK_LIST_BOX_ROW(row), page_name, search_text);
     return row;
 }
 
@@ -327,11 +428,14 @@ static GtkWidget *make_external_navigation_row(
     GtkWidget *row = make_navigation_row(
         icon_name, title, subtitle, NULL, search_text);
     g_autofree gchar *path = find_trusted_system_program(program);
+    ShellNavigationData *navigation =
+        shell_navigation_data(GTK_LIST_BOX_ROW(row));
 
-    g_object_set_data_full(
-        G_OBJECT(row), "action-program", g_strdup(path), g_free);
-    g_object_set_data_full(
-        G_OBJECT(row), "action-argument", g_strdup(argument), g_free);
+    if (navigation != NULL) {
+        navigation->action = SHELL_NAVIGATION_ACTION_EXTERNAL;
+        navigation->program = g_strdup(path);
+        navigation->argument = g_strdup(argument);
+    }
     if (path == NULL) {
         gtk_widget_set_sensitive(row, FALSE);
         gtk_widget_set_tooltip_text(
@@ -348,18 +452,14 @@ static GtkWidget *make_about_navigation_row(void)
         "System information",
         NULL,
         "about system information version");
-    g_object_set_data(
-        G_OBJECT(row), "action-about", GINT_TO_POINTER(1));
+    ShellNavigationData *navigation =
+        shell_navigation_data(GTK_LIST_BOX_ROW(row));
+
+    if (navigation != NULL) {
+        navigation->action = SHELL_NAVIGATION_ACTION_ABOUT;
+    }
     return row;
 }
-
-
-
-
-
-
-
-
 
 static void minimize_window(GtkButton *button, gpointer user_data)
 {
@@ -464,17 +564,6 @@ static GtkWidget *build_header(GtkWindow *parent, GtkSearchEntry **search_out)
     gtk_box_append(GTK_BOX(header_end), maximize);
     gtk_box_append(GTK_BOX(header_end), close);
     gtk_header_bar_pack_end(GTK_HEADER_BAR(header), header_end);
-
-    g_object_set_data(
-        G_OBJECT(parent), "system-settings-header-end", header_end);
-    g_object_set_data(
-        G_OBJECT(parent), "system-settings-search-entry", search);
-    g_object_set_data(
-        G_OBJECT(parent), "system-settings-minimize-button", minimize);
-    g_object_set_data(
-        G_OBJECT(parent), "system-settings-maximize-button", maximize);
-    g_object_set_data(
-        G_OBJECT(parent), "system-settings-close-button", close);
 
     if (search_out != NULL) {
         *search_out = GTK_SEARCH_ENTRY(search);
@@ -718,10 +807,6 @@ static GtkWidget *build_sidebar(
     gtk_widget_set_vexpand(nav_scroller, TRUE);
     gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(nav_scroller), list);
     gtk_box_append(GTK_BOX(sidebar), nav_scroller);
-    g_object_set_data(
-        G_OBJECT(parent),
-        "system-settings-navigation-scroller",
-        nav_scroller);
 
     gtk_widget_add_css_class(footer, "sidebar-footer");
     gtk_widget_set_hexpand(footer, TRUE);
@@ -825,15 +910,18 @@ static GtkWidget *build_unavailable_panel(
     return page;
 }
 
-static gboolean on_close_requested(GtkWindow *window, gpointer user_data)
+static gboolean on_close_requested(
+    GtkWindow *window,
+    gpointer user_data)
 {
-    ShellSearchState *state;
+    ShellWindowOwnedState *owned = user_data;
 
-    (void)user_data;
-    state = g_object_get_data(
-        G_OBJECT(window), "system-settings-search-state");
-    if (state != NULL) {
-        state->module_host = NULL;
+    (void)window;
+    if (owned == NULL) {
+        return FALSE;
+    }
+    if (owned->search_state != NULL) {
+        owned->search_state->module_host = NULL;
     }
 
     /*
@@ -841,7 +929,9 @@ static gboolean on_close_requested(GtkWindow *window, gpointer user_data)
      * Its destructor clears module compatibility lookups used by pending
      * callbacks so no reply can observe freed module state.
      */
-    g_object_set_data(G_OBJECT(window), "system-settings-module-host", NULL);
+    g_clear_pointer(
+        &owned->module_host,
+        ss_builtin_module_host_free);
     return FALSE;
 }
 
@@ -903,6 +993,7 @@ void ss_shell_window_activate(GtkApplication *application, gpointer user_data)
     ShellSearchState *search_state;
     SsBuiltinModuleHost *module_host;
     SsHomeTemporalProvider *home_temporal_provider;
+    ShellWindowOwnedState *owned;
     SsHomePageContext home_context;
 
     (void)user_data;
@@ -922,11 +1013,6 @@ void ss_shell_window_activate(GtkApplication *application, gpointer user_data)
     gtk_window_set_resizable(window, TRUE);
     g_signal_connect(
         window,
-        "close-request",
-        G_CALLBACK(on_close_requested),
-        NULL);
-    g_signal_connect(
-        window,
         "map",
         G_CALLBACK(adapt_window_to_mapped_monitor),
         NULL);
@@ -937,22 +1023,13 @@ void ss_shell_window_activate(GtkApplication *application, gpointer user_data)
         gtk_window_destroy(window);
         return;
     }
-    g_object_set_data_full(
-        G_OBJECT(window),
-        "system-settings-module-host",
-        module_host,
-        (GDestroyNotify)ss_builtin_module_host_free);
 
     home_temporal_provider = ss_home_temporal_provider_new();
     if (home_temporal_provider == NULL) {
+        ss_builtin_module_host_free(module_host);
         gtk_window_destroy(window);
         return;
     }
-    g_object_set_data_full(
-        G_OBJECT(window),
-        "system-settings-home-temporal-provider",
-        home_temporal_provider,
-        (GDestroyNotify)ss_home_temporal_provider_free);
 
     root = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     gtk_widget_add_css_class(root, "app-shell");
@@ -973,18 +1050,25 @@ void ss_shell_window_activate(GtkApplication *application, gpointer user_data)
         g_str_equal,
         g_free,
         shell_module_page_free);
-    g_object_set_data_full(
+
+    owned = g_new0(ShellWindowOwnedState, 1);
+    owned->module_host = module_host;
+    owned->home_temporal_provider = home_temporal_provider;
+    owned->search_state = search_state;
+    g_object_set_qdata_full(
         G_OBJECT(window),
-        "system-settings-search-state",
-        search_state,
-        shell_search_state_free);
+        g_quark_from_static_string("system-settings-shell-window-state"),
+        owned,
+        shell_window_owned_state_free);
+    g_signal_connect(
+        window,
+        "close-request",
+        G_CALLBACK(on_close_requested),
+        owned);
+
     gtk_box_append(
         GTK_BOX(root),
         build_sidebar(window, stack, search_entry, search_state));
-    g_object_set_data(
-        G_OBJECT(window),
-        "system-settings-navigation-list",
-        search_state->list);
 
     home_context = (SsHomePageContext){
         .temporal_provider = home_temporal_provider,
@@ -992,12 +1076,8 @@ void ss_shell_window_activate(GtkApplication *application, gpointer user_data)
         .navigate_data = search_state
     };
     home_scroller = ss_linux_home_page_new(&home_context);
-    g_object_set_data(
-        G_OBJECT(stack), "system-settings-home-scroller", home_scroller);
     gtk_stack_add_named(stack, home_scroller, SS_HOME_PAGE_ID);
     (void)shell_open_page(search_state, SS_HOME_PAGE_ID);
-    g_object_set_data(
-        G_OBJECT(window), "system-settings-stack", stack);
     gtk_box_append(GTK_BOX(root), stack_widget);
 
     gtk_window_present(window);
