@@ -1,3 +1,10 @@
+## 0.4.69 — 2026-10-11
+
+- Finish the Date & Time ownership split: location, protected system-time operations and preview state now use their canonical bounded state objects instead of anonymous compatibility overlays and flat aliases.
+- Replace the Linux shell white-box regression with a black-box lifecycle/UI contract so internal refactoring no longer requires preserving private controller fields, source inclusion or test-only compatibility wrappers.
+- Keep the built-in module host lifecycle-only by moving Home temporal presentation behind a dedicated composition provider; remove the last shell geometry compatibility key.
+- Revalidate the reduced architecture across Linux, Windows, ASan/UBSan, reproducible packaging, native release assets and Debian integration.
+
 ## 0.4.68 — 2026-10-10
 
 - Pin Common 1.19.41 so both temporal preview surfaces consume native Edo bell numerals and localized branch wording, plus locale-correct explicit 12-hour markers and ordering.
