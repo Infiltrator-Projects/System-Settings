@@ -6,6 +6,8 @@
 
 #include "shell-module-catalog.h"
 
+#include <stdbool.h>
+
 #ifndef SYSTEM_SETTINGS_MODULE_DIR
 #define SYSTEM_SETTINGS_MODULE_DIR "/usr/share/infiltrator/system-settings/modules"
 #endif

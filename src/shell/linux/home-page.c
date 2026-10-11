@@ -516,6 +516,7 @@ GtkWidget *ss_linux_home_page_new(const SsHomePageContext *context)
     const int uname_result = uname(&uts);
     const char *kernel = uname_result == 0 ? uts.release : "Unknown";
     const char *architecture = uname_result == 0 ? uts.machine : "Unknown";
+    SsHomeTemporalSnapshot temporal;
     SsHomeStatusSnapshot status;
     g_autofree gchar *os_display = g_strdup_printf(
         "Infiltrator OS (%s)", os_name != NULL ? os_name : "Linux");
@@ -824,13 +825,13 @@ GtkWidget *ss_linux_home_page_new(const SsHomePageContext *context)
     region_copy = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
     GtkWidget *region_value_label = ss_linux_ui_make_label(
         status.region_value, "region-country");
-    GtkWidget *status.region_detail_label = ss_linux_ui_make_label(
+    GtkWidget *region_detail_label = ss_linux_ui_make_label(
         status.region_detail, "status-card-detail");
     gtk_label_set_ellipsize(
         GTK_LABEL(region_value_label), PANGO_ELLIPSIZE_END);
-    gtk_label_set_wrap(GTK_LABEL(status.region_detail_label), TRUE);
+    gtk_label_set_wrap(GTK_LABEL(region_detail_label), TRUE);
     gtk_box_append(GTK_BOX(region_copy), region_value_label);
-    gtk_box_append(GTK_BOX(region_copy), status.region_detail_label);
+    gtk_box_append(GTK_BOX(region_copy), region_detail_label);
     gtk_flow_box_set_selection_mode(
         GTK_FLOW_BOX(region_body), GTK_SELECTION_NONE);
     gtk_flow_box_set_min_children_per_line(GTK_FLOW_BOX(region_body), 1U);
@@ -856,7 +857,7 @@ GtkWidget *ss_linux_home_page_new(const SsHomePageContext *context)
         status.appearance_detail);
     GtkWidget *appearance_value_label = g_object_get_data(
         G_OBJECT(appearance_card), "status-value-label");
-    GtkWidget *status.appearance_detail_label = g_object_get_data(
+    GtkWidget *appearance_detail_label = g_object_get_data(
         G_OBJECT(appearance_card), "status-detail-label");
     appearance_previews = gtk_flow_box_new();
     gtk_flow_box_set_selection_mode(
@@ -891,7 +892,7 @@ GtkWidget *ss_linux_home_page_new(const SsHomePageContext *context)
         status.network_detail);
     GtkWidget *network_value_label = g_object_get_data(
         G_OBJECT(network_card), "status-value-label");
-    GtkWidget *status.network_detail_label = g_object_get_data(
+    GtkWidget *network_detail_label = g_object_get_data(
         G_OBJECT(network_card), "status-detail-label");
     network_body = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 12);
     GtkWidget *network_visual = make_ui_asset_picture(

@@ -46,6 +46,6 @@ gboolean ss_linux_date_time_preview_refresh(gpointer panel);
 void ss_linux_date_time_preview_restart(SsLinuxDateTimePanel *panel);
 void ss_linux_date_time_preview_dispose(SsLinuxDateTimePanel *panel);
 guint ss_linux_date_time_panel_preview_interval_ms(
-    const SsLinuxDateTimePanel *panel);
+    SsLinuxDateTimePanel *panel);
 
 #endif

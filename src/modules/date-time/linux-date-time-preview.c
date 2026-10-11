@@ -32,7 +32,7 @@ static SsCalendarPreviewProvider *ensure_calendar_preview_provider(
 }
 
 static bool preview_coordinates(
-    const SsLinuxDateTimePanel *state,
+    SsLinuxDateTimePanel *state,
     double *latitude,
     double *longitude)
 {
@@ -242,7 +242,7 @@ static void stop_preview_timer(SsLinuxDateTimePanel *state)
 }
 
 guint ss_linux_date_time_panel_preview_interval_ms(
-    const SsLinuxDateTimePanel *state)
+    SsLinuxDateTimePanel *state)
 {
     const InfiltratrTemporalPolicyV3 *policy =
         state != NULL
@@ -274,7 +274,7 @@ void ss_linux_date_time_preview_restart(SsLinuxDateTimePanel *state)
     stop_preview_timer(state);
     ss_linux_date_time_preview_state(state)->timer_id = g_timeout_add(
         ss_linux_date_time_panel_preview_interval_ms(state),
-        refresh_preview,
+        ss_linux_date_time_preview_refresh,
         state);
     g_source_set_name_by_id(
         ss_linux_date_time_preview_state(state)->timer_id,
@@ -294,7 +294,7 @@ static void on_panel_mapped(
     if (ss_linux_date_time_preview_state(state)->timer_id == 0U) {
         ss_linux_date_time_preview_state(state)->timer_id = g_timeout_add(
             ss_linux_date_time_panel_preview_interval_ms(state),
-            refresh_preview,
+            ss_linux_date_time_preview_refresh,
             state);
         g_source_set_name_by_id(
             ss_linux_date_time_preview_state(state)->timer_id,
