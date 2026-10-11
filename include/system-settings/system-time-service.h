@@ -11,6 +11,10 @@
 #ifndef SYSTEM_SETTINGS_SYSTEM_TIME_SERVICE_H
 #define SYSTEM_SETTINGS_SYSTEM_TIME_SERVICE_H
 
+#if defined(SYSTEM_SETTINGS_GENERIC_SHELL)
+#error "Generic Linux shell must not include Date & Time domain contracts."
+#endif
+
 #include <gio/gio.h>
 #include <stdbool.h>
 #include <stdint.h>

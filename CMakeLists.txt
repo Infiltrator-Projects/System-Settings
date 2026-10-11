@@ -218,39 +218,6 @@ target_compile_definitions(system-settings-core PUBLIC
     SYSTEM_SETTINGS_BUILD_PROFILE="${SYSTEM_SETTINGS_BUILD_PROFILE}")
 target_link_libraries(system-settings-core PUBLIC InfiltratrCommon::Portable)
 
-# Enforce the generic Linux shell boundary as source code, not convention.
-# The built-in composition adapter lives in src/app and is the only production
-# unit allowed to know the private Date & Time GTK bridge.
-file(GLOB SS_LINUX_SHELL_SOURCES
-    "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux/*.c")
-foreach(SS_LINUX_SHELL_FILE IN LISTS SS_LINUX_SHELL_SOURCES)
-    file(READ "${SS_LINUX_SHELL_FILE}" SS_LINUX_SHELL_SOURCE)
-    foreach(SS_FORBIDDEN_SHELL_TOKEN
-            "date-time-model.h"
-            "system-time-service.h"
-            "location-search.h"
-            "location-metadata.h"
-            "regional-context.h"
-            "temporal-policy-store.h"
-            "linux-date-time-panel.h"
-            "home-temporal-presentation.h"
-            "SsDateTimeModel"
-            "SsSystemTimeService"
-            "SsLinuxDateTimePanel"
-            "SsHomeTemporalPresenter")
-        string(FIND "${SS_LINUX_SHELL_SOURCE}"
-            "${SS_FORBIDDEN_SHELL_TOKEN}"
-            SS_FORBIDDEN_SHELL_INDEX)
-        if(NOT SS_FORBIDDEN_SHELL_INDEX EQUAL -1)
-            message(FATAL_ERROR
-                "Linux shell regained Date & Time ownership in "
-                "${SS_LINUX_SHELL_FILE}: ${SS_FORBIDDEN_SHELL_TOKEN}")
-        endif()
-    endforeach()
-endforeach()
-unset(SS_LINUX_SHELL_SOURCE)
-unset(SS_LINUX_SHELL_SOURCES)
-
 if(WIN32)
     add_library(system-settings-platform STATIC
         src/platform/windows/temporal-policy-store.c)
@@ -276,6 +243,8 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         src/shell/linux/linux-ui-helpers.c
         src/shell/linux/linux-theme.c)
     ss_configure(system-settings-linux-ui)
+    target_compile_definitions(system-settings-linux-ui PRIVATE
+        SYSTEM_SETTINGS_GENERIC_SHELL=1)
     target_include_directories(system-settings-linux-ui PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux")
     target_link_libraries(system-settings-linux-ui PUBLIC
@@ -347,6 +316,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_include_directories(system-settings-linux-shell PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux")
     target_compile_definitions(system-settings-linux-shell PRIVATE
+        SYSTEM_SETTINGS_GENERIC_SHELL=1
         SYSTEM_SETTINGS_UI_ASSET_DIR="${CMAKE_INSTALL_FULL_DATADIR}/infiltrator/system-settings/ui"
         SYSTEM_SETTINGS_UI_SOURCE_DIR="${SYSTEM_SETTINGS_RUNTIME_UI_SOURCE_DIR}"
         SYSTEM_SETTINGS_MODULE_DIR="${CMAKE_INSTALL_FULL_DATADIR}/infiltrator/system-settings/modules"
@@ -361,6 +331,8 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     add_executable(system-settings
         src/shell/linux/main.c)
     ss_configure(system-settings)
+    target_compile_definitions(system-settings PRIVATE
+        SYSTEM_SETTINGS_GENERIC_SHELL=1)
     target_include_directories(system-settings PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux")
     target_link_libraries(system-settings PRIVATE

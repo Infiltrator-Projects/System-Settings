@@ -6,6 +6,10 @@
 #ifndef SYSTEM_SETTINGS_LOCATION_SEARCH_H
 #define SYSTEM_SETTINGS_LOCATION_SEARCH_H
 
+#if defined(SYSTEM_SETTINGS_GENERIC_SHELL)
+#error "Generic Linux shell must not include Date & Time domain contracts."
+#endif
+
 #include <gio/gio.h>
 #include <stdbool.h>
 

@@ -2,6 +2,10 @@
 #ifndef SYSTEM_SETTINGS_CINNAMON_INTERFACE_H
 #define SYSTEM_SETTINGS_CINNAMON_INTERFACE_H
 
+#if defined(SYSTEM_SETTINGS_GENERIC_SHELL)
+#error "Generic Linux shell must not include Date & Time domain contracts."
+#endif
+
 #include <gio/gio.h>
 #include <stdbool.h>
 

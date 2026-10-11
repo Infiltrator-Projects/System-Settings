@@ -3,9 +3,10 @@
 # Module Contract
 
 > Implementation scope: the current product has one built-in Linux GTK4 Date &
-> Time panel and a portable policy CLI/store. The shell already consumes the
-> Date & Time manifest for navigation-filter keywords without constructing the
-> panel. Multi-module discovery, result/deep-link search, the public dynamic ABI
+> Time panel and a portable policy CLI/store. The generic Linux shell now gets
+> built-in page IDs from the composition registry and title, summary, icon and
+> search metadata from the module manifest without constructing the panel.
+> Multi-module dynamic discovery, result/deep-link search, the public dynamic ABI
 > and a Windows GUI remain design requirements. See [Roadmap](ROADMAP.md).
 
 
@@ -36,22 +37,39 @@ around that implementation.
 Current Linux wiring is:
 
 ```text
-system-settings (shell executable)
+system-settings-linux-shell
        |
-       +-- private linux-date-time-panel.h
+       +-- builtin-module-host.h          generic registry/lifecycle contract
                |
-               +-- system-settings-date-time-linux (static first-party module)
+               v
+       system-settings-linux-modules     composition adapter
+               |
+               +-- private linux-date-time-panel.h
+                       |
+                       v
+               system-settings-date-time-linux
 ```
 
-That private header exposes a GTK panel only because both sides are currently
-one Linux product build. It is not installed as the public module contract and
-does not weaken the rule that ABI v1 must be toolkit-neutral.
+The generic shell does not include the private Date & Time bridge. The
+composition adapter is the only production unit outside the module that knows
+that bridge. Date & Time domain headers reject compilation when included by a
+target marked `SYSTEM_SETTINGS_GENERIC_SHELL`, while CMake separately prevents
+the generic shell/executable from directly linking the Date & Time or platform
+targets. This makes the boundary a compiler/link contract rather than a
+source-text spelling convention.
 
-This staged arrangement has two purposes:
+The private Date & Time header exposes a GTK panel only because the composition
+adapter and module are currently one Linux product build. It is not installed as
+the public module contract and does not weaken the rule that ABI v1 must be
+toolkit-neutral.
+
+This staged arrangement has three purposes:
 
 1. enforce domain ownership now — Date & Time backends/callbacks no longer live
-   in `main.c`;
-2. avoid turning an expedient GTK widget pointer into a permanent ABI promise.
+   in `main.c` or the generic shell;
+2. let the shell compose built-in navigation from registry + manifest metadata
+   without module-specific page constants or presentation strings;
+3. avoid turning an expedient GTK widget pointer into a permanent ABI promise.
 
 When the loader/host API is implemented, the Date & Time module is the first
 real implementation to adapt to it. Domain code should not need to move back
