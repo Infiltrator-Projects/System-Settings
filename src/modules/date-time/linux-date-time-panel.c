@@ -83,11 +83,11 @@ static SsCalendarPreviewProvider *ensure_calendar_preview_provider(
         return NULL;
     }
 
-    if (state->calendar_preview_provider == NULL) {
-        state->calendar_preview_provider =
+    if (state->preview.calendar_provider == NULL) {
+        state->preview.calendar_provider =
             ss_calendar_preview_provider_new();
     }
-    return state->calendar_preview_provider;
+    return state->preview.calendar_provider;
 }
 
 static gchar *temporal_policy_path(void)
@@ -127,16 +127,16 @@ static void refresh_location_authority_state(
         return;
     }
     policy = ss_date_time_model_policy(&state->model);
-    if (state->location_metadata_uncertain) {
+    if (state->location.metadata_uncertain) {
         /*
          * An unreadable locality file is not evidence that the user has no
          * explicit locality. Never replace uncertain authority with a tzdata
          * reference approximation.
          */
-        state->location_follows_timezone_reference = false;
+        state->location.follows_timezone_reference = false;
         return;
     }
-    state->location_follows_timezone_reference =
+    state->location.follows_timezone_reference =
         !metadata_matches &&
         (policy == NULL ||
          !policy->location_configured ||
@@ -155,15 +155,15 @@ static void location_metadata_file_changed(gpointer user_data)
 
     status = ss_location_metadata_load_status(&loaded);
     if (status == SS_LOCATION_METADATA_LOAD_OK) {
-        state->location_metadata = loaded;
-        state->location_metadata_present = true;
-        state->location_metadata_uncertain = false;
+        state->location.metadata = loaded;
+        state->location.metadata_present = true;
+        state->location.metadata_uncertain = false;
     } else if (status == SS_LOCATION_METADATA_LOAD_MISSING) {
-        memset(&state->location_metadata, 0, sizeof(state->location_metadata));
-        state->location_metadata_present = false;
-        state->location_metadata_uncertain = false;
+        memset(&state->location.metadata, 0, sizeof(state->location.metadata));
+        state->location.metadata_present = false;
+        state->location.metadata_uncertain = false;
     } else {
-        state->location_metadata_uncertain = true;
+        state->location.metadata_uncertain = true;
         set_status(
             state,
             "Locality metadata changed externally but could not be read; the last known-good locality remains active.",
@@ -184,15 +184,15 @@ static gboolean retry_locality_recovery(gpointer user_data)
         return G_SOURCE_REMOVE;
     }
 
-    state->locality_recovery_retry_id = 0U;
+    state->location.recovery_retry_id = 0U;
     policy = ss_date_time_model_policy(&state->model);
     if (policy != NULL &&
         ss_location_metadata_recover(
             policy->location_configured,
             policy->latitude,
             policy->longitude)) {
-        state->locality_recovery_failed = false;
-        state->locality_recovery_retry_seconds = 2U;
+        state->location.recovery_failed = false;
+        state->location.recovery_retry_seconds = 2U;
         location_metadata_file_changed(state);
         set_status(
             state,
@@ -201,7 +201,7 @@ static gboolean retry_locality_recovery(gpointer user_data)
         return G_SOURCE_REMOVE;
     }
 
-    state->locality_recovery_failed = true;
+    state->location.recovery_failed = true;
     schedule_locality_recovery_retry(state);
     return G_SOURCE_REMOVE;
 }
@@ -210,21 +210,21 @@ static void schedule_locality_recovery_retry(
     SsLinuxDateTimePanel *state)
 {
     if (state == NULL ||
-        state->locality_recovery_retry_id != 0U ||
-        !state->locality_recovery_failed) {
+        state->location.recovery_retry_id != 0U ||
+        !state->location.recovery_failed) {
         return;
     }
 
-    if (state->locality_recovery_retry_seconds == 0U)
-        state->locality_recovery_retry_seconds = 2U;
-    state->locality_recovery_retry_id = g_timeout_add_seconds(
-        state->locality_recovery_retry_seconds,
+    if (state->location.recovery_retry_seconds == 0U)
+        state->location.recovery_retry_seconds = 2U;
+    state->location.recovery_retry_id = g_timeout_add_seconds(
+        state->location.recovery_retry_seconds,
         retry_locality_recovery,
         state);
-    state->locality_recovery_retry_seconds =
-        MIN(state->locality_recovery_retry_seconds * 2U, 60U);
+    state->location.recovery_retry_seconds =
+        MIN(state->location.recovery_retry_seconds * 2U, 60U);
     g_source_set_name_by_id(
-        state->locality_recovery_retry_id,
+        state->location.recovery_retry_id,
         "[system-settings] locality recovery retry");
 }
 
@@ -255,11 +255,11 @@ static void policy_file_changed(gpointer user_data)
                 : SS_LOCATION_METADATA_LOAD_IO_ERROR;
         const bool recovered_metadata_present =
             recovered_metadata_status == SS_LOCATION_METADATA_LOAD_OK;
-        state->locality_recovery_failed = !locality_recovery_ok;
+        state->location.recovery_failed = !locality_recovery_ok;
         if (locality_recovery_ok) {
-            if (state->locality_recovery_retry_id != 0U) {
-                g_source_remove(state->locality_recovery_retry_id);
-                state->locality_recovery_retry_id = 0U;
+            if (state->location.recovery_retry_id != 0U) {
+                g_source_remove(state->location.recovery_retry_id);
+                state->location.recovery_retry_id = 0U;
             }
         } else {
             schedule_locality_recovery_retry(state);
@@ -283,17 +283,17 @@ static void policy_file_changed(gpointer user_data)
             state->manual_dirty = false;
         }
         if (recovered_metadata_present) {
-            state->location_metadata = recovered_metadata;
-            state->location_metadata_present = true;
-            state->location_metadata_uncertain = false;
+            state->location.metadata = recovered_metadata;
+            state->location.metadata_present = true;
+            state->location.metadata_uncertain = false;
         } else if (locality_recovery_ok &&
                    recovered_metadata_status ==
                        SS_LOCATION_METADATA_LOAD_MISSING) {
-            memset(&state->location_metadata, 0, sizeof(state->location_metadata));
-            state->location_metadata_present = false;
-            state->location_metadata_uncertain = false;
+            memset(&state->location.metadata, 0, sizeof(state->location.metadata));
+            state->location.metadata_present = false;
+            state->location.metadata_uncertain = false;
         } else if (locality_recovery_ok) {
-            state->location_metadata_uncertain = true;
+            state->location.metadata_uncertain = true;
         }
         refresh_location_authority_state(state);
         sync_controls(state);
@@ -324,14 +324,14 @@ static guint timezone_index_for_id(
 {
     size_t index;
 
-    if (state == NULL || state->timezone_ids == NULL ||
+    if (state == NULL || state->location.timezone_ids == NULL ||
         timezone_id == NULL) {
         return GTK_INVALID_LIST_POSITION;
     }
 
-    for (index = 0U; index < state->timezone_ids->len; ++index) {
+    for (index = 0U; index < state->location.timezone_ids->len; ++index) {
         const char *candidate = g_ptr_array_index(
-            state->timezone_ids, (guint)index);
+            state->location.timezone_ids, (guint)index);
         if (g_strcmp0(candidate, timezone_id) == 0) {
             return (guint)index;
         }
@@ -501,9 +501,9 @@ static void sync_system_time_controls(SsLinuxDateTimePanel *state)
         return;
     }
 
-    if (state->system_time_service == NULL ||
+    if (state->system_time.service == NULL ||
         !ss_system_time_service_read(
-            state->system_time_service, &system_state)) {
+            state->system_time.service, &system_state)) {
         if (state->timezone != NULL) {
             gtk_widget_set_sensitive(
                 GTK_WIDGET(state->timezone), FALSE);
@@ -548,9 +548,9 @@ static void sync_system_time_controls(SsLinuxDateTimePanel *state)
             state, system_state.timezone);
         if (zone_index == GTK_INVALID_LIST_POSITION) {
             GtkStringList *strings = GTK_STRING_LIST(gtk_drop_down_get_model(state->timezone));
-            g_ptr_array_add(state->timezone_ids, g_strdup(system_state.timezone));
+            g_ptr_array_add(state->location.timezone_ids, g_strdup(system_state.timezone));
             gtk_string_list_append(strings, system_state.timezone);
-            zone_index = state->timezone_ids->len - 1U;
+            zone_index = state->location.timezone_ids->len - 1U;
         }
         if (zone_index != GTK_INVALID_LIST_POSITION) {
             gtk_drop_down_set_selected(
@@ -581,9 +581,9 @@ static void sync_system_time_controls(SsLinuxDateTimePanel *state)
     }
 
     const bool protected_operation_active =
-        state->timezone_cancellable != NULL ||
-        state->ntp_cancellable != NULL ||
-        state->manual_time_cancellable != NULL;
+        state->location.timezone_cancellable != NULL ||
+        state->system_time.ntp_cancellable != NULL ||
+        state->system_time.manual_time_cancellable != NULL;
 
     if (!manual_visible) {
         /*
@@ -852,11 +852,11 @@ static gboolean refresh_preview(gpointer user_data)
     const gint month = g_date_time_get_month(now);
     const gint day = g_date_time_get_day_of_month(now);
     const bool date_cache_hit =
-        state->preview_date_cache_valid &&
-        state->preview_date_year == year &&
-        state->preview_date_month == month &&
-        state->preview_date_day == day &&
-        g_strcmp0(state->preview_date_calendar, policy->calendar) == 0;
+        state->preview.date_cache_valid &&
+        state->preview.date_year == year &&
+        state->preview.date_month == month &&
+        state->preview.date_day == day &&
+        g_strcmp0(state->preview.date_calendar, policy->calendar) == 0;
 
     if (!date_cache_hit) {
         const InfiltratrTemporalCalendarInfo *calendar =
@@ -903,13 +903,13 @@ static gboolean refresh_preview(gpointer user_data)
             gtk_label_set_text(GTK_LABEL(state->date_preview), summary);
         }
         if (cacheable) {
-            state->preview_date_year = year;
-            state->preview_date_month = month;
-            state->preview_date_day = day;
-            g_free(state->preview_date_calendar);
-            state->preview_date_calendar = g_strdup(policy->calendar);
-            state->preview_date_cache_valid =
-                state->preview_date_calendar != NULL;
+            state->preview.date_year = year;
+            state->preview.date_month = month;
+            state->preview.date_day = day;
+            g_free(state->preview.date_calendar);
+            state->preview.date_calendar = g_strdup(policy->calendar);
+            state->preview.date_cache_valid =
+                state->preview.date_calendar != NULL;
         }
     }
 
@@ -921,7 +921,7 @@ static gboolean refresh_preview_once(gpointer user_data)
     SsLinuxDateTimePanel *state = user_data;
 
     if (state != NULL) {
-        state->preview_idle_id = 0U;
+        state->preview.idle_id = 0U;
         (void)refresh_preview(state);
     }
     return G_SOURCE_REMOVE;
@@ -929,9 +929,9 @@ static gboolean refresh_preview_once(gpointer user_data)
 
 static void stop_preview_timer(SsLinuxDateTimePanel *state)
 {
-    if (state != NULL && state->timer_id != 0U) {
-        g_source_remove(state->timer_id);
-        state->timer_id = 0U;
+    if (state != NULL && state->preview.timer_id != 0U) {
+        g_source_remove(state->preview.timer_id);
+        state->preview.timer_id = 0U;
     }
 }
 
@@ -966,12 +966,12 @@ static void restart_preview_timer(SsLinuxDateTimePanel *state)
         return;
     }
     stop_preview_timer(state);
-    state->timer_id = g_timeout_add(
+    state->preview.timer_id = g_timeout_add(
         ss_linux_date_time_panel_preview_interval_ms(state),
         refresh_preview,
         state);
     g_source_set_name_by_id(
-        state->timer_id,
+        state->preview.timer_id,
         "[system-settings] visible Date & Time preview");
 }
 
@@ -985,13 +985,13 @@ static void on_panel_mapped(
         return;
     }
     (void)refresh_preview(state);
-    if (state->timer_id == 0U) {
-        state->timer_id = g_timeout_add(
+    if (state->preview.timer_id == 0U) {
+        state->preview.timer_id = g_timeout_add(
             ss_linux_date_time_panel_preview_interval_ms(state),
             refresh_preview,
             state);
         g_source_set_name_by_id(
-            state->timer_id,
+            state->preview.timer_id,
             "[system-settings] visible Date & Time preview");
     }
 }
@@ -1028,7 +1028,7 @@ static void sync_controls(SsLinuxDateTimePanel *state)
             ss_linux_date_time_location_metadata_matches_policy(state, policy)) {
             gtk_editable_set_text(
                 GTK_EDITABLE(state->location_search),
-                state->location_metadata.display_name);
+                state->location.metadata.display_name);
         }
     } else if (state->regional_context.has_reference_coordinates) {
         gtk_spin_button_set_value(
@@ -1277,14 +1277,14 @@ static void system_time_changed(
      * second System Settings process cannot overwrite a freshly selected place
      * with stale metadata or stale time-zone reference coordinates.
      */
-    if ((timezone_changed || state->location_follows_timezone_reference) &&
+    if ((timezone_changed || state->location.follows_timezone_reference) &&
         ss_location_metadata_transaction_begin()) {
         SsLocationMetadata authoritative_metadata = {0};
         SsSystemTimeState locked_system = {0};
         const bool locked_system_ok =
-            state->system_time_service != NULL &&
+            state->system_time.service != NULL &&
             ss_system_time_service_read(
-                state->system_time_service, &locked_system);
+                state->system_time.service, &locked_system);
         const bool regional_reloaded =
             ss_regional_context_detect(&state->regional_context);
         const bool regional_matches_system =
@@ -1300,11 +1300,11 @@ static void system_time_changed(
             ss_location_metadata_load_status(&authoritative_metadata);
 
         if (metadata_status == SS_LOCATION_METADATA_LOAD_OK) {
-            state->location_metadata = authoritative_metadata;
-            state->location_metadata_present = true;
+            state->location.metadata = authoritative_metadata;
+            state->location.metadata_present = true;
         } else if (metadata_status == SS_LOCATION_METADATA_LOAD_MISSING) {
-            memset(&state->location_metadata, 0, sizeof(state->location_metadata));
-            state->location_metadata_present = false;
+            memset(&state->location.metadata, 0, sizeof(state->location.metadata));
+            state->location.metadata_present = false;
         }
         if (policy_reloaded) {
             refresh_location_authority_state(state);
@@ -1316,15 +1316,15 @@ static void system_time_changed(
             locked_system_ok &&
             locked_system.timezone[0] != '\0' &&
             g_strcmp0(
-                state->location_metadata.timezone_id,
+                state->location.metadata.timezone_id,
                 locked_system.timezone) != 0) {
-            SsLocationMetadata candidate = state->location_metadata;
+            SsLocationMetadata candidate = state->location.metadata;
             (void)g_strlcpy(
                 candidate.timezone_id,
                 locked_system.timezone,
                 sizeof(candidate.timezone_id));
             if (ss_location_metadata_save(&candidate)) {
-                state->location_metadata = candidate;
+                state->location.metadata = candidate;
                 set_status(
                     state,
                     "Operating-system time zone and locality metadata reconciled.",
@@ -1338,7 +1338,7 @@ static void system_time_changed(
         }
 
         if (policy_reloaded &&
-            state->location_follows_timezone_reference &&
+            state->location.follows_timezone_reference &&
             regional_matches_system &&
             state->regional_context.has_reference_coordinates) {
             const InfiltratrTemporalPolicyV3 *policy =
@@ -1383,7 +1383,7 @@ static void system_time_changed(
 
         ss_location_metadata_transaction_end();
     } else if (timezone_changed ||
-               state->location_follows_timezone_reference) {
+               state->location.follows_timezone_reference) {
         set_status(
             state,
             "The system time changed, but the locality transaction lock could not be acquired.",
@@ -1413,11 +1413,11 @@ static guint *operation_generation(
     }
     switch (operation) {
     case SS_SYSTEM_TIME_OPERATION_TIMEZONE:
-        return &state->timezone_generation;
+        return &state->location.timezone_generation;
     case SS_SYSTEM_TIME_OPERATION_NTP:
-        return &state->ntp_generation;
+        return &state->system_time.ntp_generation;
     case SS_SYSTEM_TIME_OPERATION_MANUAL:
-        return &state->manual_time_generation;
+        return &state->system_time.manual_time_generation;
     default:
         return NULL;
     }
@@ -1432,11 +1432,11 @@ static GCancellable **operation_cancellable(
     }
     switch (operation) {
     case SS_SYSTEM_TIME_OPERATION_TIMEZONE:
-        return &state->timezone_cancellable;
+        return &state->location.timezone_cancellable;
     case SS_SYSTEM_TIME_OPERATION_NTP:
-        return &state->ntp_cancellable;
+        return &state->system_time.ntp_cancellable;
     case SS_SYSTEM_TIME_OPERATION_MANUAL:
-        return &state->manual_time_cancellable;
+        return &state->system_time.manual_time_cancellable;
     default:
         return NULL;
     }
@@ -1461,11 +1461,11 @@ static SystemTimeUiRequest *begin_system_time_operation(
      * A repeated request of the same kind may still supersede its predecessor.
      */
     if ((operation != SS_SYSTEM_TIME_OPERATION_TIMEZONE &&
-         state->timezone_cancellable != NULL) ||
+         state->location.timezone_cancellable != NULL) ||
         (operation != SS_SYSTEM_TIME_OPERATION_NTP &&
-         state->ntp_cancellable != NULL) ||
+         state->system_time.ntp_cancellable != NULL) ||
         (operation != SS_SYSTEM_TIME_OPERATION_MANUAL &&
-         state->manual_time_cancellable != NULL)) {
+         state->system_time.manual_time_cancellable != NULL)) {
         return NULL;
     }
 
@@ -1522,13 +1522,13 @@ static void system_time_operation_complete(
             ss_linux_date_time_location_update_summary(state);
 
             if (request->operation == SS_SYSTEM_TIME_OPERATION_TIMEZONE &&
-                state->location_metadata_present) {
+                state->location.metadata_present) {
                 SsSystemTimeState observed;
                 if (ss_system_time_service_read(
-                        state->system_time_service, &observed) &&
+                        state->system_time.service, &observed) &&
                     observed.timezone[0] != '\0' &&
                     g_strcmp0(
-                        state->location_metadata.timezone_id,
+                        state->location.metadata.timezone_id,
                         observed.timezone) != 0) {
                     metadata_out_of_sync = true;
                 }
@@ -1558,7 +1558,7 @@ static void request_system_timezone(
     SsLinuxDateTimePanel *state,
     const char *timezone_id)
 {
-    if (state == NULL || state->system_time_service == NULL ||
+    if (state == NULL || state->system_time.service == NULL ||
         timezone_id == NULL || timezone_id[0] == '\0') {
         return;
     }
@@ -1578,9 +1578,9 @@ static void request_system_timezone(
     sync_system_time_controls(state);
     set_status(state, "Updating the operating-system time zone…", false);
     ss_system_time_service_set_timezone_async(
-        state->system_time_service,
+        state->system_time.service,
         timezone_id,
-        state->timezone_cancellable,
+        state->location.timezone_cancellable,
         system_time_operation_complete,
         request);
 }
@@ -1594,15 +1594,15 @@ void on_timezone_changed(GObject *object G_GNUC_UNUSED,
     const char *timezone_id;
 
     if (state == NULL || state->updating_system_controls ||
-        state->timezone_ids == NULL) {
+        state->location.timezone_ids == NULL) {
         return;
     }
 
     selected = gtk_drop_down_get_selected(state->timezone);
-    if (selected >= state->timezone_ids->len) {
+    if (selected >= state->location.timezone_ids->len) {
         return;
     }
-    timezone_id = g_ptr_array_index(state->timezone_ids, selected);
+    timezone_id = g_ptr_array_index(state->location.timezone_ids, selected);
     request_system_timezone(state, timezone_id);
 }
 
@@ -1614,7 +1614,7 @@ void on_network_time_changed(GObject *object,
     bool enabled;
 
     if (state == NULL || state->updating_system_controls ||
-        state->system_time_service == NULL) {
+        state->system_time.service == NULL) {
         return;
     }
 
@@ -1637,9 +1637,9 @@ void on_network_time_changed(GObject *object,
         enabled ? "Enabling network time…" : "Disabling network time…",
         false);
     ss_system_time_service_set_ntp_async(
-        state->system_time_service,
+        state->system_time.service,
         enabled,
-        state->ntp_cancellable,
+        state->system_time.ntp_cancellable,
         system_time_operation_complete,
         request);
 }
@@ -1734,7 +1734,7 @@ void on_manual_set_time_clicked(
     const char *date_text;
     const char *time_text;
 
-    if (state == NULL || state->system_time_service == NULL) {
+    if (state == NULL || state->system_time.service == NULL) {
         return;
     }
 
@@ -1767,9 +1767,9 @@ void on_manual_set_time_clicked(
             "Setting the operating-system date and time…",
             false);
         ss_system_time_service_set_time_async(
-            state->system_time_service,
+            state->system_time.service,
             unix_time_usec,
-            state->manual_time_cancellable,
+            state->system_time.manual_time_cancellable,
             system_time_operation_complete,
             request);
     }
@@ -1847,9 +1847,9 @@ static void system_time_service_ready(
         return;
     }
 
-    state->system_time_service = service;
+    state->system_time.service = service;
     ss_system_time_service_set_changed_callback(
-        state->system_time_service,
+        state->system_time.service,
         system_time_changed,
         state);
     sync_system_time_controls(state);
@@ -1859,7 +1859,7 @@ static void system_time_service_ready(
         g_object_unref(window);
         return;
     }
-    if (state->locality_recovery_failed) {
+    if (state->location.recovery_failed) {
         set_status(
             state,
             "Date & Time is available, but interrupted locality metadata could not yet be recovered. The journal has been preserved for retry.",
@@ -1932,7 +1932,7 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
         return NULL;
     }
 
-    state->calendar_preview_provider =
+    state->preview.calendar_provider =
         ss_calendar_preview_provider_new();
 
     (void)ss_regional_context_detect(&state->regional_context);
@@ -1946,11 +1946,11 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
                 G_IO_ERROR_FAILED,
                 "Unable to read the temporal policy during locality recovery.");
             ss_calendar_preview_provider_free(
-                state->calendar_preview_provider);
+                state->preview.calendar_provider);
             g_free(state);
             return NULL;
         }
-        state->locality_recovery_failed =
+        state->location.recovery_failed =
             !ss_location_metadata_recover(
                 policy->location_configured,
                 policy->latitude,
@@ -1958,16 +1958,16 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
     }
     {
         const SsLocationMetadataLoadStatus metadata_status =
-            ss_location_metadata_load_status(&state->location_metadata);
-        state->location_metadata_present =
+            ss_location_metadata_load_status(&state->location.metadata);
+        state->location.metadata_present =
             metadata_status == SS_LOCATION_METADATA_LOAD_OK;
-        state->location_metadata_uncertain =
+        state->location.metadata_uncertain =
             metadata_status == SS_LOCATION_METADATA_LOAD_INVALID ||
             metadata_status == SS_LOCATION_METADATA_LOAD_IO_ERROR;
     }
     refresh_location_authority_state(state);
 
-    state->service_cancellable = g_cancellable_new();
+    state->system_time.service_cancellable = g_cancellable_new();
 
     {
         g_autofree gchar *policy_path = temporal_policy_path();
@@ -1981,9 +1981,9 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
                 G_IO_ERROR,
                 G_IO_ERROR_FAILED,
                 "Unable to observe the temporal policy.");
-            g_clear_object(&state->service_cancellable);
+            g_clear_object(&state->system_time.service_cancellable);
             ss_calendar_preview_provider_free(
-                state->calendar_preview_provider);
+                state->preview.calendar_provider);
             g_free(state);
             return NULL;
         }
@@ -1991,12 +1991,12 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
     {
         g_autofree gchar *metadata_path =
             ss_location_metadata_path_alloc();
-        state->location_metadata_observer =
+        state->location.metadata_observer =
             ss_policy_file_observer_new(
                 metadata_path,
                 location_metadata_file_changed,
                 state);
-        if (state->location_metadata_observer == NULL) {
+        if (state->location.metadata_observer == NULL) {
             g_set_error_literal(
                 error,
                 G_IO_ERROR,
@@ -2004,9 +2004,9 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
                 "Unable to observe locality metadata.");
             ss_policy_file_observer_free(state->policy_observer);
             state->policy_observer = NULL;
-            g_clear_object(&state->service_cancellable);
+            g_clear_object(&state->system_time.service_cancellable);
             ss_calendar_preview_provider_free(
-                state->calendar_preview_provider);
+                state->preview.calendar_provider);
             g_free(state);
             return NULL;
         }
@@ -2043,7 +2043,7 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
             state,
             "The legacy native-default clock policy could not be migrated to an explicit 12-hour or 24-hour clock selection.",
             true);
-    } else if (state->locality_recovery_failed) {
+    } else if (state->location.recovery_failed) {
         set_status(
             state,
             "Date & Time is available, but interrupted locality metadata could not yet be recovered. The journal has been preserved for retry.",
@@ -2062,10 +2062,10 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
      * window before either external-service work path runs.
      */
     ss_system_time_service_new_async(
-        state->service_cancellable,
+        state->system_time.service_cancellable,
         system_time_service_ready,
         g_object_ref(state->window));
-    state->preview_idle_id =
+    state->preview.idle_id =
         g_idle_add(refresh_preview_once, state);
     return state;
 }
@@ -2098,45 +2098,45 @@ void ss_linux_date_time_panel_free(gpointer data)
     ss_linux_date_time_location_cancel_coordinate_commit(state);
     ss_policy_file_observer_free(state->policy_observer);
     state->policy_observer = NULL;
-    ss_policy_file_observer_free(state->location_metadata_observer);
-    state->location_metadata_observer = NULL;
-    if (state->preview_idle_id != 0U) {
-        g_source_remove(state->preview_idle_id);
-        state->preview_idle_id = 0U;
+    ss_policy_file_observer_free(state->location.metadata_observer);
+    state->location.metadata_observer = NULL;
+    if (state->preview.idle_id != 0U) {
+        g_source_remove(state->preview.idle_id);
+        state->preview.idle_id = 0U;
     }
-    if (state->locality_recovery_retry_id != 0U) {
-        g_source_remove(state->locality_recovery_retry_id);
-        state->locality_recovery_retry_id = 0U;
+    if (state->location.recovery_retry_id != 0U) {
+        g_source_remove(state->location.recovery_retry_id);
+        state->location.recovery_retry_id = 0U;
     }
-    if (state->location_search_cancellable != NULL) {
-        g_cancellable_cancel(state->location_search_cancellable);
-        g_clear_object(&state->location_search_cancellable);
+    if (state->location.search_cancellable != NULL) {
+        g_cancellable_cancel(state->location.search_cancellable);
+        g_clear_object(&state->location.search_cancellable);
     }
-    if (state->service_cancellable != NULL) {
-        g_cancellable_cancel(state->service_cancellable);
-        g_clear_object(&state->service_cancellable);
+    if (state->system_time.service_cancellable != NULL) {
+        g_cancellable_cancel(state->system_time.service_cancellable);
+        g_clear_object(&state->system_time.service_cancellable);
     }
-    if (state->timezone_cancellable != NULL) {
-        g_cancellable_cancel(state->timezone_cancellable);
-        g_clear_object(&state->timezone_cancellable);
+    if (state->location.timezone_cancellable != NULL) {
+        g_cancellable_cancel(state->location.timezone_cancellable);
+        g_clear_object(&state->location.timezone_cancellable);
     }
-    if (state->ntp_cancellable != NULL) {
-        g_cancellable_cancel(state->ntp_cancellable);
-        g_clear_object(&state->ntp_cancellable);
+    if (state->system_time.ntp_cancellable != NULL) {
+        g_cancellable_cancel(state->system_time.ntp_cancellable);
+        g_clear_object(&state->system_time.ntp_cancellable);
     }
-    if (state->manual_time_cancellable != NULL) {
-        g_cancellable_cancel(state->manual_time_cancellable);
-        g_clear_object(&state->manual_time_cancellable);
+    if (state->system_time.manual_time_cancellable != NULL) {
+        g_cancellable_cancel(state->system_time.manual_time_cancellable);
+        g_clear_object(&state->system_time.manual_time_cancellable);
     }
 
     g_clear_pointer(&state->clock_mode_ids, g_ptr_array_unref);
-    g_clear_pointer(&state->timezone_ids, g_ptr_array_unref);
-    g_clear_pointer(&state->preview_date_calendar, g_free);
+    g_clear_pointer(&state->location.timezone_ids, g_ptr_array_unref);
+    g_clear_pointer(&state->preview.date_calendar, g_free);
     ss_calendar_preview_provider_free(
-        state->calendar_preview_provider);
-    state->calendar_preview_provider = NULL;
-    ss_system_time_service_free(state->system_time_service);
-    state->system_time_service = NULL;
+        state->preview.calendar_provider);
+    state->preview.calendar_provider = NULL;
+    ss_system_time_service_free(state->system_time.service);
+    state->system_time.service = NULL;
     g_clear_object(&state->cinnamon_interface_settings);
     if (state->root != NULL) {
         disconnect_panel_widgets(state->root, state);

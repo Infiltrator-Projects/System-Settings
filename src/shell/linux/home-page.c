@@ -36,8 +36,7 @@ static GtkWidget *make_feature(
     gtk_widget_set_valign(icon, GTK_ALIGN_CENTER);
     gtk_widget_set_valign(text, GTK_ALIGN_CENTER);
     gtk_image_set_pixel_size(GTK_IMAGE(icon), 22);
-    gtk_box_append(GTK_BOX(icon_wrap), icon);
-    gtk_box_append(GTK_BOX(box), icon_wrap);
+    gtk_box_append(GTK_BOX(box), icon);
     gtk_box_append(
         GTK_BOX(text),
         ss_linux_ui_make_label(title, "home-feature-title"));

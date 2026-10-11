@@ -310,7 +310,8 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # Composition root for today's built-in modules. Shell code consumes only
     # builtin-module-host.h; private module headers never enter the shell target.
     add_library(system-settings-linux-modules STATIC
-        src/app/linux-builtin-module-host.c)
+        src/app/linux-builtin-module-host.c
+        src/app/home-temporal-provider.c)
     ss_configure(system-settings-linux-modules)
     target_include_directories(system-settings-linux-modules
         PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux"
@@ -503,7 +504,6 @@ if(BUILD_TESTING)
         add_executable(linux-shell-test tests/linux-shell-test.c)
         ss_configure(linux-shell-test)
         target_include_directories(linux-shell-test PRIVATE
-            "${CMAKE_CURRENT_SOURCE_DIR}/src/modules/date-time"
             "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux")
         target_compile_definitions(linux-shell-test PRIVATE
             SYSTEM_SETTINGS_UI_ASSET_DIR="${CMAKE_INSTALL_FULL_DATADIR}/infiltrator/system-settings/ui"
@@ -512,7 +512,6 @@ if(BUILD_TESTING)
             SYSTEM_SETTINGS_MODULE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/modules")
         target_link_libraries(linux-shell-test PRIVATE
             system-settings-linux-shell
-            system-settings-date-time-linux
             system-settings-linux-ui
             system-settings-core
             system-settings-platform
