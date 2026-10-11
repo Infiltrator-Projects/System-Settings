@@ -207,15 +207,22 @@ function(ss_configure target)
     endif()
 endfunction()
 
+# Generic product identity is deliberately independent of settings-domain code.
+# The shell may consume this target without acquiring Date & Time ownership.
+add_library(system-settings-app STATIC
+    src/app/project-info.c)
+ss_configure(system-settings-app)
+target_compile_definitions(system-settings-app PUBLIC
+    SYSTEM_SETTINGS_VERSION="${PROJECT_VERSION}"
+    SYSTEM_SETTINGS_BUILD_PROFILE="${SYSTEM_SETTINGS_BUILD_PROFILE}")
+target_link_libraries(system-settings-app PUBLIC InfiltratrCommon::Portable)
+
+# Portable Date & Time domain logic. Generic shell targets must not link this.
 add_library(system-settings-core STATIC
-    src/app/project-info.c
     src/modules/date-time/date-time-model.c
     src/modules/date-time/manual-time.c
     src/modules/date-time/native-clock-policy.c)
 ss_configure(system-settings-core)
-target_compile_definitions(system-settings-core PUBLIC
-    SYSTEM_SETTINGS_VERSION="${PROJECT_VERSION}"
-    SYSTEM_SETTINGS_BUILD_PROFILE="${SYSTEM_SETTINGS_BUILD_PROFILE}")
 target_link_libraries(system-settings-core PUBLIC InfiltratrCommon::Portable)
 
 if(WIN32)
@@ -324,7 +331,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_libraries(system-settings-linux-shell PRIVATE
         system-settings-linux-modules
         system-settings-linux-ui
-        system-settings-core
+        system-settings-app
         InfiltratrCommon::Portable
         PkgConfig::GTK4)
 
@@ -337,7 +344,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux")
     target_link_libraries(system-settings PRIVATE
         system-settings-linux-shell
-        system-settings-core
+        system-settings-app
         InfiltratrCommon::Portable
         PkgConfig::GTK4)
 
@@ -345,6 +352,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     get_target_property(
         SS_SHELL_LIBRARY_DIRECT_LINKS system-settings-linux-shell LINK_LIBRARIES)
     foreach(SS_FORBIDDEN_SHELL_LINK
+            system-settings-core
             system-settings-platform
             system-settings-date-time-linux)
         list(FIND SS_SHELL_LIBRARY_DIRECT_LINKS "${SS_FORBIDDEN_SHELL_LINK}"
@@ -358,6 +366,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 
     get_target_property(SS_EXECUTABLE_DIRECT_LINKS system-settings LINK_LIBRARIES)
     foreach(SS_FORBIDDEN_EXECUTABLE_LINK
+            system-settings-core
             system-settings-platform
             system-settings-date-time-linux)
         list(FIND SS_EXECUTABLE_DIRECT_LINKS "${SS_FORBIDDEN_EXECUTABLE_LINK}"
@@ -455,7 +464,7 @@ if(BUILD_TESTING)
 
     add_executable(project-info-test tests/project-info-test.c)
     ss_configure(project-info-test)
-    target_link_libraries(project-info-test PRIVATE system-settings-core)
+    target_link_libraries(project-info-test PRIVATE system-settings-app)
     add_test(NAME project-info COMMAND project-info-test)
 
     if(WIN32)
@@ -493,6 +502,7 @@ if(BUILD_TESTING)
         target_link_libraries(linux-shell-test PRIVATE
             system-settings-linux-shell
             system-settings-linux-ui
+            system-settings-app
             system-settings-core
             system-settings-platform
             PkgConfig::GTK4)
