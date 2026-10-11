@@ -2,6 +2,10 @@
 #ifndef SYSTEM_SETTINGS_NATIVE_CLOCK_POLICY_H
 #define SYSTEM_SETTINGS_NATIVE_CLOCK_POLICY_H
 
+#if defined(SYSTEM_SETTINGS_GENERIC_SHELL)
+#error "Generic Linux shell must not include Date & Time domain contracts."
+#endif
+
 #include <stdbool.h>
 #include <infiltratr/temporal.h>
 
