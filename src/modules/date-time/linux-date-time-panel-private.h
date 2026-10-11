@@ -2,58 +2,27 @@
 #ifndef SYSTEM_SETTINGS_LINUX_DATE_TIME_PANEL_PRIVATE_H
 #define SYSTEM_SETTINGS_LINUX_DATE_TIME_PANEL_PRIVATE_H
 
+#ifdef SYSTEM_SETTINGS_DATE_TIME_LOCATION_BOUNDARY
+#error "Locality must use linux-date-time-location-private.h, not the complete Date & Time panel controller."
+#endif
+
 #include "linux-date-time-panel.h"
+#include "linux-date-time-location-private.h"
 #include "calendar-preview-provider.h"
 #include "policy-file-observer.h"
 
 #include "system-settings/date-time-model.h"
-#include "system-settings/location-metadata.h"
 #include "system-settings/regional-context.h"
 #include "system-settings/system-time-service.h"
 
 #include <gio/gio.h>
 #include <gtk/gtk.h>
 
-typedef struct SsLinuxDateTimeLifetime SsLinuxDateTimeLifetime;
-
-SsLinuxDateTimeLifetime *ss_linux_date_time_lifetime_new(
-    SsLinuxDateTimePanel *panel);
-SsLinuxDateTimeLifetime *ss_linux_date_time_lifetime_ref(
-    SsLinuxDateTimeLifetime *lifetime);
-void ss_linux_date_time_lifetime_invalidate(
-    SsLinuxDateTimeLifetime *lifetime);
-void ss_linux_date_time_lifetime_unref(
-    SsLinuxDateTimeLifetime *lifetime);
-SsLinuxDateTimePanel *ss_linux_date_time_lifetime_get_panel(
-    SsLinuxDateTimeLifetime *lifetime);
-
 /*
- * Mutable state is grouped by the domain that owns it. The panel remains
- * the composition root, but locality code no longer shares flat widget or
- * protected-system-time fields with unrelated presentation concerns.
+ * The complete controller is visible only to composition/controller units.
+ * Locality has its own compiler-visible private boundary and cannot include
+ * this header when built as linux-date-time-location.c.
  */
-typedef struct SsLinuxDateTimeLocationState {
-    GtkEntry *search_entry;
-    GtkButton *search_button;
-    GtkListBox *results;
-    GtkWidget *summary;
-    GtkSpinButton *latitude;
-    GtkSpinButton *longitude;
-
-    SsLocationMetadata metadata;
-    SsPolicyFileObserver *metadata_observer;
-    GCancellable *search_cancellable;
-    guint coordinate_commit_id;
-    guint recovery_retry_id;
-    guint recovery_retry_seconds;
-    guint search_generation;
-    bool metadata_present;
-    bool metadata_uncertain;
-    bool follows_timezone_reference;
-    bool recovery_failed;
-    bool updating_controls;
-} SsLinuxDateTimeLocationState;
-
 typedef struct SsLinuxDateTimeSystemTimeState {
     GtkWidget *overview_timezone;
     GtkWidget *overview_sync;
@@ -121,7 +90,7 @@ struct SsLinuxDateTimePanel {
 GtkWidget *ss_linux_date_time_panel_build_ui(
     SsLinuxDateTimePanel *state);
 
-/* Internal controller services shared by split Date & Time translation units. */
+/* Internal controller services shared by non-locality Date & Time units. */
 void ss_linux_date_time_panel_set_status(
     SsLinuxDateTimePanel *state,
     const char *message,
@@ -136,19 +105,6 @@ bool ss_linux_date_time_panel_read_system_time(
     const SsLinuxDateTimePanel *state,
     SsSystemTimeState *out);
 
-bool ss_linux_date_time_location_coordinate_close(
-    double left,
-    double right);
-bool ss_linux_date_time_location_metadata_matches_policy(
-    const SsLinuxDateTimePanel *state,
-    const InfiltratrTemporalPolicyV3 *policy);
-bool ss_linux_date_time_location_policy_matches_reference(
-    const SsLinuxDateTimePanel *state);
-void ss_linux_date_time_location_update_summary(
-    SsLinuxDateTimePanel *state);
-void ss_linux_date_time_location_cancel_coordinate_commit(
-    SsLinuxDateTimePanel *state);
-
 void on_clock_changed(GObject *object, GParamSpec *pspec, gpointer user_data);
 void on_calendar_changed(GObject *object, GParamSpec *pspec, gpointer user_data);
 void on_seconds_changed(GObject *object, GParamSpec *pspec, gpointer user_data);
@@ -158,11 +114,5 @@ void on_manual_set_time_clicked(GtkButton *button, gpointer user_data);
 void on_manual_entry_changed(GtkEditable *editable, gpointer user_data);
 void on_show_date_changed(GObject *object, GParamSpec *pspec, gpointer user_data);
 void on_first_day_changed(GObject *object, GParamSpec *pspec, gpointer user_data);
-void on_location_result_activated(
-    GtkListBox *box, GtkListBoxRow *row, gpointer user_data);
-void on_location_search_clicked(GtkButton *button, gpointer user_data);
-void on_location_search_activate(GtkEntry *entry, gpointer user_data);
-void on_location_coordinate_changed(
-    GObject *object, GParamSpec *pspec, gpointer user_data);
 
 #endif
