@@ -27,10 +27,11 @@ typedef struct HomeProgramAction {
     gchar *argument;
 } HomeProgramAction;
 
-static void home_program_action_free(gpointer data)
+static void home_program_action_free(gpointer data, GClosure *closure)
 {
     HomeProgramAction *action = data;
 
+    (void)closure;
     if (action == NULL) {
         return;
     }
