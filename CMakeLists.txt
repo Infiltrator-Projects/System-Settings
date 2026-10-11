@@ -263,6 +263,8 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         src/modules/date-time/home-temporal-presentation.c
         src/modules/date-time/policy-file-observer.c
         src/modules/date-time/linux-date-time-panel.c
+        src/modules/date-time/linux-date-time-preview.c
+        src/modules/date-time/linux-date-time-preview-boundary.c
         src/modules/date-time/linux-date-time-location-boundary.c
         src/modules/date-time/linux-date-time-location.c
         src/modules/date-time/linux-date-time-panel-ui.c
@@ -274,6 +276,10 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         src/modules/date-time/linux-date-time-location.c
         PROPERTIES COMPILE_DEFINITIONS
             SYSTEM_SETTINGS_DATE_TIME_LOCATION_BOUNDARY=1)
+    set_source_files_properties(
+        src/modules/date-time/linux-date-time-preview.c
+        PROPERTIES COMPILE_DEFINITIONS
+            SYSTEM_SETTINGS_DATE_TIME_PREVIEW_BOUNDARY=1)
     ss_configure(system-settings-date-time-linux)
     target_include_directories(system-settings-date-time-linux PRIVATE
         "${CMAKE_CURRENT_SOURCE_DIR}/src/modules/date-time")
@@ -317,7 +323,9 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 
     add_library(system-settings-linux-shell STATIC
         src/shell/linux/shell-command.c
+        src/shell/linux/home-status.c
         src/shell/linux/home-page.c
+        src/shell/linux/shell-module-catalog.c
         src/shell/linux/shell-window.c)
     ss_configure(system-settings-linux-shell)
     target_include_directories(system-settings-linux-shell PUBLIC

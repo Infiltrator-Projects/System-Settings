@@ -16,26 +16,6 @@ typedef struct HomeTemporalTicker {
     guint interval_ms;
 } HomeTemporalTicker;
 
-typedef struct HomeStatusTicker {
-    GtkWidget *owner;
-    GtkLabel *uptime;
-    GtkLabel *date_timezone;
-    GtkLabel *region_value;
-    GtkLabel *region_detail;
-    GtkLabel *appearance_value;
-    GtkLabel *appearance_detail;
-    GtkLabel *network_value;
-    GtkLabel *network_detail;
-    guint source_id;
-    GtkSettings *settings;
-    GNetworkMonitor *network;
-    gulong theme_name_id;
-    gulong theme_dark_id;
-    gulong network_available_id;
-    gulong network_metered_id;
-    gulong network_connectivity_id;
-} HomeStatusTicker;
-
 typedef struct HomeAdaptiveLayout {
     GtkWidget *hero;
     GtkFlowBox *features;

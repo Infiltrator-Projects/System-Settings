@@ -93,8 +93,6 @@ SsLinuxDateTimePanel *ss_linux_date_time_lifetime_get_panel(
 }
 
 static void sync_controls(SsLinuxDateTimePanel *state);
-static gboolean refresh_preview(gpointer user_data);
-static void restart_preview_timer(SsLinuxDateTimePanel *state);
 static void schedule_locality_recovery_retry(
     SsLinuxDateTimePanel *state);
 
@@ -126,19 +124,7 @@ void ss_linux_date_time_panel_set_status(
  * lifetime of the panel so every specialised clock and calendar follows the
  * same runtime-discovery/retry path.
  */
-static SsCalendarPreviewProvider *ensure_calendar_preview_provider(
-    SsLinuxDateTimePanel *state)
-{
-    if (state == NULL) {
-        return NULL;
-    }
 
-    if (state->preview.calendar_provider == NULL) {
-        state->preview.calendar_provider =
-            ss_calendar_preview_provider_new();
-    }
-    return state->preview.calendar_provider;
-}
 
 static gchar *temporal_policy_path(void)
 {
@@ -347,8 +333,8 @@ static void policy_file_changed(gpointer user_data)
         }
         refresh_location_authority_state(state);
         sync_controls(state);
-        restart_preview_timer(state);
-        (void)refresh_preview(state);
+        ss_linux_date_time_preview_restart(state);
+        (void)ss_linux_date_time_preview_refresh(state);
         if (!locality_recovery_ok) {
             set_status(
                 state,
@@ -448,7 +434,7 @@ static void sync_native_format_controls(SsLinuxDateTimePanel *state)
     state->system_time.updating_controls = false;
 }
 
-static bool desktop_uses_24h(const SsLinuxDateTimePanel *state)
+bool ss_linux_date_time_panel_desktop_uses_24h(const SsLinuxDateTimePanel *state)
 {
     bool value = true;
 
@@ -509,7 +495,7 @@ static void fill_manual_time_entries(SsLinuxDateTimePanel *state)
     }
     if (ss_manual_time_format(
             policy->clock_mode,
-            desktop_uses_24h(state),
+            ss_linux_date_time_panel_desktop_uses_24h(state),
             unix_microseconds,
             (int32_t)(offset_microseconds / G_USEC_PER_SEC),
             policy->show_seconds,
@@ -785,283 +771,23 @@ static void update_control_capabilities(SsLinuxDateTimePanel *state)
     }
 }
 
-static bool preview_coordinates(
-    const SsLinuxDateTimePanel *state,
-    double *latitude,
-    double *longitude)
-{
-    const InfiltratrTemporalPolicyV3 *policy;
 
-    if (state == NULL || latitude == NULL || longitude == NULL) {
-        return false;
-    }
 
-    policy = ss_date_time_model_policy(&state->model);
-    if (policy != NULL && policy->location_configured) {
-        *latitude = policy->latitude;
-        *longitude = policy->longitude;
-        return true;
-    }
 
-    if (state->regional_context.has_reference_coordinates) {
-        *latitude = state->regional_context.reference_latitude;
-        *longitude = state->regional_context.reference_longitude;
-        return true;
-    }
 
-    return false;
-}
 
-static bool format_preview_at(SsLinuxDateTimePanel *state,
-                              GDateTime *now,
-                              char *buffer,
-                              size_t capacity)
-{
-    const InfiltratrTemporalPolicyV3 *policy =
-        ss_date_time_model_policy(&state->model);
-    const InfiltratrTemporalClockModeInfo *mode;
-    const char *effective_mode;
-    int64_t unix_us;
-    gint64 offset_us;
-    double latitude = 0.0;
-    double longitude = 0.0;
-    bool has_location;
 
-    if (policy == NULL || now == NULL || buffer == NULL || capacity == 0U) {
-        return false;
-    }
 
-    /*
-     * Common is the system-wide clock renderer. The legacy "standard" value
-     * deliberately remains platform-owned, so resolve it to Cinnamon's current
-     * conventional choice before entering the portable formatter. Every
-     * explicit mode then uses the same implementation that other Infiltrator
-     * applications consume.
-     */
-    effective_mode = policy->clock_mode;
-    if (strcmp(effective_mode, "standard") == 0) {
-        effective_mode = ss_native_clock_mode_id(
-            desktop_uses_24h(state));
-    }
 
-    mode = infiltratr_temporal_clock_mode_find(effective_mode);
-    if (mode == NULL) {
-        return false;
-    }
 
-    has_location = preview_coordinates(
-        state, &latitude, &longitude);
-    if ((mode->requires_latitude || mode->requires_longitude) &&
-        !has_location) {
-        return g_snprintf(
-                   buffer,
-                   capacity,
-                   "%s — location required",
-                   mode->name) > 0;
-    }
 
-    unix_us = g_date_time_to_unix(now) * G_USEC_PER_SEC +
-        g_date_time_get_microsecond(now);
-    offset_us = g_date_time_get_utc_offset(now);
-    return infiltratr_temporal_format_clock_mode_localized(
-        g_get_language_names()[0], effective_mode,
-        unix_us,
-        (int32_t)(offset_us / G_USEC_PER_SEC),
-        policy->show_seconds,
-        false,
-        has_location,
-        latitude,
-        longitude,
-        buffer,
-        capacity,
-        NULL);
-}
 
-static gboolean refresh_preview(gpointer user_data)
-{
-    SsLinuxDateTimePanel *state = user_data;
-    const InfiltratrTemporalPolicyV3 *policy;
-    g_autoptr(GDateTime) now = g_date_time_new_now_local();
-    char clock_text[160];
 
-    if (state == NULL || state->preview.clock_label == NULL ||
-        state->preview.date_label == NULL || now == NULL) {
-        return G_SOURCE_CONTINUE;
-    }
 
-    policy = ss_date_time_model_policy(&state->model);
-    if (policy == NULL) {
-        return G_SOURCE_CONTINUE;
-    }
 
-    if (format_preview_at(state, now, clock_text, sizeof(clock_text)) &&
-        g_strcmp0(
-            gtk_label_get_text(GTK_LABEL(state->preview.clock_label)),
-            clock_text) != 0) {
-        gtk_label_set_text(GTK_LABEL(state->preview.clock_label), clock_text);
-    }
 
-    /*
-     * Extended clocks can legitimately require a 250 ms timer, but the
-     * calendar and overview policy do not. Older iterations rebuilt the same
-     * date, called into Calendar and rewrote static labels on every clock tick.
-     * Cache successful date formatting by civil day/calendar and leave overview
-     * policy refreshes on their existing policy/settings change paths.
-     */
-    const gint year = g_date_time_get_year(now);
-    const gint month = g_date_time_get_month(now);
-    const gint day = g_date_time_get_day_of_month(now);
-    const bool date_cache_hit =
-        state->preview.date_cache_valid &&
-        state->preview.date_year == year &&
-        state->preview.date_month == month &&
-        state->preview.date_day == day &&
-        g_strcmp0(state->preview.date_calendar, policy->calendar) == 0;
 
-    if (!date_cache_hit) {
-        const InfiltratrTemporalCalendarInfo *calendar =
-            infiltratr_temporal_calendar_find(policy->calendar);
-        g_autofree gchar *gregorian =
-            g_date_time_format(now, "%A, %e %B %Y");
-        g_autofree gchar *selected_date = NULL;
-        g_autofree gchar *summary = NULL;
-        bool cacheable = false;
 
-        if (calendar != NULL) {
-            if (strcmp(policy->calendar, "gregorian") == 0) {
-                summary = g_strdup_printf(
-                    "%s • %s",
-                    calendar->name,
-                    gregorian != NULL ? gregorian : "");
-                cacheable = true;
-            } else {
-                selected_date =
-                    ss_calendar_preview_provider_format_date(
-                        ensure_calendar_preview_provider(state),
-                        policy->calendar,
-                        year,
-                        month,
-                        day);
-                if (selected_date != NULL) {
-                    summary = g_strdup_printf(
-                        "%s • %s",
-                        calendar->name,
-                        selected_date);
-                    cacheable = true;
-                } else {
-                    summary = g_strdup_printf(
-                        "%s • preview unavailable",
-                        calendar->name);
-                }
-            }
-        }
-
-        if (summary != NULL &&
-            g_strcmp0(
-                gtk_label_get_text(GTK_LABEL(state->preview.date_label)),
-                summary) != 0) {
-            gtk_label_set_text(GTK_LABEL(state->preview.date_label), summary);
-        }
-        if (cacheable) {
-            state->preview.date_year = year;
-            state->preview.date_month = month;
-            state->preview.date_day = day;
-            g_free(state->preview.date_calendar);
-            state->preview.date_calendar = g_strdup(policy->calendar);
-            state->preview.date_cache_valid =
-                state->preview.date_calendar != NULL;
-        }
-    }
-
-    return G_SOURCE_CONTINUE;
-}
-
-static gboolean refresh_preview_once(gpointer user_data)
-{
-    SsLinuxDateTimePanel *state = user_data;
-
-    if (state != NULL) {
-        state->preview.idle_id = 0U;
-        (void)refresh_preview(state);
-    }
-    return G_SOURCE_REMOVE;
-}
-
-static void stop_preview_timer(SsLinuxDateTimePanel *state)
-{
-    if (state != NULL && state->preview.timer_id != 0U) {
-        g_source_remove(state->preview.timer_id);
-        state->preview.timer_id = 0U;
-    }
-}
-
-guint ss_linux_date_time_panel_preview_interval_ms(
-    const SsLinuxDateTimePanel *state)
-{
-    const InfiltratrTemporalPolicyV3 *policy =
-        state != NULL
-            ? ss_date_time_model_policy(&state->model)
-            : NULL;
-
-    if (policy == NULL || !policy->show_seconds) {
-        return 1000U;
-    }
-    if (g_strcmp0(policy->clock_mode, "standard") == 0 ||
-        g_strcmp0(policy->clock_mode, "standard-12") == 0 ||
-        g_strcmp0(policy->clock_mode, "standard-24") == 0) {
-        return 1000U;
-    }
-    /*
-     * Extended clocks may advance displayed units faster than one SI second.
-     * Until Common exposes a per-mode cadence capability, 250 ms remains the
-     * conservative sampling interval for those modes only.
-     */
-    return 250U;
-}
-
-static void restart_preview_timer(SsLinuxDateTimePanel *state)
-{
-    if (state == NULL || state->root == NULL ||
-        !gtk_widget_get_mapped(state->root)) {
-        return;
-    }
-    stop_preview_timer(state);
-    state->preview.timer_id = g_timeout_add(
-        ss_linux_date_time_panel_preview_interval_ms(state),
-        refresh_preview,
-        state);
-    g_source_set_name_by_id(
-        state->preview.timer_id,
-        "[system-settings] visible Date & Time preview");
-}
-
-static void on_panel_mapped(
-    GtkWidget *widget G_GNUC_UNUSED,
-    gpointer user_data)
-{
-    SsLinuxDateTimePanel *state = user_data;
-
-    if (state == NULL) {
-        return;
-    }
-    (void)refresh_preview(state);
-    if (state->preview.timer_id == 0U) {
-        state->preview.timer_id = g_timeout_add(
-            ss_linux_date_time_panel_preview_interval_ms(state),
-            refresh_preview,
-            state);
-        g_source_set_name_by_id(
-            state->preview.timer_id,
-            "[system-settings] visible Date & Time preview");
-    }
-}
-
-static void on_panel_unmapped(
-    GtkWidget *widget G_GNUC_UNUSED,
-    gpointer user_data)
-{
-    stop_preview_timer(user_data);
-}
 
 static void sync_controls(SsLinuxDateTimePanel *state)
 {
@@ -1179,7 +905,7 @@ static void on_cinnamon_interface_changed(
 
     if (changed) {
         sync_controls(state);
-        restart_preview_timer(state);
+        ss_linux_date_time_preview_restart(state);
         set_status(
             state,
             "An external Mint/Cinnamon time preference changed and System Settings reconciled the matching setting.",
@@ -1187,7 +913,7 @@ static void on_cinnamon_interface_changed(
         return;
     }
 
-    (void)refresh_preview(state);
+    (void)ss_linux_date_time_preview_refresh(state);
 }
 
 static bool native_compatibility_matches(
@@ -1220,8 +946,8 @@ static void policy_saved(SsLinuxDateTimePanel *state)
             : "System temporal policy saved, but Mint/Cinnamon compatibility settings did not fully synchronize.",
         !compatibility_ok);
     update_control_capabilities(state);
-    restart_preview_timer(state);
-    (void)refresh_preview(state);
+    ss_linux_date_time_preview_restart(state);
+    (void)ss_linux_date_time_preview_refresh(state);
 }
 
 void ss_linux_date_time_panel_policy_saved(
@@ -1454,7 +1180,7 @@ static void system_time_changed(
 
     sync_system_time_controls(state);
     ss_linux_date_time_location_update_summary(state);
-    (void)refresh_preview(state);
+    (void)ss_linux_date_time_preview_refresh(state);
 }
 
 static void system_time_ui_request_free(SystemTimeUiRequest *request)
@@ -1736,7 +1462,7 @@ static bool parse_manual_datetime(
     if (policy == NULL ||
         !ss_manual_time_parse(
             policy->clock_mode,
-            desktop_uses_24h(state),
+            ss_linux_date_time_panel_desktop_uses_24h(state),
             time_text,
             &microseconds_of_day)) {
         return false;
@@ -1952,12 +1678,12 @@ static bool migrate_legacy_native_clock(
     if (!state->model.persisted_policy_present) {
         infiltratr_copy_string(state->model.policy.clock_mode,
             sizeof(state->model.policy.clock_mode),
-            ss_native_clock_mode_id(desktop_uses_24h(state)));
+            ss_native_clock_mode_id(ss_linux_date_time_panel_desktop_uses_24h(state)));
         return true;
     }
     return ss_date_time_model_set_clock_mode(
         &state->model,
-        ss_native_clock_mode_id(desktop_uses_24h(state)));
+        ss_native_clock_mode_id(ss_linux_date_time_panel_desktop_uses_24h(state)));
 }
 
 SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
@@ -1991,8 +1717,7 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
         return NULL;
     }
 
-    state->preview.calendar_provider =
-        ss_calendar_preview_provider_new();
+    ss_linux_date_time_preview_init(state);
 
     (void)ss_regional_context_detect(&state->regional_context);
     {
@@ -2004,8 +1729,7 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
                 G_IO_ERROR,
                 G_IO_ERROR_FAILED,
                 "Unable to read the temporal policy during locality recovery.");
-            ss_calendar_preview_provider_free(
-                state->preview.calendar_provider);
+            ss_linux_date_time_preview_dispose(state);
             g_free(state);
             return NULL;
         }
@@ -2041,8 +1765,7 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
                 G_IO_ERROR_FAILED,
                 "Unable to observe the temporal policy.");
             g_clear_object(&state->system_time.service_cancellable);
-            ss_calendar_preview_provider_free(
-                state->preview.calendar_provider);
+            ss_linux_date_time_preview_dispose(state);
             g_free(state);
             return NULL;
         }
@@ -2064,8 +1787,7 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
             ss_policy_file_observer_free(state->policy_observer);
             state->policy_observer = NULL;
             g_clear_object(&state->system_time.service_cancellable);
-            ss_calendar_preview_provider_free(
-                state->preview.calendar_provider);
+            ss_linux_date_time_preview_dispose(state);
             g_free(state);
             return NULL;
         }
@@ -2083,12 +1805,7 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
 
     legacy_migration_ok = migrate_legacy_native_clock(state);
     state->root = g_object_ref_sink(ss_linux_date_time_panel_build_ui(state));
-    g_signal_connect(
-        state->root, "map",
-        G_CALLBACK(on_panel_mapped), state);
-    g_signal_connect(
-        state->root, "unmap",
-        G_CALLBACK(on_panel_unmapped), state);
+    ss_linux_date_time_preview_attach(state);
 
     gtk_widget_set_sensitive(GTK_WIDGET(state->show_date),
         state->cinnamon_interface_settings != NULL &&
@@ -2125,8 +1842,7 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
         state->system_time.service_cancellable,
         system_time_service_ready,
         ss_linux_date_time_lifetime_ref(state->lifetime));
-    state->preview.idle_id =
-        g_idle_add(refresh_preview_once, state);
+    ss_linux_date_time_preview_schedule_initial(state);
     return state;
 }
 
@@ -2157,16 +1873,12 @@ void ss_linux_date_time_panel_free(gpointer data)
     /* Make every outstanding async completion inert before cancellation. */
     ss_linux_date_time_lifetime_invalidate(state->lifetime);
 
-    stop_preview_timer(state);
+    ss_linux_date_time_preview_dispose(state);
     ss_linux_date_time_location_cancel_coordinate_commit(state);
     ss_policy_file_observer_free(state->policy_observer);
     state->policy_observer = NULL;
     ss_policy_file_observer_free(state->location.metadata_observer);
     state->location.metadata_observer = NULL;
-    if (state->preview.idle_id != 0U) {
-        g_source_remove(state->preview.idle_id);
-        state->preview.idle_id = 0U;
-    }
     if (state->location.recovery_retry_id != 0U) {
         g_source_remove(state->location.recovery_retry_id);
         state->location.recovery_retry_id = 0U;
@@ -2194,10 +1906,6 @@ void ss_linux_date_time_panel_free(gpointer data)
 
     g_clear_pointer(&state->clock_mode_ids, g_ptr_array_unref);
     g_clear_pointer(&state->system_time.timezone_ids, g_ptr_array_unref);
-    g_clear_pointer(&state->preview.date_calendar, g_free);
-    ss_calendar_preview_provider_free(
-        state->preview.calendar_provider);
-    state->preview.calendar_provider = NULL;
     ss_system_time_service_free(state->system_time.service);
     state->system_time.service = NULL;
     g_clear_object(&state->cinnamon_interface_settings);

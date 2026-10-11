@@ -6,6 +6,7 @@
 
 #include "home-page.h"
 #include "home-page-private.h"
+#include "home-status.h"
 #include "linux-ui-helpers.h"
 #include "shell-command.h"
 
@@ -279,22 +280,7 @@ static GtkWidget *make_status_card(
     return card;
 }
 
-static const char *network_connectivity_text(
-    GNetworkConnectivity connectivity)
-{
-    switch (connectivity) {
-    case G_NETWORK_CONNECTIVITY_LOCAL:
-        return "Local network only";
-    case G_NETWORK_CONNECTIVITY_LIMITED:
-        return "Limited connectivity";
-    case G_NETWORK_CONNECTIVITY_PORTAL:
-        return "Sign-in required";
-    case G_NETWORK_CONNECTIVITY_FULL:
-        return "Full internet access";
-    default:
-        return "Connectivity unknown";
-    }
-}
+
 
 static GtkWidget *make_ui_asset_picture(
     const char *filename,
@@ -403,236 +389,25 @@ static GtkWidget *make_theme_preview(
     return box;
 }
 
-static gchar *format_uptime(void)
-{
-    g_autofree gchar *contents = NULL;
-    gsize length = 0U;
-    double seconds = 0.0;
 
-    if (!g_file_get_contents("/proc/uptime", &contents, &length, NULL) ||
-        contents == NULL || sscanf(contents, "%lf", &seconds) != 1 ||
-        seconds < 0.0) {
-        return g_strdup("Unknown");
-    }
 
-    const guint64 total = (guint64)seconds;
-    const guint64 days = total / 86400U;
-    const guint64 hours = (total % 86400U) / 3600U;
-    const guint64 minutes = (total % 3600U) / 60U;
-    if (days > 0U) {
-        return g_strdup_printf(
-            "%" G_GUINT64_FORMAT "d %" G_GUINT64_FORMAT "h", days, hours);
-    }
-    if (hours > 0U) {
-        return g_strdup_printf(
-            "%" G_GUINT64_FORMAT "h %" G_GUINT64_FORMAT "m", hours, minutes);
-    }
-    return g_strdup_printf("%" G_GUINT64_FORMAT "m", minutes);
-}
 
-static const char *current_language_label(void)
-{
-    const gchar *const *languages = g_get_language_names();
-    return languages != NULL && languages[0] != NULL
-        ? languages[0]
-        : "Unknown";
-}
 
-static const char *current_format_locale_label(void)
-{
-    const char *locale_name = setlocale(LC_TIME, NULL);
-    return locale_name != NULL && locale_name[0] != '\0'
-        ? locale_name
-        : "Unknown";
-}
 
-static gboolean refresh_home_status(gpointer user_data)
-{
-    HomeStatusTicker *ticker = user_data;
-    g_autofree gchar *uptime = NULL;
-    GtkSettings *settings;
-    gchar *theme_name = NULL;
-    gboolean prefer_dark = FALSE;
-    GNetworkMonitor *network;
-    gboolean online = FALSE;
-    gboolean metered = FALSE;
-    GNetworkConnectivity connectivity = G_NETWORK_CONNECTIVITY_LOCAL;
-    const char *format_locale = current_format_locale_label();
-    const char *language_name = current_language_label();
-    g_autofree gchar *region_detail = NULL;
-    g_autofree gchar *appearance_detail = NULL;
-    g_autofree gchar *network_detail = NULL;
-    g_autoptr(GTimeZone) local_zone = g_time_zone_new_local();
 
-    if (ticker == NULL) {
-        return G_SOURCE_REMOVE;
-    }
-    settings = ticker->settings != NULL
-        ? ticker->settings
-        : gtk_settings_get_default();
-    network = ticker->network != NULL
-        ? ticker->network
-        : g_network_monitor_get_default();
-    uptime = format_uptime();
-    label_set_text_if_changed(ticker->uptime, uptime);
-    if (local_zone != NULL) {
-        label_set_text_if_changed(
-            ticker->date_timezone, g_time_zone_get_identifier(local_zone));
-    }
-    label_set_text_if_changed(ticker->region_value, format_locale);
-    region_detail = g_strdup_printf(
-        "Date/time format locale • %s • Interface language • %s",
-        format_locale,
-        language_name);
-    label_set_text_if_changed(ticker->region_detail, region_detail);
-    if (settings != NULL) {
-        g_object_get(
-            settings,
-            "gtk-theme-name", &theme_name,
-            "gtk-application-prefer-dark-theme", &prefer_dark,
-            NULL);
-    }
-    label_set_text_if_changed(
-        ticker->appearance_value,
-        theme_name != NULL ? theme_name : "System theme");
-    appearance_detail = g_strdup_printf(
-        "%s presentation", prefer_dark ? "Dark" : "Light");
-    label_set_text_if_changed(
-        ticker->appearance_detail, appearance_detail);
-    if (network != NULL) {
-        online = g_network_monitor_get_network_available(network);
-        metered = g_network_monitor_get_network_metered(network);
-        connectivity = g_network_monitor_get_connectivity(network);
-    }
-    label_set_text_if_changed(
-        ticker->network_value, online ? "Connected" : "Offline");
-    network_detail = g_strdup_printf(
-        "%s%s",
-        network_connectivity_text(connectivity),
-        metered ? " • Metered" : "");
-    label_set_text_if_changed(ticker->network_detail, network_detail);
-    g_free(theme_name);
-    return G_SOURCE_CONTINUE;
-}
 
-static void home_status_source_changed(
-    GObject *object G_GNUC_UNUSED,
-    GParamSpec *pspec G_GNUC_UNUSED,
-    gpointer user_data)
-{
-    (void)refresh_home_status(user_data);
-}
 
-static void stop_home_status_ticker(HomeStatusTicker *ticker)
-{
-    if (ticker == NULL) {
-        return;
-    }
-    if (ticker->source_id != 0U) {
-        g_source_remove(ticker->source_id);
-        ticker->source_id = 0U;
-    }
-    if (ticker->settings != NULL) {
-        if (ticker->theme_name_id != 0U) {
-            g_signal_handler_disconnect(ticker->settings, ticker->theme_name_id);
-        }
-        if (ticker->theme_dark_id != 0U) {
-            g_signal_handler_disconnect(ticker->settings, ticker->theme_dark_id);
-        }
-    }
-    if (ticker->network != NULL) {
-        if (ticker->network_available_id != 0U) {
-            g_signal_handler_disconnect(
-                ticker->network, ticker->network_available_id);
-        }
-        if (ticker->network_metered_id != 0U) {
-            g_signal_handler_disconnect(
-                ticker->network, ticker->network_metered_id);
-        }
-        if (ticker->network_connectivity_id != 0U) {
-            g_signal_handler_disconnect(
-                ticker->network, ticker->network_connectivity_id);
-        }
-    }
-    ticker->theme_name_id = 0U;
-    ticker->theme_dark_id = 0U;
-    ticker->network_available_id = 0U;
-    ticker->network_metered_id = 0U;
-    ticker->network_connectivity_id = 0U;
-    ticker->settings = NULL;
-    ticker->network = NULL;
-}
 
-static void start_home_status_ticker(HomeStatusTicker *ticker)
-{
-    if (ticker == NULL || ticker->source_id != 0U) {
-        return;
-    }
 
-    ticker->settings = gtk_settings_get_default();
-    ticker->network = g_network_monitor_get_default();
-    if (ticker->settings != NULL) {
-        ticker->theme_name_id = g_signal_connect(
-            ticker->settings,
-            "notify::gtk-theme-name",
-            G_CALLBACK(home_status_source_changed),
-            ticker);
-        ticker->theme_dark_id = g_signal_connect(
-            ticker->settings,
-            "notify::gtk-application-prefer-dark-theme",
-            G_CALLBACK(home_status_source_changed),
-            ticker);
-    }
-    if (ticker->network != NULL) {
-        ticker->network_available_id = g_signal_connect(
-            ticker->network,
-            "notify::network-available",
-            G_CALLBACK(home_status_source_changed),
-            ticker);
-        ticker->network_metered_id = g_signal_connect(
-            ticker->network,
-            "notify::network-metered",
-            G_CALLBACK(home_status_source_changed),
-            ticker);
-        ticker->network_connectivity_id = g_signal_connect(
-            ticker->network,
-            "notify::connectivity",
-            G_CALLBACK(home_status_source_changed),
-            ticker);
-    }
 
-    (void)refresh_home_status(ticker);
-    ticker->source_id = g_timeout_add_seconds(
-        60U, refresh_home_status, ticker);
-    g_source_set_name_by_id(
-        ticker->source_id,
-        "[system-settings] visible Home system status");
-}
 
-static void home_status_mapped(
-    GtkWidget *widget G_GNUC_UNUSED,
-    gpointer user_data)
-{
-    start_home_status_ticker(user_data);
-}
 
-static void home_status_unmapped(
-    GtkWidget *widget G_GNUC_UNUSED,
-    gpointer user_data)
-{
-    stop_home_status_ticker(user_data);
-}
 
-static void home_status_ticker_free(gpointer data)
-{
-    HomeStatusTicker *ticker = data;
 
-    if (ticker == NULL) {
-        return;
-    }
-    stop_home_status_ticker(ticker);
-    g_free(ticker);
-}
+
+
+
+
 
 guint home_layout_columns_for_width(int width)
 {
@@ -741,23 +516,8 @@ GtkWidget *ss_linux_home_page_new(const SsHomePageContext *context)
     const int uname_result = uname(&uts);
     const char *kernel = uname_result == 0 ? uts.release : "Unknown";
     const char *architecture = uname_result == 0 ? uts.machine : "Unknown";
-    const char *format_locale = current_format_locale_label();
-    const char *language_name = current_language_label();
-    GtkSettings *gtk_settings = gtk_settings_get_default();
-    gchar *theme_name = NULL;
-    gboolean prefer_dark = FALSE;
-    GNetworkMonitor *network = g_network_monitor_get_default();
-    gboolean online = FALSE;
-    gboolean metered = FALSE;
-    GNetworkConnectivity connectivity = G_NETWORK_CONNECTIVITY_LOCAL;
     SsHomeTemporalSnapshot temporal;
-    g_autofree gchar *region_detail = NULL;
-    g_autofree gchar *appearance_detail = NULL;
-    g_autofree gchar *network_detail = NULL;
-    g_autofree gchar *uptime_text = format_uptime();
-    g_autoptr(GTimeZone) local_zone = g_time_zone_new_local();
-    const char *timezone_name =
-        local_zone != NULL ? g_time_zone_get_identifier(local_zone) : "Unknown";
+    SsHomeStatusSnapshot status;
     g_autofree gchar *os_display = g_strdup_printf(
         "Infiltrator OS (%s)", os_name != NULL ? os_name : "Linux");
 
@@ -779,29 +539,8 @@ GtkWidget *ss_linux_home_page_new(const SsHomePageContext *context)
         temporal.system_time_text = g_strdup("Unknown");
     }
 
-    if (gtk_settings != NULL) {
-        g_object_get(
-            gtk_settings,
-            "gtk-theme-name", &theme_name,
-            "gtk-application-prefer-dark-theme", &prefer_dark,
-            NULL);
-    }
-    if (network != NULL) {
-        online = g_network_monitor_get_network_available(network);
-        metered = g_network_monitor_get_network_metered(network);
-        connectivity = g_network_monitor_get_connectivity(network);
-    }
-
-    region_detail = g_strdup_printf(
-        "Date/time format locale • %s • Interface language • %s",
-        format_locale,
-        language_name);
-    appearance_detail = g_strdup_printf(
-        "%s presentation", prefer_dark ? "Dark" : "Light");
-    network_detail = g_strdup_printf(
-        "%s%s",
-        network_connectivity_text(connectivity),
-        metered ? " • Metered" : "");
+    ss_home_status_snapshot_init(&status);
+    ss_home_status_snapshot_read(&status);
 
     gtk_widget_add_css_class(page, "home-page");
     gtk_widget_add_css_class(hero, "home-hero");
@@ -914,7 +653,7 @@ GtkWidget *ss_linux_home_page_new(const SsHomePageContext *context)
     append_overview_row(GTK_GRID(overview_data), 3, "Desktop", desktop);
     append_overview_row(GTK_GRID(overview_data), 4, "Hostname", host_name);
     GtkWidget *uptime_label = append_overview_row(
-        GTK_GRID(overview_data), 5, "Uptime", uptime_text);
+        GTK_GRID(overview_data), 5, "Uptime", status.uptime);
     system_time_label = append_overview_row(
         GTK_GRID(overview_data), 6, "System time", temporal.system_time_text);
     gtk_flow_box_set_selection_mode(
@@ -1054,7 +793,7 @@ GtkWidget *ss_linux_home_page_new(const SsHomePageContext *context)
     gtk_box_append(GTK_BOX(date_meta), pin_wrap);
     date_location = gtk_box_new(GTK_ORIENTATION_VERTICAL, 1);
     GtkWidget *date_timezone_label = ss_linux_ui_make_label(
-        timezone_name, "location-primary");
+        status.timezone, "location-primary");
     gtk_box_append(GTK_BOX(date_location), date_timezone_label);
     gtk_box_append(
         GTK_BOX(date_location),
@@ -1085,9 +824,9 @@ GtkWidget *ss_linux_home_page_new(const SsHomePageContext *context)
     region_body = gtk_flow_box_new();
     region_copy = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
     GtkWidget *region_value_label = ss_linux_ui_make_label(
-        format_locale, "region-country");
+        status.region_value, "region-country");
     GtkWidget *region_detail_label = ss_linux_ui_make_label(
-        region_detail, "status-card-detail");
+        status.region_detail, "status-card-detail");
     gtk_label_set_ellipsize(
         GTK_LABEL(region_value_label), PANGO_ELLIPSIZE_END);
     gtk_label_set_wrap(GTK_LABEL(region_detail_label), TRUE);
@@ -1114,8 +853,8 @@ GtkWidget *ss_linux_home_page_new(const SsHomePageContext *context)
         "appearance-status-card",
         "preferences-desktop-theme-symbolic",
         "Display & Appearance",
-        theme_name != NULL ? theme_name : "System theme",
-        appearance_detail);
+        status.appearance_value,
+        status.appearance_detail);
     GtkWidget *appearance_value_label = g_object_get_data(
         G_OBJECT(appearance_card), "status-value-label");
     GtkWidget *appearance_detail_label = g_object_get_data(
@@ -1149,8 +888,8 @@ GtkWidget *ss_linux_home_page_new(const SsHomePageContext *context)
         "network-status-card",
         "network-wired-symbolic",
         "Network",
-        online ? "Connected" : "Offline",
-        network_detail);
+        status.network_value,
+        status.network_detail);
     GtkWidget *network_value_label = g_object_get_data(
         G_OBJECT(network_card), "status-value-label");
     GtkWidget *network_detail_label = g_object_get_data(
@@ -1246,27 +985,18 @@ GtkWidget *ss_linux_home_page_new(const SsHomePageContext *context)
         ticker,
         home_temporal_ticker_free);
 
-    HomeStatusTicker *status_ticker = g_new0(HomeStatusTicker, 1);
-    status_ticker->owner = scroller;
-    status_ticker->uptime = GTK_LABEL(uptime_label);
-    status_ticker->date_timezone = GTK_LABEL(date_timezone_label);
-    status_ticker->region_value = GTK_LABEL(region_value_label);
-    status_ticker->region_detail = GTK_LABEL(region_detail_label);
-    status_ticker->appearance_value = GTK_LABEL(appearance_value_label);
-    status_ticker->appearance_detail = GTK_LABEL(appearance_detail_label);
-    status_ticker->network_value = GTK_LABEL(network_value_label);
-    status_ticker->network_detail = GTK_LABEL(network_detail_label);
-    g_signal_connect(
-        scroller, "map", G_CALLBACK(home_status_mapped), status_ticker);
-    g_signal_connect(
-        scroller, "unmap", G_CALLBACK(home_status_unmapped), status_ticker);
-    g_object_set_data_full(
-        G_OBJECT(scroller),
-        "system-settings-home-status-source",
-        status_ticker,
-        home_status_ticker_free);
+    ss_home_status_attach(
+        scroller,
+        GTK_LABEL(uptime_label),
+        GTK_LABEL(date_timezone_label),
+        GTK_LABEL(region_value_label),
+        GTK_LABEL(region_detail_label),
+        GTK_LABEL(appearance_value_label),
+        GTK_LABEL(appearance_detail_label),
+        GTK_LABEL(network_value_label),
+        GTK_LABEL(network_detail_label));
 
-    g_free(theme_name);
+    ss_home_status_snapshot_clear(&status);
     ss_home_temporal_snapshot_clear(&temporal);
     return scroller;
 }

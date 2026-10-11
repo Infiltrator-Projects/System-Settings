@@ -111,8 +111,10 @@ Linux shell
           v
 Date & Time module
   linux-date-time-panel.c
-    temporal-policy/native-setting/timedated coordination
+    policy reconciliation / protected system-time composition
     async lifetime/cancellation
+  linux-date-time-preview.c
+    isolated live clock/calendar preview lifecycle
   linux-date-time-location.c
     locality search and coordinate transactions
     durable two-file locality journal/recovery
@@ -179,6 +181,14 @@ replacing an already loaded runtime requires restarting the process. Each provid
 The shell constructs Home first and creates the built-in Date & Time panel only
 on first selection. Time-zone catalogue parsing, policy observers and timedated
 proxy setup therefore do not participate in shell first paint.
+
+Home system-status observation now lives behind `home-status.c`, while module
+manifest discovery/search metadata lives behind `shell-module-catalog.c`. The
+Home constructor and shell window therefore compose those concerns instead of
+owning their platform observation and manifest parsing machinery. Date & Time
+live preview similarly compiles through a narrow preview facade; it cannot
+include the complete panel-private controller or reach locality/protected
+system-time state by accident.
 
 The application presents its existing window on repeated activation. On close,
 the host releases its module instances before the window is destroyed. Panel cleanup removes

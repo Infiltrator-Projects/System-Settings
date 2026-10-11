@@ -2,13 +2,17 @@
 #ifndef SYSTEM_SETTINGS_LINUX_DATE_TIME_PANEL_PRIVATE_H
 #define SYSTEM_SETTINGS_LINUX_DATE_TIME_PANEL_PRIVATE_H
 
+#ifdef SYSTEM_SETTINGS_DATE_TIME_PREVIEW_BOUNDARY
+#error "Preview must use linux-date-time-preview-private.h, not the complete Date & Time panel controller."
+#endif
+
 #ifdef SYSTEM_SETTINGS_DATE_TIME_LOCATION_BOUNDARY
 #error "Locality must use linux-date-time-location-private.h, not the complete Date & Time panel controller."
 #endif
 
 #include "linux-date-time-panel.h"
 #include "linux-date-time-location-private.h"
-#include "calendar-preview-provider.h"
+#include "linux-date-time-preview-private.h"
 #include "policy-file-observer.h"
 
 #include "system-settings/date-time-model.h"
@@ -53,22 +57,6 @@ typedef struct SsLinuxDateTimeSystemTimeState {
     bool manual_dirty;
 } SsLinuxDateTimeSystemTimeState;
 
-typedef struct SsLinuxDateTimePreviewState {
-    GtkWidget *clock_label;
-    GtkWidget *date_label;
-    GtkWidget *overview_clock;
-    GtkWidget *overview_calendar;
-
-    SsCalendarPreviewProvider *calendar_provider;
-    guint timer_id;
-    guint idle_id;
-    gint date_year;
-    gint date_month;
-    gint date_day;
-    gchar *date_calendar;
-    bool date_cache_valid;
-} SsLinuxDateTimePreviewState;
-
 struct SsLinuxDateTimePanel {
     GtkWindow *window;
     GtkWidget *root;
@@ -105,11 +93,11 @@ void ss_linux_date_time_panel_sync_controls(
     SsLinuxDateTimePanel *state);
 void ss_linux_date_time_panel_policy_saved(
     SsLinuxDateTimePanel *state);
-guint ss_linux_date_time_panel_preview_interval_ms(
-    const SsLinuxDateTimePanel *state);
 bool ss_linux_date_time_panel_read_system_time(
     const SsLinuxDateTimePanel *state,
     SsSystemTimeState *out);
+bool ss_linux_date_time_panel_desktop_uses_24h(
+    const SsLinuxDateTimePanel *state);
 
 void on_clock_changed(GObject *object, GParamSpec *pspec, gpointer user_data);
 void on_calendar_changed(GObject *object, GParamSpec *pspec, gpointer user_data);
