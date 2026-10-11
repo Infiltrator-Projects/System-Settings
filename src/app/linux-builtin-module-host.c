@@ -20,6 +20,7 @@ typedef void (*SsBuiltinModuleDestroyFunc)(gpointer controller);
 
 typedef struct SsBuiltinModuleDescriptor {
     const char *page_id;
+    const char *manifest_filename;
     SsBuiltinModuleCreateFunc create;
     SsBuiltinModuleWidgetFunc widget;
     SsBuiltinModuleDestroyFunc destroy;
@@ -53,6 +54,7 @@ static void destroy_date_time_module(gpointer controller)
 static const SsBuiltinModuleDescriptor builtin_modules[] = {
     {
         .page_id = "date-time",
+        .manifest_filename = "date-time.settings-module",
         .create = create_date_time_module,
         .widget = date_time_module_widget,
         .destroy = destroy_date_time_module,
@@ -72,6 +74,25 @@ static const SsBuiltinModuleDescriptor *find_module_descriptor(
         }
     }
     return NULL;
+}
+
+size_t ss_builtin_module_host_module_count(void)
+{
+    return G_N_ELEMENTS(builtin_modules);
+}
+
+const char *ss_builtin_module_host_module_page_id(size_t index)
+{
+    return index < G_N_ELEMENTS(builtin_modules)
+        ? builtin_modules[index].page_id
+        : NULL;
+}
+
+const char *ss_builtin_module_host_module_manifest(size_t index)
+{
+    return index < G_N_ELEMENTS(builtin_modules)
+        ? builtin_modules[index].manifest_filename
+        : NULL;
 }
 
 static void builtin_module_instance_free(gpointer data)
@@ -167,7 +188,6 @@ bool ss_builtin_module_host_ensure_page(
             host->instances,
             (gpointer)descriptor->page_id,
             instance);
-
     }
 
     panel_widget = descriptor->widget(instance->controller);
