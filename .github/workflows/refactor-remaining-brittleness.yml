@@ -38,12 +38,10 @@ jobs:
 
           preview = Path('src/modules/date-time/linux-date-time-preview.c')
           text = preview.read_text(encoding='utf-8')
-          count = text.count('        refresh_preview,\n')
-          if count != 1:
-              raise SystemExit(f'preview callback rename: expected 1, got {count}')
-          text = text.replace(
-              '        refresh_preview,\n',
-              '        ss_linux_date_time_preview_refresh,\n')
+          count = text.count('refresh_preview,')
+          if count != 2:
+              raise SystemExit(f'preview callback rename: expected 2, got {count}')
+          text = text.replace('refresh_preview,', 'ss_linux_date_time_preview_refresh,')
           old = 'static bool preview_coordinates(\n    const SsLinuxDateTimePanel *state,\n'
           new = 'static bool preview_coordinates(\n    SsLinuxDateTimePanel *state,\n'
           if text.count(old) != 1:
