@@ -2,7 +2,7 @@
 #ifndef SYSTEM_SETTINGS_HOME_PAGE_PRIVATE_H
 #define SYSTEM_SETTINGS_HOME_PAGE_PRIVATE_H
 
-#include "builtin-module-host.h"
+#include "home-page.h"
 
 #include <gtk/gtk.h>
 
@@ -11,7 +11,7 @@ typedef struct HomeTemporalTicker {
     GtkLabel *clock;
     GtkLabel *date;
     GtkLabel *system_time;
-    SsBuiltinModuleHost *module_host;
+    SsHomeTemporalProvider *temporal_provider;
     guint source_id;
     guint interval_ms;
 } HomeTemporalTicker;
