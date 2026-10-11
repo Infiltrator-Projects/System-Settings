@@ -91,18 +91,18 @@ static GtkStringList *timezone_strings(SsLinuxDateTimePanel *state)
         return strings;
     }
 
-    g_clear_pointer(&state->timezone_ids, g_ptr_array_unref);
-    state->timezone_ids = ss_regional_context_list_timezones(
+    g_clear_pointer(&state->location.timezone_ids, g_ptr_array_unref);
+    state->location.timezone_ids = ss_regional_context_list_timezones(
         state->regional_context.timezone_id);
 
-    if (state->timezone_ids == NULL) {
-        state->timezone_ids =
+    if (state->location.timezone_ids == NULL) {
+        state->location.timezone_ids =
             g_ptr_array_new_with_free_func(g_free);
     }
 
-    for (index = 0U; index < state->timezone_ids->len; ++index) {
+    for (index = 0U; index < state->location.timezone_ids->len; ++index) {
         const char *zone = g_ptr_array_index(
-            state->timezone_ids, (guint)index);
+            state->location.timezone_ids, (guint)index);
         gtk_string_list_append(strings, zone);
     }
     return strings;

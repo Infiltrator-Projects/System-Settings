@@ -10,7 +10,6 @@
 
 #include "builtin-module-host.h"
 
-#include "home-temporal-presenter.h"
 #include "linux-date-time-panel.h"
 
 #include <gio/gio.h>
@@ -35,7 +34,6 @@ typedef struct SsBuiltinModuleInstance {
 struct SsBuiltinModuleHost {
     GtkWindow *window;
     GHashTable *instances;
-    SsHomeTemporalPresenter *home_temporal;
 };
 
 static gpointer create_date_time_module(GtkWindow *window, GError **error)
@@ -143,7 +141,6 @@ void ss_builtin_module_host_free(SsBuiltinModuleHost *host)
     }
 
     g_clear_pointer(&host->instances, g_hash_table_unref);
-    ss_home_temporal_presenter_free(host->home_temporal);
     g_free(host);
 }
 
@@ -225,72 +222,4 @@ bool ss_builtin_module_host_is_loaded(
     return host != NULL && host->instances != NULL &&
            page_id != NULL &&
            g_hash_table_contains(host->instances, page_id);
-}
-
-void ss_home_temporal_snapshot_init(SsHomeTemporalSnapshot *snapshot)
-{
-    if (snapshot != NULL) {
-        *snapshot = (SsHomeTemporalSnapshot){0};
-    }
-}
-
-void ss_home_temporal_snapshot_clear(SsHomeTemporalSnapshot *snapshot)
-{
-    if (snapshot == NULL) {
-        return;
-    }
-    g_clear_pointer(&snapshot->clock_text, g_free);
-    g_clear_pointer(&snapshot->date_text, g_free);
-    g_clear_pointer(&snapshot->system_time_text, g_free);
-}
-
-static SsHomeTemporalPresenter *ensure_home_temporal_presenter(
-    SsBuiltinModuleHost *host)
-{
-    if (host == NULL) {
-        return NULL;
-    }
-    if (host->home_temporal == NULL) {
-        host->home_temporal = ss_home_temporal_presenter_new();
-    }
-    return host->home_temporal;
-}
-
-bool ss_builtin_module_host_format_home_temporal(
-    SsBuiltinModuleHost *host,
-    SsHomeTemporalSnapshot *out)
-{
-    SsHomeTemporalPresenter *presenter;
-    SsHomeTemporalPresentation presentation;
-
-    if (out == NULL) {
-        return false;
-    }
-    presenter = ensure_home_temporal_presenter(host);
-    if (presenter == NULL) {
-        return false;
-    }
-
-    ss_home_temporal_presentation_init(&presentation);
-    if (!ss_home_temporal_presenter_format_now(presenter, &presentation)) {
-        ss_home_temporal_presentation_clear(&presentation);
-        return false;
-    }
-
-    out->clock_text = g_steal_pointer(&presentation.clock_text);
-    out->date_text = g_steal_pointer(&presentation.date_text);
-    out->system_time_text = g_steal_pointer(&presentation.system_time_text);
-    ss_home_temporal_presentation_clear(&presentation);
-    return true;
-}
-
-guint ss_builtin_module_host_home_temporal_refresh_interval_ms(
-    SsBuiltinModuleHost *host)
-{
-    SsHomeTemporalPresenter *presenter =
-        ensure_home_temporal_presenter(host);
-
-    return presenter != NULL
-        ? ss_home_temporal_presenter_refresh_interval_ms(presenter)
-        : 1000U;
 }

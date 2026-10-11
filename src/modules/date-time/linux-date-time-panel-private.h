@@ -91,57 +91,9 @@ struct SsLinuxDateTimePanel {
     SsPolicyFileObserver *policy_observer;
     GPtrArray *clock_mode_ids;
 
-    /*
-     * The anonymous compatibility views preserve current translation-unit and
-     * regression-test source while establishing the bounded state objects
-     * above as the canonical ownership model. New code should use
-     * state->location, state->system_time and state->preview.
-     */
-    union {
-        SsLinuxDateTimeLocationState location;
-        struct {
-            SsLocationMetadata location_metadata;
-            SsPolicyFileObserver *location_metadata_observer;
-            GPtrArray *timezone_ids;
-            GCancellable *location_search_cancellable;
-            GCancellable *timezone_cancellable;
-            guint coordinate_commit_id;
-            guint locality_recovery_retry_id;
-            guint locality_recovery_retry_seconds;
-            guint location_search_generation;
-            guint timezone_generation;
-            bool location_metadata_present;
-            bool location_metadata_uncertain;
-            bool location_follows_timezone_reference;
-            bool locality_recovery_failed;
-        };
-    };
-
-    union {
-        SsLinuxDateTimeSystemTimeState system_time;
-        struct {
-            SsSystemTimeService *system_time_service;
-            GCancellable *service_cancellable;
-            GCancellable *ntp_cancellable;
-            GCancellable *manual_time_cancellable;
-            guint ntp_generation;
-            guint manual_time_generation;
-        };
-    };
-
-    union {
-        SsLinuxDateTimePreviewState preview;
-        struct {
-            SsCalendarPreviewProvider *calendar_preview_provider;
-            guint timer_id;
-            guint preview_idle_id;
-            gint preview_date_year;
-            gint preview_date_month;
-            gint preview_date_day;
-            gchar *preview_date_calendar;
-            bool preview_date_cache_valid;
-        };
-    };
+    SsLinuxDateTimeLocationState location;
+    SsLinuxDateTimeSystemTimeState system_time;
+    SsLinuxDateTimePreviewState preview;
 
     bool updating_controls;
     bool updating_system_controls;

@@ -221,21 +221,6 @@ bool shell_open_page(ShellSearchState *state, const char *page_id)
     return ready;
 }
 
-/*
- * These wrappers exist only because the existing white-box shell regression
- * test calls the old names directly. Production routing uses shell_open_page().
- */
-void ensure_date_time_panel(ShellSearchState *state)
-{
-    (void)ensure_module_page(state, SS_DATE_TIME_PAGE_ID);
-}
-
-void open_date_time(GtkButton *button, gpointer user_data)
-{
-    (void)button;
-    (void)shell_open_page(user_data, SS_DATE_TIME_PAGE_ID);
-}
-
 static void on_navigation_selected(
     GtkListBox *box,
     GtkListBoxRow *row,
@@ -940,7 +925,7 @@ static void adapt_window_to_mapped_monitor(
     set_adaptive_default_window_size(GTK_WINDOW(widget));
 }
 
-void on_activate(GtkApplication *application, gpointer user_data)
+void ss_shell_window_activate(GtkApplication *application, gpointer user_data)
 {
     const InfiltratrProjectInfo *info = ss_project_info();
     GtkWindow *window;
@@ -952,6 +937,7 @@ void on_activate(GtkApplication *application, gpointer user_data)
     GtkSearchEntry *search_entry = NULL;
     ShellSearchState *search_state;
     SsBuiltinModuleHost *module_host;
+    SsHomeTemporalProvider *home_temporal_provider;
     SsHomePageContext home_context;
 
     (void)user_data;
@@ -991,6 +977,17 @@ void on_activate(GtkApplication *application, gpointer user_data)
         "system-settings-module-host",
         module_host,
         (GDestroyNotify)ss_builtin_module_host_free);
+
+    home_temporal_provider = ss_home_temporal_provider_new();
+    if (home_temporal_provider == NULL) {
+        gtk_window_destroy(window);
+        return;
+    }
+    g_object_set_data_full(
+        G_OBJECT(window),
+        "system-settings-home-temporal-provider",
+        home_temporal_provider,
+        (GDestroyNotify)ss_home_temporal_provider_free);
 
     root = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     gtk_widget_add_css_class(root, "app-shell");
@@ -1041,14 +1038,8 @@ void on_activate(GtkApplication *application, gpointer user_data)
         SS_DATE_TIME_PAGE_ID,
         GTK_SCROLLED_WINDOW(module_scroller));
 
-    /* Compatibility key retained for the current shell geometry regression. */
-    g_object_set_data(
-        G_OBJECT(window),
-        "system-settings-date-scroller",
-        module_scroller);
-
     home_context = (SsHomePageContext){
-        .module_host = module_host,
+        .temporal_provider = home_temporal_provider,
         .navigate = open_home_primary_page,
         .navigate_data = search_state
     };
