@@ -11,6 +11,10 @@
 #ifndef SYSTEM_SETTINGS_DATE_TIME_MODEL_H
 #define SYSTEM_SETTINGS_DATE_TIME_MODEL_H
 
+#if defined(SYSTEM_SETTINGS_GENERIC_SHELL)
+#error "Generic Linux shell must not include Date & Time domain contracts."
+#endif
+
 #include <stdbool.h>
 #include <infiltratr/temporal.h>
 #include "system-settings/temporal-policy-store.h"
