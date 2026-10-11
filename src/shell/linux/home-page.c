@@ -36,7 +36,8 @@ static GtkWidget *make_feature(
     gtk_widget_set_valign(icon, GTK_ALIGN_CENTER);
     gtk_widget_set_valign(text, GTK_ALIGN_CENTER);
     gtk_image_set_pixel_size(GTK_IMAGE(icon), 22);
-    gtk_box_append(GTK_BOX(box), icon);
+    gtk_box_append(GTK_BOX(icon_wrap), icon);
+    gtk_box_append(GTK_BOX(box), icon_wrap);
     gtk_box_append(
         GTK_BOX(text),
         ss_linux_ui_make_label(title, "home-feature-title"));
@@ -81,13 +82,13 @@ static gboolean refresh_home_temporal(gpointer user_data)
     guint desired_interval;
 
     if (ticker == NULL || ticker->clock == NULL || ticker->date == NULL ||
-        ticker->system_time == NULL || ticker->module_host == NULL) {
+        ticker->system_time == NULL || ticker->temporal_provider == NULL) {
         return G_SOURCE_REMOVE;
     }
 
     ss_home_temporal_snapshot_init(&temporal);
-    if (ss_builtin_module_host_format_home_temporal(
-            ticker->module_host, &temporal)) {
+    if (ss_home_temporal_provider_format(
+            ticker->temporal_provider, &temporal)) {
         label_set_text_if_changed(ticker->clock, temporal.clock_text);
         label_set_text_if_changed(ticker->date, temporal.date_text);
         label_set_text_if_changed(
@@ -95,9 +96,8 @@ static gboolean refresh_home_temporal(gpointer user_data)
     }
     ss_home_temporal_snapshot_clear(&temporal);
 
-    desired_interval =
-        ss_builtin_module_host_home_temporal_refresh_interval_ms(
-            ticker->module_host);
+    desired_interval = ss_home_temporal_provider_refresh_interval_ms(
+        ticker->temporal_provider);
     if (desired_interval != ticker->interval_ms) {
         ticker->source_id = 0U;
         ticker->interval_ms = desired_interval;
@@ -122,13 +122,12 @@ static void stop_home_temporal_ticker(HomeTemporalTicker *ticker)
 static void start_home_temporal_ticker(HomeTemporalTicker *ticker)
 {
     if (ticker == NULL || ticker->source_id != 0U ||
-        ticker->module_host == NULL) {
+        ticker->temporal_provider == NULL) {
         return;
     }
 
-    ticker->interval_ms =
-        ss_builtin_module_host_home_temporal_refresh_interval_ms(
-            ticker->module_host);
+    ticker->interval_ms = ss_home_temporal_provider_refresh_interval_ms(
+        ticker->temporal_provider);
     (void)refresh_home_temporal(ticker);
     if (ticker->source_id == 0U) {
         ticker->source_id = g_timeout_add(
@@ -169,8 +168,8 @@ static void open_date_time_from_home(GtkButton *button, gpointer user_data)
     SsHomePageContext *context = user_data;
 
     (void)button;
-    if (context != NULL && context->open_date_time != NULL) {
-        context->open_date_time(context->open_date_time_data);
+    if (context != NULL && context->navigate != NULL) {
+        context->navigate(context->navigate_data);
     }
 }
 
@@ -773,9 +772,9 @@ GtkWidget *ss_linux_home_page_new(const SsHomePageContext *context)
         g_free);
 
     ss_home_temporal_snapshot_init(&temporal);
-    if (stored_context->module_host == NULL ||
-        !ss_builtin_module_host_format_home_temporal(
-            stored_context->module_host, &temporal)) {
+    if (stored_context->temporal_provider == NULL ||
+        !ss_home_temporal_provider_format(
+            stored_context->temporal_provider, &temporal)) {
         temporal.clock_text = g_strdup("Unknown");
         temporal.date_text = g_strdup("");
         temporal.system_time_text = g_strdup("Unknown");
@@ -1237,7 +1236,7 @@ GtkWidget *ss_linux_home_page_new(const SsHomePageContext *context)
     ticker->clock = GTK_LABEL(date_clock_label);
     ticker->date = GTK_LABEL(date_calendar_label);
     ticker->system_time = GTK_LABEL(system_time_label);
-    ticker->module_host = stored_context->module_host;
+    ticker->temporal_provider = stored_context->temporal_provider;
     g_signal_connect(
         scroller, "map", G_CALLBACK(home_temporal_mapped), ticker);
     g_signal_connect(
