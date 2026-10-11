@@ -979,15 +979,15 @@ void ss_shell_window_activate(GtkApplication *application, gpointer user_data)
         (GDestroyNotify)ss_builtin_module_host_free);
 
     home_temporal_provider = ss_home_temporal_provider_new();
-if (home_temporal_provider == NULL) {
-    gtk_window_destroy(window);
-    return;
-}
-g_object_set_data_full(
-    G_OBJECT(window),
-    "system-settings-home-temporal-provider",
-    home_temporal_provider,
-    (GDestroyNotify)ss_home_temporal_provider_free);
+    if (home_temporal_provider == NULL) {
+        gtk_window_destroy(window);
+        return;
+    }
+    g_object_set_data_full(
+        G_OBJECT(window),
+        "system-settings-home-temporal-provider",
+        home_temporal_provider,
+        (GDestroyNotify)ss_home_temporal_provider_free);
 
     root = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     gtk_widget_add_css_class(root, "app-shell");
@@ -1037,12 +1037,6 @@ g_object_set_data_full(
         search_state,
         SS_DATE_TIME_PAGE_ID,
         GTK_SCROLLED_WINDOW(module_scroller));
-
-    /* Compatibility key retained for the current shell geometry regression. */
-    g_object_set_data(
-        G_OBJECT(window),
-        "system-settings-date-scroller",
-        module_scroller);
 
     home_context = (SsHomePageContext){
         .temporal_provider = home_temporal_provider,
