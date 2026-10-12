@@ -10,6 +10,7 @@
  */
 #include "system-settings/location-metadata.h"
 #include "system-settings/temporal-policy-store.h"
+#include "linux-advisory-lock.h"
 
 #include <glib.h>
 #include <infiltratr/posix.h>
@@ -20,10 +21,10 @@
 #include <fcntl.h>
 #include <math.h>
 #include <string.h>
-#include <sys/file.h>
 #include <unistd.h>
 
-static int locality_transaction_lock_fd = -1;
+static SsLinuxAdvisoryLock locality_transaction_lock =
+    SS_LINUX_ADVISORY_LOCK_INIT;
 
 #define SS_LOCALITY_LOCK_WAIT_USEC (250 * 1000)
 #define SS_LOCK_RETRY_USEC 5000
@@ -72,54 +73,29 @@ bool ss_location_metadata_transaction_begin(void)
 {
     g_autofree gchar *directory = metadata_directory_path();
     g_autofree gchar *lock_path = metadata_lock_path();
-    int fd;
+    SsLinuxAdvisoryLockResult result;
 
-    if (locality_transaction_lock_fd >= 0 ||
-        directory == NULL || lock_path == NULL) {
-        return false;
-    }
-    if (g_mkdir_with_parents(directory, 0700) != 0 && errno != EEXIST) {
-        return false;
-    }
-    if (g_chmod(directory, 0700) != 0) {
+    if (directory == NULL || lock_path == NULL) {
         return false;
     }
 
-    fd = open(lock_path, O_CREAT | O_RDWR | O_CLOEXEC, 0600);
-    if (fd < 0) {
-        return false;
+    result = ss_linux_advisory_lock_acquire(
+        &locality_transaction_lock,
+        directory,
+        lock_path,
+        SS_LOCALITY_LOCK_WAIT_USEC,
+        SS_LOCK_RETRY_USEC);
+    if (result == SS_LINUX_ADVISORY_LOCK_BUSY) {
+        g_debug("Locality metadata transaction lock is busy.");
+    } else if (result == SS_LINUX_ADVISORY_LOCK_IO_ERROR) {
+        g_warning("Unable to acquire the locality metadata transaction lock due to an I/O error.");
     }
-    {
-        const gint64 deadline =
-            g_get_monotonic_time() + SS_LOCALITY_LOCK_WAIT_USEC;
-        for (;;) {
-            if (flock(fd, LOCK_EX | LOCK_NB) == 0) {
-                break;
-            }
-            if (errno == EINTR) {
-                continue;
-            }
-            if ((errno != EWOULDBLOCK && errno != EAGAIN) ||
-                g_get_monotonic_time() >= deadline) {
-                (void)close(fd);
-                return false;
-            }
-            g_usleep(SS_LOCK_RETRY_USEC);
-        }
-    }
-
-    locality_transaction_lock_fd = fd;
-    return true;
+    return result == SS_LINUX_ADVISORY_LOCK_OK;
 }
 
 void ss_location_metadata_transaction_end(void)
 {
-    if (locality_transaction_lock_fd < 0) {
-        return;
-    }
-    (void)flock(locality_transaction_lock_fd, LOCK_UN);
-    (void)close(locality_transaction_lock_fd);
-    locality_transaction_lock_fd = -1;
+    ss_linux_advisory_lock_release(&locality_transaction_lock);
 }
 
 /* Validate fixed arrays before passing them to NUL-terminated GLib APIs. */
@@ -252,7 +228,6 @@ static bool metadata_save_path(
         0600,
         NULL);
 }
-
 
 SsLocationMetadataLoadStatus
 ss_location_metadata_load_status(SsLocationMetadata *metadata)
