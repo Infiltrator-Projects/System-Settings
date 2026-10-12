@@ -338,15 +338,15 @@ bool ss_location_metadata_finish_staged(void)
     return true;
 }
 
-bool ss_location_metadata_recover(
-    bool location_configured,
-    double latitude,
-    double longitude)
+bool ss_location_metadata_recover(void)
 {
     SsLocationMetadata staged = {0};
     g_autofree gchar *path = NULL;
+    double latitude = 0.0;
+    double longitude = 0.0;
     double latitude_difference;
     double longitude_difference;
+    bool location_configured = false;
     bool recovered = true;
 
     if (!ss_location_metadata_transaction_begin()) {
@@ -354,9 +354,9 @@ bool ss_location_metadata_recover(
     }
 
     /*
-     * The supplied coordinates may have been read before this process waited
-     * for the locality lock. Re-read the authoritative policy after acquiring
-     * the lock so recovery never decides against a stale pre-lock snapshot.
+     * Recovery owns its authority read. The temporal policy is loaded only
+     * after the locality lock is held, so no caller can accidentally supply a
+     * stale pre-lock snapshot and influence the recovery decision.
      */
     {
         const SsTemporalPolicyStore *store =
@@ -368,8 +368,8 @@ bool ss_location_metadata_recover(
             !store->load(&authoritative, &found)) {
             /*
              * Recovery must be conservative: if the authoritative policy
-             * cannot be read after taking the locality lock, do not destroy
-             * the journal or make a decision from the caller's pre-lock view.
+             * cannot be read after taking the locality lock, preserve the
+             * journal for a later retry.
              */
             recovered = false;
             goto done;
