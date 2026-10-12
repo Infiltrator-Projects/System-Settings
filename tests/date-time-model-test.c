@@ -61,8 +61,8 @@ int main(void)
         .load = fake_load,
         .save = fake_save
     };
-    SsDateTimeModel model;
-    SsDateTimeModel bootstrap_model;
+    SsDateTimeModel model = SS_DATE_TIME_MODEL_INIT;
+    SsDateTimeModel bootstrap_model = SS_DATE_TIME_MODEL_INIT;
     SsDateTimePolicyDraft *draft;
     InfiltratrTemporalPolicyV3 before;
 
@@ -164,5 +164,9 @@ int main(void)
     CHECK(policy_of(&model)->show_seconds == before.show_seconds);
     ss_date_time_policy_draft_free(draft);
 
+    ss_date_time_model_clear(&bootstrap_model);
+    ss_date_time_model_clear(&model);
+    CHECK(ss_date_time_model_policy(&model) == NULL);
+    CHECK(!ss_date_time_model_reload(&model));
     return 0;
 }
