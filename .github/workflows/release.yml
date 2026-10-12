@@ -8,35 +8,30 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   publish:
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_branch == 'main' &&
-      startsWith(github.event.workflow_run.head_commit.message, 'Release ')
+      github.event.workflow_run.head_branch == 'main'
     permissions:
       contents: write
+      actions: read
     runs-on: ubuntu-24.04
+    outputs:
+      release_candidate: ${{ steps.classify.outputs.candidate }}
+      release_version: ${{ steps.classify.outputs.version }}
     steps:
-      - name: Check out approved main commit
+      - name: Check out exact tested main commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
-          submodules: recursive
 
-      - name: Set reproducible build epoch
-        shell: bash
-        run: echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)" >> "$GITHUB_ENV"
-
-      - name: Install build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake libgtk-4-dev libgeocode-glib-dev pkg-config xvfb dbus-x11
-
-      - name: Verify release identity
+      - name: Classify release from VERSION
+        id: classify
         shell: bash
         run: |
           set -euo pipefail
@@ -44,39 +39,66 @@ jobs:
           test "$(git rev-parse HEAD)" = "$expected"
           git fetch origin main --tags
           test "$(git rev-parse origin/main)" = "$expected"
-          version="$(cat VERSION)"
-          subject="$(git log -1 --format=%s)"
-          [[ "$subject" == "Release $version"* ]]
 
-      - name: Build and test package
+          version="$(tr -d '[:space:]' < VERSION)"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          tag="v$version"
+          existing="$(git ls-remote origin "refs/tags/$tag" | awk '{print $1}')"
+
+          candidate=true
+          if [[ -n "$existing" && "$existing" != "$expected" ]]; then
+            candidate=false
+            echo "VERSION $version is already released from $existing; this is a normal post-release main commit."
+          fi
+
+          echo "candidate=$candidate" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "sha=$expected" >> "$GITHUB_OUTPUT"
+
+      - name: Download exact CI-tested release bytes
+        if: steps.classify.outputs.candidate == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: system-settings-release-assets
+          path: release-assets
+          github-token: ${{ github.token }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Verify release artifact identity
+        if: steps.classify.outputs.candidate == 'true'
+        shell: bash
         run: |
-          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON \
-            -DSYSTEM_SETTINGS_BUILD_PROFILE=generic
-          cmake --build build --parallel "$(($(nproc)>1?$(nproc)-1:1))"
-          ctest --test-dir build --output-on-failure
-          cd build
-          cpack -G DEB
+          set -euo pipefail
+          version="${{ steps.classify.outputs.version }}"
+          deb="release-assets/infiltrator-system-settings_${version}_amd64.deb"
+          native="release-assets/System-Settings-${version}-native.run"
+          source="release-assets/System-Settings-${version}-source.zip"
 
-      - name: Build native installer and complete source archive
-        run: ./build/system-settings-source-asset-builder build
+          test -s "$deb"
+          test -s "$native"
+          test -s "$source"
+          test "$(dpkg-deb -f "$deb" Package)" = "infiltrator-system-settings"
+          test "$(dpkg-deb -f "$deb" Version)" = "$version"
+          chmod +x "$native"
+          (cd release-assets && sha256sum \
+            "$(basename "$deb")" \
+            "$(basename "$native")" \
+            "$(basename "$source")" > SHA256SUMS)
 
-      - name: Publish verified release
+      - name: Publish or verify release
+        if: steps.classify.outputs.candidate == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          version="$(cat VERSION)"
-          tag="v$version"
-          sha="$(git rev-parse HEAD)"
-          deb="$(find build -maxdepth 1 -type f -name 'infiltrator-system-settings_*.deb' -print -quit)"
-          test -n "$deb"
-          test -s "$deb"
-          native="build/System-Settings-$version-native.run"
-          source="build/System-Settings-$version-source.zip"
-          test -s "$native"
-          test -s "$source"
-          (cd build && sha256sum "$(basename "$deb")" "$(basename "$native")" "$(basename "$source")" > SHA256SUMS)
+          version="${{ steps.classify.outputs.version }}"
+          tag="${{ steps.classify.outputs.tag }}"
+          sha="${{ steps.classify.outputs.sha }}"
+          deb="release-assets/infiltrator-system-settings_${version}_amd64.deb"
+          native="release-assets/System-Settings-${version}-native.run"
+          source="release-assets/System-Settings-${version}-source.zip"
 
           existing="$(git ls-remote origin "refs/tags/$tag" | awk '{print $1}')"
           if [[ -n "$existing" && "$existing" != "$sha" ]]; then
@@ -89,50 +111,31 @@ jobs:
           fi
 
           if gh release view "$tag" >/dev/null 2>&1; then
-            echo "Release $tag already exists; verifying the exact published asset set."
             verify="$(mktemp -d)"
             trap 'rm -rf "$verify"' EXIT
-            expected_names="$(
-              printf '%s\n' \
-                "$(basename "$deb")" \
-                "$(basename "$native")" \
-                "$(basename "$source")" \
-                "SHA256SUMS" | sort
-            )"
-            actual_names="$(
-              gh release view "$tag" --json assets --jq '.assets[].name' | sort
-            )"
+            expected_names="$(printf '%s\n' \
+              "$(basename "$deb")" \
+              "$(basename "$native")" \
+              "$(basename "$source")" \
+              "SHA256SUMS" | sort)"
+            actual_names="$(gh release view "$tag" --json assets --jq '.assets[].name' | sort)"
             test "$actual_names" = "$expected_names"
             gh release download "$tag" --dir "$verify"
-            for asset in "$deb" "$native" "$source" build/SHA256SUMS; do
-              name="$(basename "$asset")"
-              test -s "$verify/$name"
-              cmp "$asset" "$verify/$name"
+            for asset in "$deb" "$native" "$source" release-assets/SHA256SUMS; do
+              cmp "$asset" "$verify/$(basename "$asset")"
             done
             (cd "$verify" && sha256sum -c SHA256SUMS)
           else
-            gh release create "$tag" "$deb" "$native" "$source" build/SHA256SUMS \
+            gh release create "$tag" "$deb" "$native" "$source" release-assets/SHA256SUMS \
               --verify-tag \
               --target "$sha" \
               --title "System Settings $version" \
               --generate-notes
           fi
 
-  branch-hygiene:
-    name: Keep only main branch
-    needs: publish
-    if: needs.publish.result == 'success'
-    permissions:
-      contents: write
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Check out published repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          ref: main
-          fetch-depth: 0
-
-      - name: Delete every non-main branch
+      - name: Keep only main branch
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -142,68 +145,42 @@ jobs:
               | grep -Ev '^(HEAD|main)$' || true
           )
           for branch in "${branches[@]}"; do
-            echo "Deleting merged/stale branch: $branch"
             git push origin --delete "$branch"
           done
-
           git fetch origin '+refs/heads/*:refs/remotes/origin/*' --prune
           mapfile -t remaining < <(
             git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin \
               | grep -v '^HEAD$'
           )
-          if (( ${#remaining[@]} != 1 )) || [[ "${remaining[0]}" != "main" ]]; then
-            printf 'Unexpected remaining branches: %s\n' "${remaining[*]}" >&2
-            exit 1
-          fi
+          (( ${#remaining[@]} == 1 ))
+          [[ "${remaining[0]}" == "main" ]]
 
   apt-publication:
-    name: Observe central APT pull publication
+    name: Observe central APT publication
     needs: publish
-    if: needs.publish.result == 'success'
-    # The central repository is an independent downstream pull consumer.
-    # Keep publication visibility here, but never turn a verified GitHub
-    # release into a failed release because that external service is delayed.
+    if: needs.publish.outputs.release_candidate == 'true'
     continue-on-error: true
     permissions:
       contents: read
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 15
     steps:
-      - name: Check out exact published commit
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-          fetch-depth: 1
-
-      - name: Observe central APT pull publication
+      - name: Wait for central catalogue
         env:
-          RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+          VERSION: ${{ needs.publish.outputs.release_version }}
           APP_ID: system-settings
         shell: bash
         run: |
           set -euo pipefail
-          VERSION="$(tr -d '[:space:]' < VERSION)"
-          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           catalogue='https://infiltrator-projects.github.io/Infiltrator-Repository/catalogue/apps.json'
-
-          if curl -fsS --retry 2 --retry-delay 1 "$catalogue?release=$RELEASE_SHA&attempt=0" \
-            | jq -e --arg id "$APP_ID" --arg version "$VERSION" \
-              '.[] | select(.id == $id and .version == $version)' >/dev/null; then
-            echo "APT repository already advertises $APP_ID $VERSION."
-            exit 0
-          fi
-
-          echo "Waiting for the central repository to pull $APP_ID $VERSION."
-          for attempt in $(seq 1 120); do
-            if curl -fsS --retry 2 --retry-delay 1 "$catalogue?release=$RELEASE_SHA&attempt=$attempt" \
+          for attempt in $(seq 0 72); do
+            if curl -fsS --retry 2 --retry-delay 1 "$catalogue?version=$VERSION&attempt=$attempt" \
               | jq -e --arg id "$APP_ID" --arg version "$VERSION" \
                 '.[] | select(.id == $id and .version == $version)' >/dev/null; then
               echo "APT repository advertises $APP_ID $VERSION."
               exit 0
             fi
-            echo "Waiting for APT publication of $APP_ID $VERSION ($attempt/120)..."
             sleep 10
           done
-
-          echo "::warning::Central APT repository did not advertise $APP_ID $VERSION within 20 minutes; the verified GitHub release remains valid."
+          echo "::warning::Central APT repository did not advertise $APP_ID $VERSION within 12 minutes."
           exit 1
