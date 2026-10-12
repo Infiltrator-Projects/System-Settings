@@ -11,39 +11,27 @@
 #include <infiltratr/core.h>
 #include <math.h>
 #include <stdlib.h>
-#include <string.h>
 
-typedef struct SsDateTimeModelPrivate {
+struct SsDateTimeModelPrivate {
     InfiltratrTemporalPolicyV3 policy;
     const SsTemporalPolicyStore *store;
     bool persisted_policy_present;
     bool saving;
-} SsDateTimeModelPrivate;
+};
 
 struct SsDateTimePolicyDraft {
     InfiltratrTemporalPolicyV3 policy;
 };
 
-_Static_assert(
-    sizeof(SsDateTimeModelPrivate) <= SS_DATE_TIME_MODEL_STORAGE_SIZE,
-    "SsDateTimeModel private representation exceeds public opaque storage");
-_Static_assert(
-    _Alignof(SsDateTimeModelPrivate) <= _Alignof(SsDateTimeModel),
-    "SsDateTimeModel opaque storage has insufficient alignment");
-
 static SsDateTimeModelPrivate *model_private(SsDateTimeModel *model)
 {
-    return model != NULL
-        ? (SsDateTimeModelPrivate *)(void *)model->_storage
-        : NULL;
+    return model != NULL ? model->_private : NULL;
 }
 
 static const SsDateTimeModelPrivate *model_private_const(
     const SsDateTimeModel *model)
 {
-    return model != NULL
-        ? (const SsDateTimeModelPrivate *)(const void *)model->_storage
-        : NULL;
+    return model != NULL ? model->_private : NULL;
 }
 
 static const InfiltratrTemporalClockModeInfo *valid_clock_mode(
@@ -172,20 +160,34 @@ bool ss_date_time_model_init(
 {
     SsDateTimeModelPrivate *private_state;
 
-    if (model == NULL || store == NULL || store->load == NULL ||
-        store->save == NULL ||
+    if (model == NULL || model->_private != NULL ||
+        store == NULL || store->load == NULL || store->save == NULL ||
         ((store->begin_update == NULL) != (store->end_update == NULL))) {
         return false;
     }
 
-    memset(model, 0, sizeof(*model));
-    private_state = model_private(model);
+    private_state = calloc(1U, sizeof(*private_state));
     if (private_state == NULL ||
         !infiltratr_temporal_policy_v3_default(&private_state->policy)) {
+        free(private_state);
         return false;
     }
     private_state->store = store;
-    return ss_date_time_model_reload(model);
+    model->_private = private_state;
+    if (!ss_date_time_model_reload(model)) {
+        ss_date_time_model_clear(model);
+        return false;
+    }
+    return true;
+}
+
+void ss_date_time_model_clear(SsDateTimeModel *model)
+{
+    if (model == NULL) {
+        return;
+    }
+    free(model->_private);
+    model->_private = NULL;
 }
 
 bool ss_date_time_model_reload(SsDateTimeModel *model)
