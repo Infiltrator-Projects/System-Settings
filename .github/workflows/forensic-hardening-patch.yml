@@ -18,7 +18,7 @@ jobs:
           ref: fix/forensic-hardening-0.4.76
           fetch-depth: 0
 
-      - name: Apply exact lifecycle and CI-gate edits
+      - name: Apply exact model lifecycle edits
         shell: python
         run: |
           from pathlib import Path
@@ -57,30 +57,13 @@ jobs:
               raise SystemExit("unexpected model init macro")
           header.write_text(text.replace(old_init, "#define SS_DATE_TIME_MODEL_INIT { 0 }"))
 
-          ci = Path(".github/workflows/ci.yml")
-          text = ci.read_text()
-          old_trigger = "on:\n  push:\n    branches: [main]\n  workflow_dispatch:\n"
-          new_trigger = (
-              "on:\n"
-              "  push:\n"
-              "    branches: [main]\n"
-              "  pull_request:\n"
-              "    branches: [main]\n"
-              "  workflow_dispatch:\n"
-          )
-          if text.count(old_trigger) != 1:
-              raise SystemExit("unexpected CI trigger block")
-          ci.write_text(text.replace(old_trigger, new_trigger))
-
-          Path(".github/workflows/forensic-hardening-patch.yml").unlink()
-
-      - name: Commit final hardening edits
+      - name: Commit source hardening edits
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
+          git add src/modules/date-time/linux-date-time-panel.c include/system-settings/date-time-model.h
           git diff --cached --check
-          git commit -m "Finish forensic hardening lifecycle and PR gate"
+          git commit -m "Finish Date and Time model lifecycle hardening"
           git push origin HEAD:fix/forensic-hardening-0.4.76
