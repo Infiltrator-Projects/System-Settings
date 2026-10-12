@@ -35,7 +35,9 @@ bool ss_linux_date_time_panel_read_system_time(
     return state != NULL &&
            out != NULL &&
            ss_linux_date_time_system_time_state_const(state)->service != NULL &&
-           ss_system_time_service_read(ss_linux_date_time_system_time_state_const(state)->service, out);
+           ss_system_time_service_read(
+               ss_linux_date_time_system_time_state_const(state)->service,
+               out) == SS_SYSTEM_TIME_RESULT_OK;
 }
 
 static guint timezone_index_for_id(
@@ -129,8 +131,9 @@ void ss_linux_date_time_system_time_sync(SsLinuxDateTimePanel *state)
     }
 
     if (ss_linux_date_time_system_time_state(state)->service == NULL ||
-        !ss_system_time_service_read(
-            ss_linux_date_time_system_time_state(state)->service, &system_state)) {
+        ss_system_time_service_read(
+            ss_linux_date_time_system_time_state(state)->service,
+            &system_state) != SS_SYSTEM_TIME_RESULT_OK) {
         if (ss_linux_date_time_system_time_state(state)->timezone != NULL) {
             gtk_widget_set_sensitive(
                 GTK_WIDGET(ss_linux_date_time_system_time_state(state)->timezone), FALSE);
@@ -344,7 +347,7 @@ static SystemTimeUiRequest *begin_system_time_operation(
 
 static void system_time_operation_complete(
     SsSystemTimeService *service G_GNUC_UNUSED,
-    bool success,
+    SsSystemTimeResult result,
     const char *error_message,
     gpointer user_data)
 {
@@ -369,7 +372,7 @@ static void system_time_operation_complete(
         if (cancellable != NULL) {
             g_clear_object(cancellable);
         }
-        if (success) {
+        if (result == SS_SYSTEM_TIME_RESULT_OK) {
             SsSystemTimeState observed = {0};
             const char *observed_timezone = NULL;
 
@@ -393,11 +396,14 @@ static void system_time_operation_complete(
                     : "Operating-system date/time settings updated.",
                 metadata_out_of_sync);
         } else {
+            const char *message = error_message != NULL
+                ? error_message
+                : ss_system_time_result_default_message(result);
             ss_linux_date_time_system_time_sync(state);
             ss_linux_date_time_panel_set_status(
                 state,
-                error_message != NULL
-                    ? error_message
+                message != NULL
+                    ? message
                     : "The operating-system date/time setting could not be changed.",
                 true);
         }
@@ -629,6 +635,7 @@ void on_manual_set_time_clicked(
 
 static void system_time_service_ready(
     SsSystemTimeService *service,
+    SsSystemTimeResult result,
     const char *error_message,
     gpointer user_data)
 {
@@ -642,11 +649,14 @@ static void system_time_service_ready(
         return;
     }
 
-    if (service == NULL) {
+    if (service == NULL || result != SS_SYSTEM_TIME_RESULT_OK) {
+        const char *message = error_message != NULL
+            ? error_message
+            : ss_system_time_result_default_message(result);
         ss_linux_date_time_panel_set_status(
             state,
-            error_message != NULL
-                ? error_message
+            message != NULL
+                ? message
                 : "The operating-system date/time service is unavailable.",
             true);
         ss_linux_date_time_lifetime_unref(lifetime);
@@ -660,8 +670,17 @@ static void system_time_service_ready(
         state);
     ss_linux_date_time_system_time_sync(state);
     SsSystemTimeState initial;
-    if (!ss_system_time_service_read(service, &initial)) {
-        ss_linux_date_time_panel_set_status(state, "The operating-system date/time service is unavailable.", true);
+    const SsSystemTimeResult initial_result =
+        ss_system_time_service_read(service, &initial);
+    if (initial_result != SS_SYSTEM_TIME_RESULT_OK) {
+        const char *message =
+            ss_system_time_result_default_message(initial_result);
+        ss_linux_date_time_panel_set_status(
+            state,
+            message != NULL
+                ? message
+                : "The operating-system date/time service is unavailable.",
+            true);
         ss_linux_date_time_lifetime_unref(lifetime);
         return;
     }
