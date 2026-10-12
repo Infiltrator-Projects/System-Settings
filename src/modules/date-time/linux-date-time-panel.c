@@ -1123,6 +1123,7 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
                 G_IO_ERROR_FAILED,
                 "Unable to read the temporal policy during locality recovery.");
             ss_linux_date_time_preview_dispose(state);
+            ss_date_time_model_clear(&state->model);
             g_free(state);
             return NULL;
         }
@@ -1156,6 +1157,7 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
                 G_IO_ERROR_FAILED,
                 "Unable to observe the temporal policy.");
             ss_linux_date_time_preview_dispose(state);
+            ss_date_time_model_clear(&state->model);
             g_free(state);
             return NULL;
         }
@@ -1177,6 +1179,7 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
             ss_policy_file_observer_free(state->policy_observer);
             state->policy_observer = NULL;
             ss_linux_date_time_preview_dispose(state);
+            ss_date_time_model_clear(&state->model);
             g_free(state);
             return NULL;
         }
@@ -1283,5 +1286,6 @@ void ss_linux_date_time_panel_free(gpointer data)
     }
     ss_linux_date_time_lifetime_unref(state->lifetime);
     state->lifetime = NULL;
+    ss_date_time_model_clear(&state->model);
     g_free(state);
 }

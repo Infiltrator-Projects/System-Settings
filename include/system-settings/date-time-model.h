@@ -29,7 +29,7 @@ typedef struct SsDateTimeModel {
     SsDateTimeModelPrivate *_private;
 } SsDateTimeModel;
 
-#define SS_DATE_TIME_MODEL_INIT { NULL }
+#define SS_DATE_TIME_MODEL_INIT { 0 }
 
 typedef struct SsDateTimePolicyDraft SsDateTimePolicyDraft;
 
