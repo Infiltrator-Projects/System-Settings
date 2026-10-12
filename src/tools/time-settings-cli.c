@@ -66,8 +66,8 @@ int main(int argc, char **argv)
     bool location_change_requested = false;
     bool location_clear_requested = false;
     bool output_persisted = false;
-    InfiltratrTemporalPolicyV3 original_policy;
-    InfiltratrTemporalPolicyV3 output_policy;
+    InfiltratrTemporalPolicyV3 original_policy = {0};
+    InfiltratrTemporalPolicyV3 output_policy = {0};
 #ifndef _WIN32
     SsLocationMetadata location_candidate = {0};
     bool location_staged = false;
