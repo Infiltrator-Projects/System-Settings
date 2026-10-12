@@ -649,6 +649,14 @@ static void system_time_service_ready(
         return;
     }
 
+    /*
+     * Proxy construction is complete on every callback path. Retaining this
+     * completed cancellable falsely made the controller look as though a
+     * connection attempt was still in flight and blocked a later restart.
+     */
+    g_clear_object(
+        &ss_linux_date_time_system_time_state(state)->service_cancellable);
+
     if (service == NULL || result != SS_SYSTEM_TIME_RESULT_OK) {
         const char *message = error_message != NULL
             ? error_message
