@@ -299,8 +299,10 @@ static void path_list_free(PathList *list)
     if (list == NULL) {
         return;
     }
-    for (size_t i = 0U; i < list->length; ++i) {
-        free(list->items[i]);
+    if (list->items != NULL) {
+        for (size_t i = 0U; i < list->length; ++i) {
+            free(list->items[i]);
+        }
     }
     free(list->items);
     memset(list, 0, sizeof(*list));
@@ -425,10 +427,14 @@ static bool trees_equal(
         !collect_files(right_root, "", &right)) {
         goto done;
     }
-    if (left.length > 1U && left.items != NULL) {
+    if ((left.length > 0U && left.items == NULL) ||
+        (right.length > 0U && right.items == NULL)) {
+        goto done;
+    }
+    if (left.length > 1U) {
         qsort(left.items, left.length, sizeof(*left.items), compare_paths);
     }
-    if (right.length > 1U && right.items != NULL) {
+    if (right.length > 1U) {
         qsort(right.items, right.length, sizeof(*right.items), compare_paths);
     }
     if (left.length != right.length) {
@@ -600,8 +606,11 @@ static bool write_common_manifest(const char *common_root)
             ".system-settings-common-sha256")) {
         goto done;
     }
+    if (list.length > 0U && list.items == NULL) {
+        goto done;
+    }
 
-    if (list.length > 1U && list.items != NULL) {
+    if (list.length > 1U) {
         qsort(list.items, list.length, sizeof(*list.items), compare_paths);
     }
     manifest = fopen(manifest_path, "wb");
