@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "system-settings/date-time-model.h"
 
+#include <infiltratr/core.h>
+
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>
