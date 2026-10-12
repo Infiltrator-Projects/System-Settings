@@ -8,6 +8,8 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Build and analysis jobs remain read-only. Only the final publish job receives
+# contents: write, after every required gate in this same workflow run passes.
 permissions:
   contents: read
   actions: read
@@ -295,3 +297,142 @@ jobs:
           LSAN_OPTIONS: suppressions=${{ github.workspace }}/tests/lsan.supp:print_suppressions=1
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
         run: ctest --test-dir build-sanitized --output-on-failure -R linux-shell
+
+  publish:
+    name: Publish exact tested release
+    needs: [linux, static-analysis, windows, sanitizers]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    concurrency:
+      group: system-settings-release
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Check out exact tested commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Classify release candidate
+        id: classify
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.sha }}"
+          test "$(git rev-parse HEAD)" = "$expected"
+
+          version="$(tr -d '[:space:]' < VERSION)"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          tag="v$version"
+          candidate=true
+
+          current_main="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          test -n "$current_main"
+          if [[ "$current_main" != "$expected" ]]; then
+            candidate=false
+            echo "Ignoring stale successful CI run $expected; main is now $current_main."
+          else
+            existing="$(git ls-remote origin "refs/tags/$tag" | awk '{print $1}')"
+            if [[ -n "$existing" && "$existing" != "$expected" ]]; then
+              candidate=false
+              echo "VERSION $version is already owned by $existing; this main commit is not a release candidate."
+            fi
+          fi
+
+          echo "candidate=$candidate" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "sha=$expected" >> "$GITHUB_OUTPUT"
+
+      - name: Download exact CI-tested release bytes
+        if: steps.classify.outputs.candidate == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: system-settings-release-assets
+          path: release-assets
+
+      - name: Seal exact tested bundle for publication
+        if: steps.classify.outputs.candidate == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t tested_assets < <(
+            find release-assets -maxdepth 1 -type f -print | sort
+          )
+          if [[ ${#tested_assets[@]} -eq 0 ]]; then
+            echo "CI release bundle is empty." >&2
+            exit 1
+          fi
+          for asset in "${tested_assets[@]}"; do
+            test -s "$asset"
+          done
+
+          # CI owns the asset contract. Publication adds only the checksum file;
+          # it never rebuilds or renames the already-tested release bytes.
+          (
+            cd release-assets
+            rm -f SHA256SUMS
+            mapfile -t names < <(
+              find . -maxdepth 1 -type f -printf '%f\n' | sort
+            )
+            if [[ ${#names[@]} -eq 0 ]]; then
+              echo "CI release bundle contained no publishable files." >&2
+              exit 1
+            fi
+            sha256sum "${names[@]}" > SHA256SUMS
+            sha256sum -c SHA256SUMS
+          )
+
+      - name: Publish or repair release
+        if: steps.classify.outputs.candidate == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ steps.classify.outputs.version }}"
+          tag="${{ steps.classify.outputs.tag }}"
+          sha="${{ steps.classify.outputs.sha }}"
+
+          mapfile -t assets < <(
+            find release-assets -maxdepth 1 -type f -print | sort
+          )
+          test -s release-assets/SHA256SUMS
+          [[ ${#assets[@]} -ge 2 ]]
+
+          tag_target="$(git ls-remote origin "refs/tags/$tag" | awk '{print $1}')"
+          if [[ -n "$tag_target" && "$tag_target" != "$sha" ]]; then
+            echo "Tag $tag already points to $tag_target, not tested commit $sha." >&2
+            exit 1
+          fi
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            # A rerun repairs a partial upload from this run's immutable tested
+            # artifact bundle rather than rebuilding or reaching into another run.
+            gh release upload "$tag" "${assets[@]}" --clobber
+          else
+            gh release create "$tag" "${assets[@]}" \
+              --target "$sha" \
+              --title "System Settings $version" \
+              --generate-notes
+          fi
+
+          expected_names="$(
+            find release-assets -maxdepth 1 -type f -printf '%f\n' | sort
+          )"
+          actual_names="$(gh release view "$tag" --json assets --jq '.assets[].name' | sort)"
+          test "$actual_names" = "$expected_names"
+
+          verify="$(mktemp -d)"
+          trap 'rm -rf "$verify"' EXIT
+          gh release download "$tag" --dir "$verify"
+          for asset in "${assets[@]}"; do
+            cmp "$asset" "$verify/$(basename "$asset")"
+          done
+          (cd "$verify" && sha256sum -c SHA256SUMS)
+
+# Central APT publication remains owned by Infiltrator-Repository. It discovers
+# verified GitHub releases and publishes its own signed catalogue independently.
