@@ -316,7 +316,7 @@ jobs:
           ref: ${{ github.sha }}
           fetch-depth: 0
 
-      - name: Classify release candidate
+      - name: Require releasable current main
         id: classify
         shell: bash
         run: |
@@ -337,8 +337,8 @@ jobs:
           else
             existing="$(git ls-remote origin "refs/tags/$tag" | awk '{print $1}')"
             if [[ -n "$existing" && "$existing" != "$expected" ]]; then
-              candidate=false
-              echo "VERSION $version is already owned by $existing; this main commit is not a release candidate."
+              echo "VERSION $version is already owned by $existing; current main $expected must use a new version before CI can be green." >&2
+              exit 1
             fi
           fi
 
