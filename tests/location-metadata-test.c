@@ -89,8 +89,9 @@ int main(void)
     ss_location_metadata_transaction_end();
 
     /*
-     * Interrupted paired locality writes leave a private journal. A matching
-     * authoritative policy finalizes it; a non-matching policy discards it.
+     * Interrupted paired locality writes leave a private journal. Recovery
+     * reads authoritative policy only after taking the locality lock. A
+     * matching policy finalizes the journal; a non-matching policy discards it.
      */
     {
         SsLocationMetadata staged = saved;
@@ -102,11 +103,10 @@ int main(void)
         staged.longitude = 146.2000;
 
         CHECK(ss_location_metadata_stage(&staged));
-        CHECK(ss_location_metadata_recover(
-            false, staged.latitude, staged.longitude));
+        CHECK(ss_location_metadata_recover());
         CHECK(!ss_location_metadata_load(&loaded));
-    CHECK(ss_location_metadata_load_status(&loaded) ==
-          SS_LOCATION_METADATA_LOAD_MISSING);
+        CHECK(ss_location_metadata_load_status(&loaded) ==
+              SS_LOCATION_METADATA_LOAD_MISSING);
 
         {
             const SsTemporalPolicyStore *store =
@@ -121,8 +121,7 @@ int main(void)
         }
 
         CHECK(ss_location_metadata_stage(&staged));
-        CHECK(ss_location_metadata_recover(
-            true, staged.latitude, staged.longitude));
+        CHECK(ss_location_metadata_recover());
         CHECK(ss_location_metadata_load(&loaded));
         CHECK(strcmp(loaded.display_name, "Staged locality") == 0);
         CHECK(absolute_difference(
@@ -151,7 +150,7 @@ int main(void)
         CHECK(infiltratr_temporal_policy_v3_default(&authoritative));
         CHECK(store->save(&authoritative));
     }
-    CHECK(ss_location_metadata_recover(false, 0.0, 0.0));
+    CHECK(ss_location_metadata_recover());
     CHECK(!g_file_test(expected_file, G_FILE_TEST_EXISTS));
     CHECK(ss_location_metadata_save(&saved));
 
@@ -202,7 +201,7 @@ int main(void)
         staged.longitude = 145.0;
         CHECK(ss_location_metadata_stage(&staged));
         CHECK(g_chmod(pending_file, 0000) == 0);
-        CHECK(!ss_location_metadata_recover(false, 0.0, 0.0));
+        CHECK(!ss_location_metadata_recover());
         CHECK(g_file_test(pending_file, G_FILE_TEST_IS_REGULAR));
         CHECK(g_chmod(pending_file, 0600) == 0);
         CHECK(ss_location_metadata_discard_staged());

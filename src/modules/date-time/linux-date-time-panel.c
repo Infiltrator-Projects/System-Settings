@@ -408,19 +408,13 @@ static void location_metadata_file_changed(gpointer user_data)
 static gboolean retry_locality_recovery(gpointer user_data)
 {
     SsLinuxDateTimePanel *state = user_data;
-    const InfiltratrTemporalPolicyV3 *policy;
 
     if (state == NULL) {
         return G_SOURCE_REMOVE;
     }
 
     state->location.recovery_retry_id = 0U;
-    policy = ss_date_time_model_policy(&state->model);
-    if (policy != NULL &&
-        ss_location_metadata_recover(
-            policy->location_configured,
-            policy->latitude,
-            policy->longitude)) {
+    if (ss_location_metadata_recover()) {
         state->location.recovery_failed = false;
         state->location.recovery_retry_seconds = 2U;
         location_metadata_file_changed(state);
@@ -478,11 +472,7 @@ static void policy_file_changed(gpointer user_data)
         const InfiltratrTemporalPolicyV3 *policy =
             ss_date_time_model_policy(&state->model);
         const bool locality_recovery_ok =
-            policy != NULL &&
-            ss_location_metadata_recover(
-                policy->location_configured,
-                policy->latitude,
-                policy->longitude);
+            policy != NULL && ss_location_metadata_recover();
         SsLocationMetadata recovered_metadata = {0};
         const SsLocationMetadataLoadStatus recovered_metadata_status =
             locality_recovery_ok
@@ -1128,10 +1118,7 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
             return NULL;
         }
         state->location.recovery_failed =
-            !ss_location_metadata_recover(
-                policy->location_configured,
-                policy->latitude,
-                policy->longitude);
+            !ss_location_metadata_recover();
     }
     {
         const SsLocationMetadataLoadStatus metadata_status =

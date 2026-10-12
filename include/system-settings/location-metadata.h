@@ -84,14 +84,14 @@ bool ss_location_metadata_finish_staged(void);
 bool ss_location_metadata_discard_staged(void);
 
 /**
- * Recover an interrupted two-file locality transaction. If the staged
- * coordinates match the authoritative temporal policy, finalize metadata;
- * otherwise discard the abandoned stage. No staged file is also success.
+ * Recover an interrupted two-file locality transaction.
+ *
+ * Recovery acquires the locality lock and then reads the authoritative temporal
+ * policy itself. Callers deliberately provide no pre-lock policy snapshot: if
+ * staged coordinates match the authoritative policy, metadata is finalized;
+ * otherwise the abandoned stage is discarded. No staged file is also success.
  */
-bool ss_location_metadata_recover(
-    bool location_configured,
-    double latitude,
-    double longitude);
+bool ss_location_metadata_recover(void);
 
 #ifdef __cplusplus
 }
