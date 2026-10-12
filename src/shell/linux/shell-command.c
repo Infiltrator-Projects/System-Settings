@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#define _POSIX_C_SOURCE 200809L
 /**
  * @file shell-command.c
  * @brief Trusted external-settings delegation shared by shell surfaces.
@@ -8,6 +9,7 @@
 
 #include <glib/gstdio.h>
 #include <stddef.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 
@@ -73,32 +75,92 @@ static gboolean mode_is_trusted(mode_t mode)
     return (mode & (S_IWGRP | S_IWOTH)) == 0;
 }
 
-static gboolean trusted_system_executable(
-    const char *directory,
-    const char *candidate)
+static gboolean trusted_directory(const char *path)
 {
-    GStatBuf directory_stat;
-    GStatBuf executable_stat;
+    GStatBuf status;
 
-    if (directory == NULL || candidate == NULL ||
-        g_stat(directory, &directory_stat) != 0 ||
-        !S_ISDIR(directory_stat.st_mode) ||
-        directory_stat.st_uid != 0 ||
-        !mode_is_trusted(directory_stat.st_mode) ||
-        g_stat(candidate, &executable_stat) != 0 ||
-        !S_ISREG(executable_stat.st_mode) ||
-        executable_stat.st_uid != 0 ||
-        !mode_is_trusted(executable_stat.st_mode)) {
+    return path != NULL &&
+           g_stat(path, &status) == 0 &&
+           S_ISDIR(status.st_mode) &&
+           status.st_uid == 0 &&
+           mode_is_trusted(status.st_mode);
+}
+
+/*
+ * realpath() removes every symlink component. Verify every directory in that
+ * resolved path, not merely the directory in which the command name was
+ * discovered. A distribution-managed symlink may therefore point elsewhere,
+ * but no unprivileged writable directory can sit between / and the executable.
+ */
+static gboolean trusted_parent_chain(const char *resolved_path)
+{
+    g_autofree gchar *current = NULL;
+
+    if (resolved_path == NULL || !g_path_is_absolute(resolved_path)) {
         return FALSE;
     }
 
+    current = g_path_get_dirname(resolved_path);
+    while (current != NULL) {
+        g_autofree gchar *parent = NULL;
+
+        if (!trusted_directory(current)) {
+            return FALSE;
+        }
+        if (g_str_equal(current, G_DIR_SEPARATOR_S)) {
+            return TRUE;
+        }
+
+        parent = g_path_get_dirname(current);
+        if (parent == NULL || g_str_equal(parent, current)) {
+            return FALSE;
+        }
+        g_free(current);
+        current = g_steal_pointer(&parent);
+    }
+    return FALSE;
+}
+
+static gchar *trusted_system_executable(
+    const char *directory,
+    const char *candidate)
+{
+    GStatBuf executable_stat;
+    char *resolved_native;
+    gchar *resolved;
+
+    if (directory == NULL || candidate == NULL ||
+        !trusted_directory(directory)) {
+        return NULL;
+    }
+
+    resolved_native = realpath(candidate, NULL);
+    if (resolved_native == NULL) {
+        return NULL;
+    }
+    resolved = g_strdup(resolved_native);
+    free(resolved_native);
+    if (resolved == NULL) {
+        return NULL;
+    }
+
+    if (g_stat(resolved, &executable_stat) != 0 ||
+        !S_ISREG(executable_stat.st_mode) ||
+        executable_stat.st_uid != 0 ||
+        !mode_is_trusted(executable_stat.st_mode) ||
+        !trusted_parent_chain(resolved) ||
+        !g_file_test(resolved, G_FILE_TEST_IS_EXECUTABLE)) {
+        g_free(resolved);
+        return NULL;
+    }
+
     /*
-     * g_stat() follows a final symlink, allowing normal distribution-managed
-     * command links while still requiring the resolved executable itself to be
-     * root-owned and non-writable by group/other users. The containing search
-     * directory is independently held to the same trust requirement.
+     * Return the canonical path rather than the symlink-bearing discovery
+     * path. With every parent directory root-owned and non-writable by
+     * group/other users, an unprivileged process cannot redirect the checked
+     * path between validation and g_subprocess_newv().
      */
-    return g_file_test(candidate, G_FILE_TEST_IS_EXECUTABLE);
+    return resolved;
 }
 
 gchar *find_trusted_system_program(const char *program)
@@ -120,8 +182,10 @@ gchar *find_trusted_system_program(const char *program)
     for (size_t index = 0U; index < G_N_ELEMENTS(directories); ++index) {
         g_autofree gchar *candidate =
             g_build_filename(directories[index], program, NULL);
-        if (trusted_system_executable(directories[index], candidate)) {
-            return g_steal_pointer(&candidate);
+        gchar *resolved =
+            trusted_system_executable(directories[index], candidate);
+        if (resolved != NULL) {
+            return resolved;
         }
     }
     return NULL;
