@@ -9,6 +9,7 @@
  */
 
 #include "builtin-module-host.h"
+#include "builtin-module-ids.h"
 
 #include "linux-date-time-panel.h"
 
@@ -53,8 +54,8 @@ static void destroy_date_time_module(gpointer controller)
 
 static const SsBuiltinModuleDescriptor builtin_modules[] = {
     {
-        .page_id = "date-time",
-        .manifest_filename = "date-time.settings-module",
+        .page_id = SS_BUILTIN_PAGE_ID_DATE_TIME,
+        .manifest_filename = SS_BUILTIN_MANIFEST_DATE_TIME,
         .create = create_date_time_module,
         .widget = date_time_module_widget,
         .destroy = destroy_date_time_module,

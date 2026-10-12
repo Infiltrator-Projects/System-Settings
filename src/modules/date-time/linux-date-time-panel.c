@@ -366,7 +366,7 @@ void ss_linux_date_time_panel_system_time_service_ready(
     } else {
         ss_linux_date_time_panel_set_status(
             state,
-            state->model.persisted_policy_present
+            ss_date_time_model_has_persisted_policy(&state->model)
                 ? "Using the saved system-wide temporal policy. Native Mint/Linux date and time controls are live."
                 : "Using Mint/Cinnamon temporal preferences as the initial policy. Native Mint/Linux date and time controls are live.",
             false);
@@ -462,12 +462,17 @@ static void policy_file_changed(gpointer user_data)
 {
     SsLinuxDateTimePanel *state = user_data;
     InfiltratrTemporalPolicyV3 previous;
+    const InfiltratrTemporalPolicyV3 *current;
 
     if (state == NULL) {
         return;
     }
 
-    previous = state->model.policy;
+    current = ss_date_time_model_policy(&state->model);
+    if (current == NULL) {
+        return;
+    }
+    previous = *current;
     ss_linux_date_time_location_cancel_coordinate_commit(state);
     if (ss_date_time_model_reload(&state->model)) {
         const InfiltratrTemporalPolicyV3 *policy =
@@ -495,14 +500,11 @@ static void policy_file_changed(gpointer user_data)
             schedule_locality_recovery_retry(state);
         }
         const bool changed =
-            !temporal_policy_equal(&previous, &state->model.policy);
+            !temporal_policy_equal(&previous, policy);
         const bool manual_context_changed =
-            g_strcmp0(
-                previous.clock_mode,
-                state->model.policy.clock_mode) != 0 ||
-            g_strcmp0(
-                previous.calendar,
-                state->model.policy.calendar) != 0;
+            policy != NULL &&
+            (g_strcmp0(previous.clock_mode, policy->clock_mode) != 0 ||
+             g_strcmp0(previous.calendar, policy->calendar) != 0);
 
         /*
          * Preserve a user's typed wall-time draft across unrelated external
@@ -831,7 +833,8 @@ static void on_cinnamon_interface_changed(
     bool changed = false;
     bool reconciliation_attempted = false;
 
-    if (state == NULL || key == NULL || state->updating_controls || state->model.saving) {
+    if (state == NULL || key == NULL || state->updating_controls ||
+        ss_date_time_model_is_saving(&state->model)) {
         return;
     }
 
@@ -1054,6 +1057,7 @@ static bool migrate_legacy_native_clock(
     SsLinuxDateTimePanel *state)
 {
     const InfiltratrTemporalPolicyV3 *policy;
+    const char *native_clock_mode;
 
     if (state == NULL) {
         return false;
@@ -1065,15 +1069,14 @@ static bool migrate_legacy_native_clock(
         return true;
     }
 
-    if (!state->model.persisted_policy_present) {
-        infiltratr_copy_string(state->model.policy.clock_mode,
-            sizeof(state->model.policy.clock_mode),
-            ss_native_clock_mode_id(ss_linux_date_time_panel_desktop_uses_24h(state)));
-        return true;
+    native_clock_mode = ss_native_clock_mode_id(
+        ss_linux_date_time_panel_desktop_uses_24h(state));
+    if (!ss_date_time_model_has_persisted_policy(&state->model)) {
+        return ss_date_time_model_normalize_unpersisted_clock_mode(
+            &state->model, native_clock_mode);
     }
     return ss_date_time_model_set_clock_mode(
-        &state->model,
-        ss_native_clock_mode_id(ss_linux_date_time_panel_desktop_uses_24h(state)));
+        &state->model, native_clock_mode);
 }
 
 SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
@@ -1120,6 +1123,7 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
                 G_IO_ERROR_FAILED,
                 "Unable to read the temporal policy during locality recovery.");
             ss_linux_date_time_preview_dispose(state);
+            ss_date_time_model_clear(&state->model);
             g_free(state);
             return NULL;
         }
@@ -1153,6 +1157,7 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
                 G_IO_ERROR_FAILED,
                 "Unable to observe the temporal policy.");
             ss_linux_date_time_preview_dispose(state);
+            ss_date_time_model_clear(&state->model);
             g_free(state);
             return NULL;
         }
@@ -1174,6 +1179,7 @@ SsLinuxDateTimePanel *ss_linux_date_time_panel_new(
             ss_policy_file_observer_free(state->policy_observer);
             state->policy_observer = NULL;
             ss_linux_date_time_preview_dispose(state);
+            ss_date_time_model_clear(&state->model);
             g_free(state);
             return NULL;
         }
@@ -1280,5 +1286,6 @@ void ss_linux_date_time_panel_free(gpointer data)
     }
     ss_linux_date_time_lifetime_unref(state->lifetime);
     state->lifetime = NULL;
+    ss_date_time_model_clear(&state->model);
     g_free(state);
 }

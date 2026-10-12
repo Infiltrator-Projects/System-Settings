@@ -119,9 +119,13 @@ jobs:
           fi
 
   apt-publication:
-    name: Verify central APT pull publication
+    name: Observe central APT pull publication
     needs: publish
     if: needs.publish.result == 'success'
+    # The central repository is an independent downstream pull consumer.
+    # Keep publication visibility here, but never turn a verified GitHub
+    # release into a failed release because that external service is delayed.
+    continue-on-error: true
     permissions:
       contents: read
     runs-on: ubuntu-24.04
@@ -133,7 +137,7 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 1
 
-      - name: Verify central APT pull publication
+      - name: Observe central APT pull publication
         env:
           RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
           APP_ID: system-settings
@@ -163,5 +167,5 @@ jobs:
             sleep 10
           done
 
-          echo "::error::Central APT repository did not advertise $APP_ID $VERSION within 20 minutes."
+          echo "::warning::Central APT repository did not advertise $APP_ID $VERSION within 20 minutes; the verified GitHub release remains valid."
           exit 1

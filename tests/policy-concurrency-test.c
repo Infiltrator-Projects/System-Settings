@@ -21,28 +21,42 @@
         } \
     } while (0)
 
+static const InfiltratrTemporalPolicyV3 *policy_of(
+    const SsDateTimeModel *model)
+{
+    const InfiltratrTemporalPolicyV3 *policy =
+        ss_date_time_model_policy(model);
+    CHECK(policy != NULL);
+    return policy;
+}
+
 static int child_edit(int start_fd, bool calendar_edit)
 {
-    SsDateTimeModel model;
+    SsDateTimeModel model = SS_DATE_TIME_MODEL_INIT;
     char token;
+    int result;
 
     if (!ss_date_time_model_init(
             &model, ss_platform_temporal_policy_store())) {
         return EXIT_FAILURE;
     }
     if (read(start_fd, &token, 1U) != 1) {
+        ss_date_time_model_clear(&model);
         return EXIT_FAILURE;
     }
 
     if (calendar_edit) {
-        return ss_date_time_model_set_calendar(
-                   &model, "egyptian-nabonassar")
+        result = ss_date_time_model_set_calendar(
+                     &model, "egyptian-nabonassar")
+            ? EXIT_SUCCESS
+            : EXIT_FAILURE;
+    } else {
+        result = ss_date_time_model_set_show_seconds(&model, true)
             ? EXIT_SUCCESS
             : EXIT_FAILURE;
     }
-    return ss_date_time_model_set_show_seconds(&model, true)
-        ? EXIT_SUCCESS
-        : EXIT_FAILURE;
+    ss_date_time_model_clear(&model);
+    return result;
 }
 
 int main(int argc, char **argv)
@@ -55,8 +69,8 @@ int main(int argc, char **argv)
     pid_t calendar_child;
     pid_t seconds_child;
     int status = 0;
-    SsDateTimeModel initial;
-    SsDateTimeModel final;
+    SsDateTimeModel initial = SS_DATE_TIME_MODEL_INIT;
+    SsDateTimeModel final = SS_DATE_TIME_MODEL_INIT;
 
     CHECK(argc == 2);
     CHECK(root != NULL);
@@ -66,7 +80,7 @@ int main(int argc, char **argv)
         &initial, ss_platform_temporal_policy_store()));
     CHECK(ss_date_time_model_set_clock_mode(
         &initial, "standard-24"));
-    CHECK(!initial.policy.show_seconds);
+    CHECK(!policy_of(&initial)->show_seconds);
 
     CHECK(pipe(start_pipe) == 0);
     calendar_child = fork();
@@ -95,10 +109,10 @@ int main(int argc, char **argv)
     CHECK(ss_date_time_model_init(
         &final, ss_platform_temporal_policy_store()));
     CHECK(strcmp(
-        final.policy.calendar,
+        policy_of(&final)->calendar,
         "egyptian-nabonassar") == 0);
-    CHECK(final.policy.show_seconds);
-    CHECK(strcmp(final.policy.clock_mode, "standard-24") == 0);
+    CHECK(policy_of(&final)->show_seconds);
+    CHECK(strcmp(policy_of(&final)->clock_mode, "standard-24") == 0);
 
     /*
      * Exercise the public CLI transaction boundary too. Each process changes
@@ -134,9 +148,9 @@ int main(int argc, char **argv)
     CHECK(WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS);
 
     CHECK(ss_date_time_model_reload(&final));
-    CHECK(strcmp(final.policy.calendar, "gregorian") == 0);
-    CHECK(!final.policy.show_seconds);
-    CHECK(strcmp(final.policy.clock_mode, "standard-24") == 0);
+    CHECK(strcmp(policy_of(&final)->calendar, "gregorian") == 0);
+    CHECK(!policy_of(&final)->show_seconds);
+    CHECK(strcmp(policy_of(&final)->clock_mode, "standard-24") == 0);
 
     /*
      * Policy lock contention is bounded too. A wedged peer must result in a
@@ -186,5 +200,7 @@ int main(int argc, char **argv)
     }
     CHECK(g_rmdir(policy_dir) == 0);
     CHECK(g_rmdir(root) == 0);
+    ss_date_time_model_clear(&final);
+    ss_date_time_model_clear(&initial);
     return EXIT_SUCCESS;
 }

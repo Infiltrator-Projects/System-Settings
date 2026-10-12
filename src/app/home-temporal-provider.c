@@ -9,6 +9,7 @@
  */
 
 #include "home-temporal-provider.h"
+#include "builtin-module-ids.h"
 #include "home-temporal-presenter.h"
 
 struct SsHomeTemporalProvider {
@@ -23,7 +24,7 @@ SsHomeTemporalProvider *ss_home_temporal_provider_new(void)
 const char *ss_home_temporal_provider_page_id(
     const SsHomeTemporalProvider *provider)
 {
-    return provider != NULL ? "date-time" : NULL;
+    return provider != NULL ? SS_BUILTIN_PAGE_ID_DATE_TIME : NULL;
 }
 
 void ss_home_temporal_provider_free(SsHomeTemporalProvider *provider)

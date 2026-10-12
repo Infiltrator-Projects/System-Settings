@@ -65,7 +65,7 @@ static int publish_locality(
     int committed_fd,
     int release_fd)
 {
-    SsDateTimeModel model;
+    SsDateTimeModel model = SS_DATE_TIME_MODEL_INIT;
     SsLocationMetadata metadata = {0};
     int result = 1;
 
@@ -108,6 +108,7 @@ static int publish_locality(
     result = 0;
 
 done:
+    ss_date_time_model_clear(&model);
     ss_location_metadata_transaction_end();
     return result;
 }
@@ -184,16 +185,20 @@ int main(void)
     CHECK(wait_ok(first) == 0);
     CHECK(wait_ok(second) == 0);
 
-    SsDateTimeModel final_model;
+    SsDateTimeModel final_model = SS_DATE_TIME_MODEL_INIT;
     SsLocationMetadata final_metadata = {0};
+    const InfiltratrTemporalPolicyV3 *final_policy;
     CHECK(ss_date_time_model_init(
         &final_model, ss_platform_temporal_policy_store()));
     CHECK(ss_location_metadata_load(&final_metadata));
-    CHECK(final_model.policy.location_configured);
-    CHECK(fabs(final_model.policy.latitude -
+    final_policy = ss_date_time_model_policy(&final_model);
+    CHECK(final_policy != NULL);
+    CHECK(final_policy->location_configured);
+    CHECK(fabs(final_policy->latitude -
                final_metadata.latitude) < 0.000001);
-    CHECK(fabs(final_model.policy.longitude -
+    CHECK(fabs(final_policy->longitude -
                final_metadata.longitude) < 0.000001);
+    ss_date_time_model_clear(&final_model);
 
     g_autofree gchar *pending = g_build_filename(
         root, "infiltrator", "system-settings", "location.pending", NULL);
