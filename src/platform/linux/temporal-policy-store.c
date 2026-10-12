@@ -6,17 +6,12 @@
  */
 #include "system-settings/temporal-policy-store.h"
 #include "system-settings/cinnamon-interface.h"
+#include "linux-advisory-lock.h"
 
 #include <infiltratr/core.h>
 #include <infiltratr/temporal_posix.h>
 
-#include <errno.h>
-#include <glib/gstdio.h>
-#include <fcntl.h>
-#include <sys/file.h>
-#include <unistd.h>
-
-static int update_lock_fd = -1;
+static SsLinuxAdvisoryLock update_lock = SS_LINUX_ADVISORY_LOCK_INIT;
 
 #define SS_POLICY_LOCK_WAIT_USEC (250 * 1000)
 #define SS_LOCK_RETRY_USEC 5000
@@ -25,11 +20,7 @@ static bool begin_update(void)
 {
     g_autofree gchar *directory = NULL;
     g_autofree gchar *lock_path = NULL;
-    int fd;
-
-    if (update_lock_fd >= 0) {
-        return false;
-    }
+    SsLinuxAdvisoryLockResult result;
 
     /*
      * Keep the lock path allocation-backed just like Common's policy path.
@@ -44,47 +35,24 @@ static bool begin_update(void)
     if (directory == NULL || lock_path == NULL) {
         return false;
     }
-    if (g_mkdir_with_parents(directory, 0700) != 0 && errno != EEXIST) {
-        return false;
-    }
-    if (g_chmod(directory, 0700) != 0) {
-        return false;
-    }
 
-    fd = open(lock_path, O_CREAT | O_RDWR | O_CLOEXEC, 0600);
-    if (fd < 0) {
-        return false;
+    result = ss_linux_advisory_lock_acquire(
+        &update_lock,
+        directory,
+        lock_path,
+        SS_POLICY_LOCK_WAIT_USEC,
+        SS_LOCK_RETRY_USEC);
+    if (result == SS_LINUX_ADVISORY_LOCK_BUSY) {
+        g_debug("Temporal policy update lock is busy.");
+    } else if (result == SS_LINUX_ADVISORY_LOCK_IO_ERROR) {
+        g_warning("Unable to acquire the temporal policy update lock due to an I/O error.");
     }
-    {
-        const gint64 deadline =
-            g_get_monotonic_time() + SS_POLICY_LOCK_WAIT_USEC;
-        for (;;) {
-            if (flock(fd, LOCK_EX | LOCK_NB) == 0) {
-                break;
-            }
-            if (errno == EINTR) {
-                continue;
-            }
-            if ((errno != EWOULDBLOCK && errno != EAGAIN) ||
-                g_get_monotonic_time() >= deadline) {
-                close(fd);
-                return false;
-            }
-            g_usleep(SS_LOCK_RETRY_USEC);
-        }
-    }
-    update_lock_fd = fd;
-    return true;
+    return result == SS_LINUX_ADVISORY_LOCK_OK;
 }
 
 static void end_update(void)
 {
-    if (update_lock_fd < 0) {
-        return;
-    }
-    (void)flock(update_lock_fd, LOCK_UN);
-    (void)close(update_lock_fd);
-    update_lock_fd = -1;
+    ss_linux_advisory_lock_release(&update_lock);
 }
 
 static void load_cinnamon_defaults(InfiltratrTemporalPolicyV3 *policy)
