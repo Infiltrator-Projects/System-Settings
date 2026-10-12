@@ -163,11 +163,16 @@ jobs:
             exit 1
           fi
           printf 'Analyzing %d System Settings translation units.\n' "${#sources[@]}"
+          # Clang's DeprecatedOrUnsafeBufferHandling checker recommends C11
+          # Annex-K *_s functions that glibc deliberately does not implement
+          # and reports bounded snprintf/memcpy/memset/fprintf calls as errors.
+          # Keep the rest of the analyzer family strict, including unbounded
+          # strcpy, dead stores, nullability and lifetime diagnostics.
           printf '%s\0' "${sources[@]}" \
             | xargs -0 -r -n 20 clang-tidy \
                 -p build-static-analysis \
-                --checks='-*,clang-analyzer-*' \
-                --warnings-as-errors='clang-analyzer-*'
+                --checks='-*,clang-analyzer-*,-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling' \
+                --warnings-as-errors='clang-analyzer-*,-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling'
 
   windows:
     name: Windows build and test
