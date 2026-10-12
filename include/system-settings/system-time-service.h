@@ -27,12 +27,31 @@ extern "C" {
 
 typedef struct SsSystemTimeService SsSystemTimeService;
 
+/**
+ * Stable semantic outcome for timedated reads, construction and mutations.
+ *
+ * UI/domain callers must branch on this result rather than parsing transport
+ * prose. error_message remains diagnostic/display context only.
+ */
+typedef enum SsSystemTimeResult {
+    SS_SYSTEM_TIME_RESULT_OK = 0,
+    SS_SYSTEM_TIME_RESULT_INVALID_ARGUMENT,
+    SS_SYSTEM_TIME_RESULT_UNAVAILABLE,
+    SS_SYSTEM_TIME_RESULT_CANCELLED,
+    SS_SYSTEM_TIME_RESULT_PERMISSION_DENIED,
+    SS_SYSTEM_TIME_RESULT_TRANSPORT_ERROR,
+    SS_SYSTEM_TIME_RESULT_PROTOCOL_ERROR
+} SsSystemTimeResult;
+
 typedef struct SsSystemTimeState {
     char timezone[SS_SYSTEM_TIMEZONE_CAPACITY];
     bool available;
     bool can_ntp;
     bool ntp_enabled;
 } SsSystemTimeState;
+
+/** Human-readable fallback for a typed result; NULL only for OK. */
+const char *ss_system_time_result_default_message(SsSystemTimeResult result);
 
 /**
  * State-change callback.
@@ -50,13 +69,12 @@ typedef void (*SsSystemTimeChangedCallback)(
  *
  * service and error_message are borrowed during the callback. Validation
  * errors may complete synchronously; accepted calls finish on the initiating
- * main context. Cancellation
- * is reported as an unsuccessful completion; callers that supersede requests
- * should generation-gate their own UI state.
+ * main context. Cancellation has its own typed result; callers that supersede
+ * requests should generation-gate their own UI state.
  */
 typedef void (*SsSystemTimeCompletionCallback)(
     SsSystemTimeService *service,
-    bool success,
+    SsSystemTimeResult result,
     const char *error_message,
     gpointer user_data);
 
@@ -64,10 +82,12 @@ typedef void (*SsSystemTimeCompletionCallback)(
  * Completion for asynchronous service construction.
  *
  * A non-NULL service is transferred to the callback and must eventually be
- * released with ss_system_time_service_free().
+ * released with ss_system_time_service_free(). result describes construction
+ * independently of error_message text.
  */
 typedef void (*SsSystemTimeReadyCallback)(
     SsSystemTimeService *service,
+    SsSystemTimeResult result,
     const char *error_message,
     gpointer user_data);
 
@@ -92,7 +112,7 @@ void ss_system_time_service_free(SsSystemTimeService *service);
  * I/O. The output is cleared first and populated only when the required
  * Timezone and NTP properties are valid and the bus name has an owner.
  */
-bool ss_system_time_service_read(
+SsSystemTimeResult ss_system_time_service_read(
     SsSystemTimeService *service,
     SsSystemTimeState *state);
 
