@@ -32,26 +32,31 @@ static const InfiltratrTemporalPolicyV3 *policy_of(
 
 static int child_edit(int start_fd, bool calendar_edit)
 {
-    SsDateTimeModel model;
+    SsDateTimeModel model = SS_DATE_TIME_MODEL_INIT;
     char token;
+    int result;
 
     if (!ss_date_time_model_init(
             &model, ss_platform_temporal_policy_store())) {
         return EXIT_FAILURE;
     }
     if (read(start_fd, &token, 1U) != 1) {
+        ss_date_time_model_clear(&model);
         return EXIT_FAILURE;
     }
 
     if (calendar_edit) {
-        return ss_date_time_model_set_calendar(
-                   &model, "egyptian-nabonassar")
+        result = ss_date_time_model_set_calendar(
+                     &model, "egyptian-nabonassar")
+            ? EXIT_SUCCESS
+            : EXIT_FAILURE;
+    } else {
+        result = ss_date_time_model_set_show_seconds(&model, true)
             ? EXIT_SUCCESS
             : EXIT_FAILURE;
     }
-    return ss_date_time_model_set_show_seconds(&model, true)
-        ? EXIT_SUCCESS
-        : EXIT_FAILURE;
+    ss_date_time_model_clear(&model);
+    return result;
 }
 
 int main(int argc, char **argv)
@@ -64,8 +69,8 @@ int main(int argc, char **argv)
     pid_t calendar_child;
     pid_t seconds_child;
     int status = 0;
-    SsDateTimeModel initial;
-    SsDateTimeModel final;
+    SsDateTimeModel initial = SS_DATE_TIME_MODEL_INIT;
+    SsDateTimeModel final = SS_DATE_TIME_MODEL_INIT;
 
     CHECK(argc == 2);
     CHECK(root != NULL);
@@ -195,5 +200,7 @@ int main(int argc, char **argv)
     }
     CHECK(g_rmdir(policy_dir) == 0);
     CHECK(g_rmdir(root) == 0);
+    ss_date_time_model_clear(&final);
+    ss_date_time_model_clear(&initial);
     return EXIT_SUCCESS;
 }
