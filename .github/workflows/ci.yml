@@ -117,14 +117,28 @@ jobs:
           grep -Eq 'libgeocode-glib-2-0|libgeocode-glib0' <<<"$depends"
           rm -rf "$root"
 
-      - name: Upload exact tested release assets
+      - name: Stage exact tested release bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(tr -d '[:space:]' < VERSION)"
+          bundle="build/release-assets"
+          deb="$(find build -maxdepth 1 -type f -name "infiltrator-system-settings_${version}_*.deb" -print -quit)"
+          native="build/source-assets-check/System-Settings-${version}-native.run"
+          source="build/source-assets-check/System-Settings-${version}-source.zip"
+          test -s "$deb"
+          test -s "$native"
+          test -s "$source"
+          rm -rf "$bundle"
+          mkdir -p "$bundle"
+          cp "$deb" "$native" "$source" "$bundle/"
+          test "$(find "$bundle" -maxdepth 1 -type f | wc -l)" -eq 3
+
+      - name: Upload exact tested release bundle
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: system-settings-release-assets
-          path: |
-            build/infiltrator-system-settings_*.deb
-            build/source-assets-check/System-Settings-*-native.run
-            build/source-assets-check/System-Settings-*-source.zip
+          path: build/release-assets/*
           if-no-files-found: error
 
   static-analysis:
