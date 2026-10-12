@@ -6,8 +6,10 @@
 
 #include "shell-command.h"
 
+#include <glib/gstdio.h>
 #include <stddef.h>
 #include <string.h>
+#include <sys/stat.h>
 
 static void launch_command_finished(
     GObject *process,
@@ -66,6 +68,39 @@ gboolean launch_command(
     return TRUE;
 }
 
+static gboolean mode_is_trusted(mode_t mode)
+{
+    return (mode & (S_IWGRP | S_IWOTH)) == 0;
+}
+
+static gboolean trusted_system_executable(
+    const char *directory,
+    const char *candidate)
+{
+    GStatBuf directory_stat;
+    GStatBuf executable_stat;
+
+    if (directory == NULL || candidate == NULL ||
+        g_stat(directory, &directory_stat) != 0 ||
+        !S_ISDIR(directory_stat.st_mode) ||
+        directory_stat.st_uid != 0 ||
+        !mode_is_trusted(directory_stat.st_mode) ||
+        g_stat(candidate, &executable_stat) != 0 ||
+        !S_ISREG(executable_stat.st_mode) ||
+        executable_stat.st_uid != 0 ||
+        !mode_is_trusted(executable_stat.st_mode)) {
+        return FALSE;
+    }
+
+    /*
+     * g_stat() follows a final symlink, allowing normal distribution-managed
+     * command links while still requiring the resolved executable itself to be
+     * root-owned and non-writable by group/other users. The containing search
+     * directory is independently held to the same trust requirement.
+     */
+    return g_file_test(candidate, G_FILE_TEST_IS_EXECUTABLE);
+}
+
 gchar *find_trusted_system_program(const char *program)
 {
     static const char *const directories[] = {
@@ -85,7 +120,7 @@ gchar *find_trusted_system_program(const char *program)
     for (size_t index = 0U; index < G_N_ELEMENTS(directories); ++index) {
         g_autofree gchar *candidate =
             g_build_filename(directories[index], program, NULL);
-        if (g_file_test(candidate, G_FILE_TEST_IS_EXECUTABLE)) {
+        if (trusted_system_executable(directories[index], candidate)) {
             return g_steal_pointer(&candidate);
         }
     }
