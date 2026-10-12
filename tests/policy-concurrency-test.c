@@ -21,6 +21,9 @@
         } \
     } while (0)
 
+#define RETRY_ATTEMPTS 20U
+#define RETRY_DELAY_USEC 10000U
+
 static const InfiltratrTemporalPolicyV3 *policy_of(
     const SsDateTimeModel *model)
 {
@@ -34,7 +37,7 @@ static int child_edit(int start_fd, bool calendar_edit)
 {
     SsDateTimeModel model = SS_DATE_TIME_MODEL_INIT;
     char token;
-    int result;
+    int result = EXIT_FAILURE;
 
     if (!ss_date_time_model_init(
             &model, ss_platform_temporal_policy_store())) {
@@ -45,18 +48,74 @@ static int child_edit(int start_fd, bool calendar_edit)
         return EXIT_FAILURE;
     }
 
-    if (calendar_edit) {
-        result = ss_date_time_model_set_calendar(
-                     &model, "egyptian-nabonassar")
-            ? EXIT_SUCCESS
-            : EXIT_FAILURE;
-    } else {
-        result = ss_date_time_model_set_show_seconds(&model, true)
-            ? EXIT_SUCCESS
-            : EXIT_FAILURE;
+    /*
+     * Cross-process policy locks are deliberately short and non-blocking from
+     * the caller's point of view. Under instrumentation a legitimate writer
+     * can therefore observe BUSY while its peer is still committing. Retry the
+     * public operation instead of turning that intended contract into a flaky
+     * requirement that every writer win on its first attempt.
+     */
+    for (guint attempt = 0U; attempt < RETRY_ATTEMPTS; ++attempt) {
+        const bool saved = calendar_edit
+            ? ss_date_time_model_set_calendar(
+                  &model, "egyptian-nabonassar")
+            : ss_date_time_model_set_show_seconds(&model, true);
+        if (saved) {
+            result = EXIT_SUCCESS;
+            break;
+        }
+        if (attempt + 1U < RETRY_ATTEMPTS) {
+            g_usleep(RETRY_DELAY_USEC);
+        }
     }
+
     ss_date_time_model_clear(&model);
     return result;
+}
+
+static pid_t spawn_cli_edit(
+    const char *program,
+    const char *option,
+    const char *value)
+{
+    const pid_t child = fork();
+
+    CHECK(child >= 0);
+    if (child == 0) {
+        execl(program, program, option, value, (char *)NULL);
+        _exit(127);
+    }
+    return child;
+}
+
+static int wait_exit_code(pid_t child)
+{
+    int status = 0;
+
+    CHECK(waitpid(child, &status, 0) == child);
+    if (!WIFEXITED(status)) {
+        return -1;
+    }
+    return WEXITSTATUS(status);
+}
+
+static int retry_cli_edit(
+    const char *program,
+    const char *option,
+    const char *value)
+{
+    int exit_code = 2;
+
+    for (guint attempt = 0U; attempt < RETRY_ATTEMPTS; ++attempt) {
+        exit_code = wait_exit_code(spawn_cli_edit(program, option, value));
+        if (exit_code == EXIT_SUCCESS || exit_code != 2) {
+            return exit_code;
+        }
+        if (attempt + 1U < RETRY_ATTEMPTS) {
+            g_usleep(RETRY_DELAY_USEC);
+        }
+    }
+    return exit_code;
 }
 
 int main(int argc, char **argv)
@@ -116,36 +175,28 @@ int main(int argc, char **argv)
 
     /*
      * Exercise the public CLI transaction boundary too. Each process changes
-     * a different field. Whichever acquires the platform lock second must
-     * reload the first process's committed field before publishing its own.
+     * a different field. The platform lock is intentionally bounded, so one
+     * initial command may report the retryable exit code 2 under contention.
+     * After retry, both successful transactions must retain the peer's field.
      */
-    calendar_child = fork();
-    CHECK(calendar_child >= 0);
-    if (calendar_child == 0) {
-        execl(
-            argv[1],
-            argv[1],
-            "--calendar",
-            "gregorian",
-            (char *)NULL);
-        _exit(127);
-    }
-    seconds_child = fork();
-    CHECK(seconds_child >= 0);
-    if (seconds_child == 0) {
-        execl(
-            argv[1],
-            argv[1],
-            "--seconds",
-            "off",
-            (char *)NULL);
-        _exit(127);
-    }
+    calendar_child = spawn_cli_edit(
+        argv[1], "--calendar", "gregorian");
+    seconds_child = spawn_cli_edit(
+        argv[1], "--seconds", "off");
 
-    CHECK(waitpid(calendar_child, &status, 0) == calendar_child);
-    CHECK(WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS);
-    CHECK(waitpid(seconds_child, &status, 0) == seconds_child);
-    CHECK(WIFEXITED(status) && WEXITSTATUS(status) == EXIT_SUCCESS);
+    const int calendar_exit = wait_exit_code(calendar_child);
+    const int seconds_exit = wait_exit_code(seconds_child);
+
+    CHECK(calendar_exit == EXIT_SUCCESS || calendar_exit == 2);
+    CHECK(seconds_exit == EXIT_SUCCESS || seconds_exit == 2);
+    if (calendar_exit != EXIT_SUCCESS) {
+        CHECK(retry_cli_edit(
+            argv[1], "--calendar", "gregorian") == EXIT_SUCCESS);
+    }
+    if (seconds_exit != EXIT_SUCCESS) {
+        CHECK(retry_cli_edit(
+            argv[1], "--seconds", "off") == EXIT_SUCCESS);
+    }
 
     CHECK(ss_date_time_model_reload(&final));
     CHECK(strcmp(policy_of(&final)->calendar, "gregorian") == 0);
