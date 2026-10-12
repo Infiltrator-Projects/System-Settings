@@ -6,9 +6,16 @@ on:
     workflows: ["System Settings CI"]
     types: [completed]
 
+# CI remains read-only. This workflow is the narrow promotion boundary that is
+# allowed to publish a GitHub release after the exact main-branch CI run passes.
 permissions:
   contents: read
   actions: read
+
+# Never let two promotion attempts race while creating or repairing a tag/release.
+concurrency:
+  group: system-settings-release
+  cancel-in-progress: false
 
 jobs:
   publish:
@@ -20,31 +27,28 @@ jobs:
       contents: write
       actions: read
     runs-on: ubuntu-24.04
-    outputs:
-      release_candidate: ${{ steps.classify.outputs.candidate }}
-      release_version: ${{ steps.classify.outputs.version }}
     steps:
-      - name: Check out exact tested main commit
+      - name: Check out exact tested commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
 
-      - name: Classify release from VERSION
+      - name: Classify release candidate
         id: classify
         shell: bash
         run: |
           set -euo pipefail
           expected="${{ github.event.workflow_run.head_sha }}"
           test "$(git rev-parse HEAD)" = "$expected"
-          git fetch origin main --tags
 
           version="$(tr -d '[:space:]' < VERSION)"
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           tag="v$version"
           candidate=true
 
-          current_main="$(git rev-parse origin/main)"
+          current_main="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          test -n "$current_main"
           if [[ "$current_main" != "$expected" ]]; then
             candidate=false
             echo "Ignoring stale successful CI run $expected; main is now $current_main."
@@ -52,7 +56,7 @@ jobs:
             existing="$(git ls-remote origin "refs/tags/$tag" | awk '{print $1}')"
             if [[ -n "$existing" && "$existing" != "$expected" ]]; then
               candidate=false
-              echo "VERSION $version is already released from $existing; this is a normal post-release main commit."
+              echo "VERSION $version is already owned by $existing; this main commit is not a release candidate."
             fi
           fi
 
@@ -70,19 +74,24 @@ jobs:
           github-token: ${{ github.token }}
           run-id: ${{ github.event.workflow_run.id }}
 
-      - name: Verify release artifact identity
+      - name: Verify release bundle
         if: steps.classify.outputs.candidate == 'true'
+        id: bundle
         shell: bash
         run: |
           set -euo pipefail
           version="${{ steps.classify.outputs.version }}"
-          deb="release-assets/infiltrator-system-settings_${version}_amd64.deb"
+          mapfile -t debs < <(find release-assets -maxdepth 1 -type f \
+            -name "infiltrator-system-settings_${version}_*.deb" -print)
+          [[ ${#debs[@]} -eq 1 ]]
+          deb="${debs[0]}"
           native="release-assets/System-Settings-${version}-native.run"
           source="release-assets/System-Settings-${version}-source.zip"
 
           test -s "$deb"
           test -s "$native"
           test -s "$source"
+          [[ "$(find release-assets -maxdepth 1 -type f | wc -l)" -eq 3 ]]
           test "$(dpkg-deb -f "$deb" Package)" = "infiltrator-system-settings"
           test "$(dpkg-deb -f "$deb" Version)" = "$version"
           chmod +x "$native"
@@ -91,7 +100,11 @@ jobs:
             "$(basename "$native")" \
             "$(basename "$source")" > SHA256SUMS)
 
-      - name: Publish or verify release
+          echo "deb=$deb" >> "$GITHUB_OUTPUT"
+          echo "native=$native" >> "$GITHUB_OUTPUT"
+          echo "source=$source" >> "$GITHUB_OUTPUT"
+
+      - name: Publish or repair release
         if: steps.classify.outputs.candidate == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -101,89 +114,49 @@ jobs:
           version="${{ steps.classify.outputs.version }}"
           tag="${{ steps.classify.outputs.tag }}"
           sha="${{ steps.classify.outputs.sha }}"
-          deb="release-assets/infiltrator-system-settings_${version}_amd64.deb"
-          native="release-assets/System-Settings-${version}-native.run"
-          source="release-assets/System-Settings-${version}-source.zip"
+          deb="${{ steps.bundle.outputs.deb }}"
+          native="${{ steps.bundle.outputs.native }}"
+          source="${{ steps.bundle.outputs.source }}"
 
-          existing="$(git ls-remote origin "refs/tags/$tag" | awk '{print $1}')"
-          if [[ -n "$existing" && "$existing" != "$sha" ]]; then
-            echo "Tag $tag already points to another commit." >&2
+          tag_target="$(git ls-remote origin "refs/tags/$tag" | awk '{print $1}')"
+          if [[ -n "$tag_target" && "$tag_target" != "$sha" ]]; then
+            echo "Tag $tag already points to $tag_target, not tested commit $sha." >&2
             exit 1
-          fi
-          if [[ -z "$existing" ]]; then
-            git tag "$tag" "$sha"
-            git push origin "$tag"
           fi
 
           if gh release view "$tag" >/dev/null 2>&1; then
-            verify="$(mktemp -d)"
-            trap 'rm -rf "$verify"' EXIT
-            expected_names="$(printf '%s\n' \
-              "$(basename "$deb")" \
-              "$(basename "$native")" \
-              "$(basename "$source")" \
-              "SHA256SUMS" | sort)"
-            actual_names="$(gh release view "$tag" --json assets --jq '.assets[].name' | sort)"
-            test "$actual_names" = "$expected_names"
-            gh release download "$tag" --dir "$verify"
-            for asset in "$deb" "$native" "$source" release-assets/SHA256SUMS; do
-              cmp "$asset" "$verify/$(basename "$asset")"
-            done
-            (cd "$verify" && sha256sum -c SHA256SUMS)
+            # A retry after a partial upload repairs the release from the same
+            # immutable CI artifact bundle rather than rebuilding anything.
+            gh release upload "$tag" \
+              "$deb" "$native" "$source" release-assets/SHA256SUMS \
+              --clobber
           else
-            gh release create "$tag" "$deb" "$native" "$source" release-assets/SHA256SUMS \
-              --verify-tag \
+            # gh creates the lightweight tag at --target when it does not yet
+            # exist, avoiding the old tag-first/release-second failure window.
+            gh release create "$tag" \
+              "$deb" "$native" "$source" release-assets/SHA256SUMS \
               --target "$sha" \
               --title "System Settings $version" \
               --generate-notes
           fi
 
-      - name: Keep only main branch
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch origin '+refs/heads/*:refs/remotes/origin/*' --prune
-          mapfile -t branches < <(
-            git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin \
-              | grep -Ev '^(HEAD|main)$' || true
-          )
-          for branch in "${branches[@]}"; do
-            git push origin --delete "$branch"
-          done
-          git fetch origin '+refs/heads/*:refs/remotes/origin/*' --prune
-          mapfile -t remaining < <(
-            git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin \
-              | grep -v '^HEAD$'
-          )
-          (( ${#remaining[@]} == 1 ))
-          [[ "${remaining[0]}" == "main" ]]
+          expected_names="$(printf '%s\n' \
+            "$(basename "$deb")" \
+            "$(basename "$native")" \
+            "$(basename "$source")" \
+            "SHA256SUMS" | sort)"
+          actual_names="$(gh release view "$tag" --json assets --jq '.assets[].name' | sort)"
+          test "$actual_names" = "$expected_names"
 
-  apt-publication:
-    name: Observe central APT publication
-    needs: publish
-    if: needs.publish.outputs.release_candidate == 'true'
-    continue-on-error: true
-    permissions:
-      contents: read
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    steps:
-      - name: Wait for central catalogue
-        env:
-          VERSION: ${{ needs.publish.outputs.release_version }}
-          APP_ID: system-settings
-        shell: bash
-        run: |
-          set -euo pipefail
-          catalogue='https://infiltrator-projects.github.io/Infiltrator-Repository/catalogue/apps.json'
-          for attempt in $(seq 0 72); do
-            if curl -fsS --retry 2 --retry-delay 1 "$catalogue?version=$VERSION&attempt=$attempt" \
-              | jq -e --arg id "$APP_ID" --arg version "$VERSION" \
-                '.[] | select(.id == $id and .version == $version)' >/dev/null; then
-              echo "APT repository advertises $APP_ID $VERSION."
-              exit 0
-            fi
-            sleep 10
+          verify="$(mktemp -d)"
+          trap 'rm -rf "$verify"' EXIT
+          gh release download "$tag" --dir "$verify"
+          for asset in "$deb" "$native" "$source" release-assets/SHA256SUMS; do
+            cmp "$asset" "$verify/$(basename "$asset")"
           done
-          echo "::warning::Central APT repository did not advertise $APP_ID $VERSION within 12 minutes."
-          exit 1
+          (cd "$verify" && sha256sum -c SHA256SUMS)
+
+# APT publication deliberately does not live here. Infiltrator-Repository is
+# the authority that discovers verified GitHub releases and publishes its own
+# catalogue; keeping that cross-repository concern out of this workflow avoids
+# polling, cross-repository tokens and false producer failures.
