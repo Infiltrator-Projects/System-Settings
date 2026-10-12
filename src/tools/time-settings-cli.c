@@ -245,7 +245,6 @@ int main(int argc, char **argv)
 #ifndef _WIN32
             if (location_staged) {
                 ss_location_metadata_discard_staged();
-                location_staged = false;
             }
 #endif
             fputs("Unable to save temporal presentation policy.\n", stderr);
@@ -279,7 +278,6 @@ int main(int argc, char **argv)
                 exit_code = 3;
                 goto done;
             }
-            location_staged = false;
         }
 #endif
 
@@ -297,7 +295,6 @@ done:
     release_platform_update(platform, &platform_locked);
     if (locality_locked) {
         release_locality_transaction();
-        locality_locked = false;
     }
     ss_date_time_policy_draft_free(draft);
     ss_date_time_model_clear(&model);

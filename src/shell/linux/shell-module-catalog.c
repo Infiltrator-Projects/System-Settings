@@ -36,6 +36,7 @@ static GKeyFile *load_module_manifest(const char *manifest_filename)
          ++directory_index) {
         g_autofree gchar *path = NULL;
         g_autoptr(GKeyFile) key_file = NULL;
+        g_autoptr(GError) error = NULL;
 
         if (directories[directory_index][0] == '\0') {
             continue;
@@ -44,8 +45,20 @@ static GKeyFile *load_module_manifest(const char *manifest_filename)
             directories[directory_index], manifest_filename, NULL);
         key_file = g_key_file_new();
         if (g_key_file_load_from_file(
-                key_file, path, G_KEY_FILE_NONE, NULL)) {
+                key_file, path, G_KEY_FILE_NONE, &error)) {
             return g_steal_pointer(&key_file);
+        }
+
+        /* Missing is an expected fallback condition; malformed or unreadable
+         * manifests are not. Keep the shell resilient while retaining enough
+         * evidence to diagnose a broken installation or development override. */
+        if (error != NULL &&
+            !(error->domain == G_FILE_ERROR &&
+              error->code == G_FILE_ERROR_NOENT)) {
+            g_warning(
+                "Unable to load System Settings module manifest %s: %s",
+                path,
+                error->message);
         }
     }
     return NULL;

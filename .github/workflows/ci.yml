@@ -124,6 +124,56 @@ jobs:
           path: build/*.deb
           if-no-files-found: error
 
+  static-analysis:
+    name: Clang static analysis
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    steps:
+      - name: Check out source and exact pinned Common
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          submodules: recursive
+
+      - name: Install Clang analysis dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang clang-tidy jq libgtk-4-dev libgeocode-glib-dev pkg-config
+
+      - name: Configure compilation database
+        run: |
+          cmake -S . -B build-static-analysis \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DBUILD_TESTING=ON \
+            -DSYSTEM_SETTINGS_WARNINGS_AS_ERRORS=ON
+
+      - name: Analyze System Settings translation units
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t sources < <(
+            jq -r '.[].file' build-static-analysis/compile_commands.json \
+              | grep -v '/src/vendor/' \
+              | sort -u
+          )
+          if (( ${#sources[@]} == 0 )); then
+            echo "No System Settings translation units found in compilation database." >&2
+            exit 1
+          fi
+          printf 'Analyzing %d System Settings translation units.\n' "${#sources[@]}"
+          # Clang's DeprecatedOrUnsafeBufferHandling checker recommends C11
+          # Annex-K *_s functions that glibc deliberately does not implement
+          # and reports bounded snprintf/memcpy/memset/fprintf calls as errors.
+          # Keep the rest of the analyzer family strict, including unbounded
+          # strcpy, dead stores, nullability and lifetime diagnostics.
+          printf '%s\0' "${sources[@]}" \
+            | xargs -0 -r -n 20 clang-tidy \
+                -p build-static-analysis \
+                --checks='-*,clang-analyzer-*,-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling' \
+                --warnings-as-errors='clang-analyzer-*,-clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling'
+
   windows:
     name: Windows build and test
     runs-on: windows-latest
