@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#define _XOPEN_SOURCE 700
 #define _POSIX_C_SOURCE 200809L
 /**
  * @file shell-command.c
