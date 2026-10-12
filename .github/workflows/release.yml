@@ -38,17 +38,22 @@ jobs:
           expected="${{ github.event.workflow_run.head_sha }}"
           test "$(git rev-parse HEAD)" = "$expected"
           git fetch origin main --tags
-          test "$(git rev-parse origin/main)" = "$expected"
 
           version="$(tr -d '[:space:]' < VERSION)"
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           tag="v$version"
-          existing="$(git ls-remote origin "refs/tags/$tag" | awk '{print $1}')"
-
           candidate=true
-          if [[ -n "$existing" && "$existing" != "$expected" ]]; then
+
+          current_main="$(git rev-parse origin/main)"
+          if [[ "$current_main" != "$expected" ]]; then
             candidate=false
-            echo "VERSION $version is already released from $existing; this is a normal post-release main commit."
+            echo "Ignoring stale successful CI run $expected; main is now $current_main."
+          else
+            existing="$(git ls-remote origin "refs/tags/$tag" | awk '{print $1}')"
+            if [[ -n "$existing" && "$existing" != "$expected" ]]; then
+              candidate=false
+              echo "VERSION $version is already released from $existing; this is a normal post-release main commit."
+            fi
           fi
 
           echo "candidate=$candidate" >> "$GITHUB_OUTPUT"
@@ -134,8 +139,6 @@ jobs:
           fi
 
       - name: Keep only main branch
-        env:
-          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
