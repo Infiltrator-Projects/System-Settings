@@ -322,10 +322,11 @@ static bool collect_files(
     DIR *directory;
 
     if (relative[0] == '\0') {
-        if (strlen(root) >= sizeof(directory_path)) {
+        const size_t root_length = strlen(root);
+        if (root_length >= sizeof(directory_path)) {
             return false;
         }
-        strcpy(directory_path, root);
+        memcpy(directory_path, root, root_length + 1U);
     } else if (!path_join(
                    directory_path,
                    sizeof(directory_path),
@@ -424,8 +425,12 @@ static bool trees_equal(
         !collect_files(right_root, "", &right)) {
         goto done;
     }
-    qsort(left.items, left.length, sizeof(*left.items), compare_paths);
-    qsort(right.items, right.length, sizeof(*right.items), compare_paths);
+    if (left.length > 1U && left.items != NULL) {
+        qsort(left.items, left.length, sizeof(*left.items), compare_paths);
+    }
+    if (right.length > 1U && right.items != NULL) {
+        qsort(right.items, right.length, sizeof(*right.items), compare_paths);
+    }
     if (left.length != right.length) {
         goto done;
     }
@@ -466,10 +471,11 @@ static bool normalize_tree_times(
     };
 
     if (relative[0] == '\0') {
-        if (strlen(root) >= sizeof(directory_path)) {
+        const size_t root_length = strlen(root);
+        if (root_length >= sizeof(directory_path)) {
             return false;
         }
-        strcpy(directory_path, root);
+        memcpy(directory_path, root, root_length + 1U);
     } else if (!path_join(
                    directory_path,
                    sizeof(directory_path),
@@ -595,7 +601,9 @@ static bool write_common_manifest(const char *common_root)
         goto done;
     }
 
-    qsort(list.items, list.length, sizeof(*list.items), compare_paths);
+    if (list.length > 1U && list.items != NULL) {
+        qsort(list.items, list.length, sizeof(*list.items), compare_paths);
+    }
     manifest = fopen(manifest_path, "wb");
     if (manifest == NULL) {
         goto done;
@@ -870,10 +878,11 @@ int main(int argc, char **argv)
     {
         char parent[PATH_MAX];
         char *cursor;
-        if (strlen(common_export) >= sizeof(parent)) {
+        const size_t common_export_length = strlen(common_export);
+        if (common_export_length >= sizeof(parent)) {
             goto cleanup;
         }
-        strcpy(parent, common_export);
+        memcpy(parent, common_export, common_export_length + 1U);
         for (cursor = parent + strlen(source_root) + 1U;
              *cursor != '\0';
              ++cursor) {
