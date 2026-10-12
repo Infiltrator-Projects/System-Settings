@@ -33,6 +33,76 @@ struct SsSystemTimeService {
     gpointer changed_user_data;
 };
 
+const char *ss_system_time_result_default_message(SsSystemTimeResult result)
+{
+    switch (result) {
+    case SS_SYSTEM_TIME_RESULT_OK:
+        return NULL;
+    case SS_SYSTEM_TIME_RESULT_INVALID_ARGUMENT:
+        return "The requested operating-system date/time value is invalid.";
+    case SS_SYSTEM_TIME_RESULT_UNAVAILABLE:
+        return "The operating-system date/time service is unavailable.";
+    case SS_SYSTEM_TIME_RESULT_CANCELLED:
+        return "The operating-system date/time request was cancelled.";
+    case SS_SYSTEM_TIME_RESULT_PERMISSION_DENIED:
+        return "Authorisation to change the operating-system date/time setting was denied.";
+    case SS_SYSTEM_TIME_RESULT_TRANSPORT_ERROR:
+        return "The operating-system date/time service could not be reached.";
+    case SS_SYSTEM_TIME_RESULT_PROTOCOL_ERROR:
+        return "The operating-system date/time service returned incompatible state.";
+    default:
+        return "The operating-system date/time request failed.";
+    }
+}
+
+static SsSystemTimeResult result_from_error(const GError *error)
+{
+    g_autofree gchar *remote_error = NULL;
+
+    if (error == NULL) {
+        return SS_SYSTEM_TIME_RESULT_OK;
+    }
+    if (g_error_matches(error, G_IO_ERROR, G_IO_ERROR_CANCELLED)) {
+        return SS_SYSTEM_TIME_RESULT_CANCELLED;
+    }
+
+    if (error->domain == G_DBUS_ERROR) {
+        switch ((GDBusError)error->code) {
+        case G_DBUS_ERROR_ACCESS_DENIED:
+        case G_DBUS_ERROR_AUTH_FAILED:
+            return SS_SYSTEM_TIME_RESULT_PERMISSION_DENIED;
+        case G_DBUS_ERROR_INVALID_ARGS:
+            return SS_SYSTEM_TIME_RESULT_INVALID_ARGUMENT;
+        case G_DBUS_ERROR_SERVICE_UNKNOWN:
+        case G_DBUS_ERROR_NAME_HAS_NO_OWNER:
+        case G_DBUS_ERROR_UNKNOWN_OBJECT:
+        case G_DBUS_ERROR_UNKNOWN_INTERFACE:
+            return SS_SYSTEM_TIME_RESULT_UNAVAILABLE;
+        default:
+            break;
+        }
+    }
+
+    remote_error = g_dbus_error_get_remote_error(error);
+    if (remote_error != NULL &&
+        (g_str_equal(remote_error, "org.freedesktop.DBus.Error.AccessDenied") ||
+         g_str_equal(remote_error, "org.freedesktop.PolicyKit1.Error.NotAuthorized") ||
+         g_str_equal(remote_error, "org.freedesktop.PolicyKit1.Error.Failed"))) {
+        return SS_SYSTEM_TIME_RESULT_PERMISSION_DENIED;
+    }
+
+    return SS_SYSTEM_TIME_RESULT_TRANSPORT_ERROR;
+}
+
+static const char *result_message(
+    SsSystemTimeResult result,
+    const GError *error)
+{
+    return error != NULL && error->message != NULL && error->message[0] != '\0'
+        ? error->message
+        : ss_system_time_result_default_message(result);
+}
+
 static bool variant_boolean(GDBusProxy *proxy,
                             const char *name,
                             bool fallback)
@@ -50,7 +120,7 @@ static bool variant_boolean(GDBusProxy *proxy,
     return g_variant_get_boolean(value) != FALSE;
 }
 
-bool ss_system_time_service_read(
+SsSystemTimeResult ss_system_time_service_read(
     SsSystemTimeService *service,
     SsSystemTimeState *state)
 {
@@ -60,26 +130,30 @@ bool ss_system_time_service_read(
     const char *timezone_text;
 
     if (state == NULL) {
-        return false;
+        return SS_SYSTEM_TIME_RESULT_INVALID_ARGUMENT;
     }
     memset(state, 0, sizeof(*state));
 
     if (service == NULL || service->proxy == NULL) {
-        return false;
+        return SS_SYSTEM_TIME_RESULT_UNAVAILABLE;
     }
 
     owner = g_dbus_proxy_get_name_owner(service->proxy);
+    if (owner == NULL) {
+        return SS_SYSTEM_TIME_RESULT_UNAVAILABLE;
+    }
+
     ntp = g_dbus_proxy_get_cached_property(service->proxy, "NTP");
-    if (owner == NULL || ntp == NULL ||
+    if (ntp == NULL ||
         !g_variant_is_of_type(ntp, G_VARIANT_TYPE_BOOLEAN)) {
-        return false;
+        return SS_SYSTEM_TIME_RESULT_PROTOCOL_ERROR;
     }
 
     timezone = g_dbus_proxy_get_cached_property(
         service->proxy, "Timezone");
     if (timezone == NULL ||
         !g_variant_is_of_type(timezone, G_VARIANT_TYPE_STRING)) {
-        return false;
+        return SS_SYSTEM_TIME_RESULT_PROTOCOL_ERROR;
     }
 
     timezone_text = g_variant_get_string(timezone, NULL);
@@ -88,19 +162,19 @@ bool ss_system_time_service_read(
                   timezone_text,
                   sizeof(state->timezone)) >= sizeof(state->timezone)) {
         memset(state, 0, sizeof(*state));
-        return false;
+        return SS_SYSTEM_TIME_RESULT_PROTOCOL_ERROR;
     }
 
     state->available = true;
     state->can_ntp = variant_boolean(service->proxy, "CanNTP", false);
     state->ntp_enabled =
         variant_boolean(service->proxy, "NTP", false);
-    return true;
+    return SS_SYSTEM_TIME_RESULT_OK;
 }
 
 static void emit_changed(SsSystemTimeService *service)
 {
-    SsSystemTimeState state;
+    SsSystemTimeState state = {0};
 
     if (service == NULL || service->changed_callback == NULL) {
         return;
@@ -158,6 +232,7 @@ static void new_proxy_finished(
     g_autoptr(GError) error = NULL;
     GDBusProxy *proxy;
     SsSystemTimeService *service;
+    SsSystemTimeResult outcome;
 
     proxy = g_dbus_proxy_new_for_bus_finish(result, &error);
     /*
@@ -165,11 +240,17 @@ static void new_proxy_finished(
      * service takes that reference on success; a NULL proxy needs no cleanup.
      */
     service = service_from_proxy(proxy);
+    outcome = error != NULL
+        ? result_from_error(error)
+        : (service != NULL
+            ? SS_SYSTEM_TIME_RESULT_OK
+            : SS_SYSTEM_TIME_RESULT_PROTOCOL_ERROR);
 
     if (call != NULL && call->callback != NULL) {
         call->callback(
             service,
-            error != NULL ? error->message : NULL,
+            outcome,
+            result_message(outcome, error),
             call->user_data);
     } else {
         ss_system_time_service_free(service);
@@ -242,9 +323,8 @@ void ss_system_time_service_set_changed_callback(
 }
 
 /*
- * Finish exactly one D-Bus mutation. GIO reports cancellation through error,
- * so there is one completion path for success, denial, transport failure and
- * cancellation.
+ * Finish exactly one D-Bus mutation. Transport prose is retained for display
+ * and diagnostics, but semantic handling is carried by SsSystemTimeResult.
  */
 static void call_finished(GObject *source,
                           GAsyncResult *result,
@@ -253,7 +333,7 @@ static void call_finished(GObject *source,
     SsSystemTimeCall *call = user_data;
     g_autoptr(GError) error = NULL;
     g_autoptr(GVariant) reply = NULL;
-    bool success = false;
+    SsSystemTimeResult outcome;
 
     if (call == NULL) {
         return;
@@ -261,23 +341,40 @@ static void call_finished(GObject *source,
 
     reply = g_dbus_proxy_call_finish(
         G_DBUS_PROXY(source), result, &error);
-    success = reply != NULL;
+    outcome = reply != NULL
+        ? SS_SYSTEM_TIME_RESULT_OK
+        : result_from_error(error);
 
     if (call->callback != NULL) {
         call->callback(
             call->service,
-            success,
-            error != NULL ? error->message : NULL,
+            outcome,
+            result_message(outcome, error),
             call->user_data);
     }
     service_unref(call->service);
     g_free(call);
 }
 
+static void complete_immediately(
+    SsSystemTimeService *service,
+    SsSystemTimeResult result,
+    SsSystemTimeCompletionCallback callback,
+    gpointer user_data)
+{
+    if (callback != NULL) {
+        callback(
+            service,
+            result,
+            ss_system_time_result_default_message(result),
+            user_data);
+    }
+}
+
 /*
- * Common mutation launcher. Calls are always asynchronous and use the
- * caller-provided cancellable; no synchronous D-Bus round trip is allowed on
- * the GTK thread.
+ * Common mutation launcher. Calls are always asynchronous once accepted and
+ * use the caller-provided cancellable; no synchronous D-Bus round trip is
+ * allowed on the GTK thread.
  */
 static void begin_call(SsSystemTimeService *service,
                        const char *method,
@@ -291,13 +388,20 @@ static void begin_call(SsSystemTimeService *service,
     g_autoptr(GVariant) owned_parameters = parameters != NULL
         ? g_variant_ref_sink(parameters) : NULL;
 
-    if (service == NULL || service->proxy == NULL ||
-        method == NULL || parameters == NULL) {
-        if (callback != NULL) {
-            callback(service, false,
-                     "The operating-system time service is unavailable.",
-                     user_data);
-        }
+    if (method == NULL || parameters == NULL) {
+        complete_immediately(
+            service,
+            SS_SYSTEM_TIME_RESULT_INVALID_ARGUMENT,
+            callback,
+            user_data);
+        return;
+    }
+    if (service == NULL || service->proxy == NULL) {
+        complete_immediately(
+            service,
+            SS_SYSTEM_TIME_RESULT_UNAVAILABLE,
+            callback,
+            user_data);
         return;
     }
 
@@ -326,11 +430,11 @@ void ss_system_time_service_set_timezone_async(
     gpointer user_data)
 {
     if (timezone == NULL || timezone[0] == '\0') {
-        if (callback != NULL) {
-            callback(service, false,
-                     "A valid time-zone identifier is required.",
-                     user_data);
-        }
+        complete_immediately(
+            service,
+            SS_SYSTEM_TIME_RESULT_INVALID_ARGUMENT,
+            callback,
+            user_data);
         return;
     }
 
