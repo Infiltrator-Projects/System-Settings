@@ -24,6 +24,14 @@ typedef struct SsLinuxAdvisoryLock {
 
 #define SS_LINUX_ADVISORY_LOCK_INIT { .fd = -1 }
 
+/*
+ * Every current caller can execute from the GTK/main thread. Keep the generic
+ * helper itself inside a strict responsiveness budget so a future caller
+ * cannot accidentally turn a larger requested wait into a visible UI stall.
+ * Callers still control whether they want a shorter wait, including try-lock.
+ */
+#define SS_LINUX_ADVISORY_LOCK_MAX_WAIT_USEC (50 * 1000)
+
 static inline SsLinuxAdvisoryLockResult ss_linux_advisory_lock_acquire(
     SsLinuxAdvisoryLock *lock,
     const char *directory,
@@ -32,7 +40,10 @@ static inline SsLinuxAdvisoryLockResult ss_linux_advisory_lock_acquire(
     gint64 retry_usec)
 {
     int fd;
-    const gint64 deadline = g_get_monotonic_time() + MAX(wait_usec, 0);
+    const gint64 bounded_wait_usec = MIN(
+        MAX(wait_usec, (gint64)0),
+        (gint64)SS_LINUX_ADVISORY_LOCK_MAX_WAIT_USEC);
+    const gint64 deadline = g_get_monotonic_time() + bounded_wait_usec;
 
     if (lock == NULL || directory == NULL || lock_path == NULL ||
         directory[0] == '\0' || lock_path[0] == '\0') {
@@ -65,11 +76,13 @@ static inline SsLinuxAdvisoryLockResult ss_linux_advisory_lock_acquire(
             (void)close(fd);
             return SS_LINUX_ADVISORY_LOCK_IO_ERROR;
         }
-        if (wait_usec <= 0 || g_get_monotonic_time() >= deadline) {
+
+        const gint64 remaining = deadline - g_get_monotonic_time();
+        if (bounded_wait_usec <= 0 || remaining <= 0) {
             (void)close(fd);
             return SS_LINUX_ADVISORY_LOCK_BUSY;
         }
-        g_usleep((gulong)MAX(retry_usec, 1));
+        g_usleep((gulong)MIN(MAX(retry_usec, (gint64)1), remaining));
     }
 }
 
