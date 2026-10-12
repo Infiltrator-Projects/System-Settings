@@ -325,7 +325,7 @@ static bool copy_payload(
         strlen(temporary) >= archive_capacity) {
         goto cleanup;
     }
-    strcpy(archive_path, temporary);
+    memcpy(archive_path, temporary, strlen(temporary) + 1U);
     ok = true;
 
 cleanup:
