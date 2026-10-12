@@ -74,35 +74,38 @@ jobs:
           github-token: ${{ github.token }}
           run-id: ${{ github.event.workflow_run.id }}
 
-      - name: Verify release bundle
+      - name: Seal exact tested bundle for publication
         if: steps.classify.outputs.candidate == 'true'
-        id: bundle
         shell: bash
         run: |
           set -euo pipefail
-          version="${{ steps.classify.outputs.version }}"
-          mapfile -t debs < <(find release-assets -maxdepth 1 -type f \
-            -name "infiltrator-system-settings_${version}_*.deb" -print)
-          [[ ${#debs[@]} -eq 1 ]]
-          deb="${debs[0]}"
-          native="release-assets/System-Settings-${version}-native.run"
-          source="release-assets/System-Settings-${version}-source.zip"
+          mapfile -t tested_assets < <(
+            find release-assets -maxdepth 1 -type f -print | sort
+          )
+          if [[ ${#tested_assets[@]} -eq 0 ]]; then
+            echo "CI release bundle is empty." >&2
+            exit 1
+          fi
+          for asset in "${tested_assets[@]}"; do
+            test -s "$asset"
+          done
 
-          test -s "$deb"
-          test -s "$native"
-          test -s "$source"
-          [[ "$(find release-assets -maxdepth 1 -type f | wc -l)" -eq 3 ]]
-          test "$(dpkg-deb -f "$deb" Package)" = "infiltrator-system-settings"
-          test "$(dpkg-deb -f "$deb" Version)" = "$version"
-          chmod +x "$native"
-          (cd release-assets && sha256sum \
-            "$(basename "$deb")" \
-            "$(basename "$native")" \
-            "$(basename "$source")" > SHA256SUMS)
-
-          echo "deb=$deb" >> "$GITHUB_OUTPUT"
-          echo "native=$native" >> "$GITHUB_OUTPUT"
-          echo "source=$source" >> "$GITHUB_OUTPUT"
+          # CI owns the release-asset contract. Promotion deliberately does not
+          # reconstruct package names or asset counts; it seals exactly the
+          # already-tested bytes and publishes that opaque bundle plus checksums.
+          (
+            cd release-assets
+            rm -f SHA256SUMS
+            mapfile -t names < <(
+              find . -maxdepth 1 -type f -printf '%f\n' | sort
+            )
+            if [[ ${#names[@]} -eq 0 ]]; then
+              echo "CI release bundle contained no publishable files." >&2
+              exit 1
+            fi
+            sha256sum "${names[@]}" > SHA256SUMS
+            sha256sum -c SHA256SUMS
+          )
 
       - name: Publish or repair release
         if: steps.classify.outputs.candidate == 'true'
@@ -114,9 +117,12 @@ jobs:
           version="${{ steps.classify.outputs.version }}"
           tag="${{ steps.classify.outputs.tag }}"
           sha="${{ steps.classify.outputs.sha }}"
-          deb="${{ steps.bundle.outputs.deb }}"
-          native="${{ steps.bundle.outputs.native }}"
-          source="${{ steps.bundle.outputs.source }}"
+
+          mapfile -t assets < <(
+            find release-assets -maxdepth 1 -type f -print | sort
+          )
+          test -s release-assets/SHA256SUMS
+          [[ ${#assets[@]} -ge 2 ]]
 
           tag_target="$(git ls-remote origin "refs/tags/$tag" | awk '{print $1}')"
           if [[ -n "$tag_target" && "$tag_target" != "$sha" ]]; then
@@ -127,31 +133,26 @@ jobs:
           if gh release view "$tag" >/dev/null 2>&1; then
             # A retry after a partial upload repairs the release from the same
             # immutable CI artifact bundle rather than rebuilding anything.
-            gh release upload "$tag" \
-              "$deb" "$native" "$source" release-assets/SHA256SUMS \
-              --clobber
+            gh release upload "$tag" "${assets[@]}" --clobber
           else
             # gh creates the lightweight tag at --target when it does not yet
             # exist, avoiding the old tag-first/release-second failure window.
-            gh release create "$tag" \
-              "$deb" "$native" "$source" release-assets/SHA256SUMS \
+            gh release create "$tag" "${assets[@]}" \
               --target "$sha" \
               --title "System Settings $version" \
               --generate-notes
           fi
 
-          expected_names="$(printf '%s\n' \
-            "$(basename "$deb")" \
-            "$(basename "$native")" \
-            "$(basename "$source")" \
-            "SHA256SUMS" | sort)"
+          expected_names="$(
+            find release-assets -maxdepth 1 -type f -printf '%f\n' | sort
+          )"
           actual_names="$(gh release view "$tag" --json assets --jq '.assets[].name' | sort)"
           test "$actual_names" = "$expected_names"
 
           verify="$(mktemp -d)"
           trap 'rm -rf "$verify"' EXIT
           gh release download "$tag" --dir "$verify"
-          for asset in "$deb" "$native" "$source" release-assets/SHA256SUMS; do
+          for asset in "${assets[@]}"; do
             cmp "$asset" "$verify/$(basename "$asset")"
           done
           (cd "$verify" && sha256sum -c SHA256SUMS)
