@@ -10,6 +10,95 @@
 
 #include <infiltratr/core.h>
 #include <math.h>
+#include <stdlib.h>
+#include <string.h>
+
+typedef struct SsDateTimeModelPrivate {
+    InfiltratrTemporalPolicyV3 policy;
+    const SsTemporalPolicyStore *store;
+    bool persisted_policy_present;
+    bool saving;
+} SsDateTimeModelPrivate;
+
+struct SsDateTimePolicyDraft {
+    InfiltratrTemporalPolicyV3 policy;
+};
+
+_Static_assert(
+    sizeof(SsDateTimeModelPrivate) <= SS_DATE_TIME_MODEL_STORAGE_SIZE,
+    "SsDateTimeModel private representation exceeds public opaque storage");
+_Static_assert(
+    _Alignof(SsDateTimeModelPrivate) <= _Alignof(SsDateTimeModel),
+    "SsDateTimeModel opaque storage has insufficient alignment");
+
+static SsDateTimeModelPrivate *model_private(SsDateTimeModel *model)
+{
+    return model != NULL
+        ? (SsDateTimeModelPrivate *)(void *)model->_storage
+        : NULL;
+}
+
+static const SsDateTimeModelPrivate *model_private_const(
+    const SsDateTimeModel *model)
+{
+    return model != NULL
+        ? (const SsDateTimeModelPrivate *)(const void *)model->_storage
+        : NULL;
+}
+
+static const InfiltratrTemporalClockModeInfo *valid_clock_mode(
+    const char *clock_mode)
+{
+    return clock_mode != NULL
+        ? infiltratr_temporal_clock_mode_find(clock_mode)
+        : NULL;
+}
+
+static const InfiltratrTemporalCalendarInfo *valid_calendar(
+    const char *calendar_id)
+{
+    return calendar_id != NULL
+        ? infiltratr_temporal_calendar_find(calendar_id)
+        : NULL;
+}
+
+static bool valid_location(double latitude, double longitude)
+{
+    return isfinite(latitude) && isfinite(longitude) &&
+        latitude >= -90.0 && latitude <= 90.0 &&
+        longitude >= -180.0 && longitude <= 180.0;
+}
+
+static void assign_clock_mode(
+    InfiltratrTemporalPolicyV3 *policy,
+    const InfiltratrTemporalClockModeInfo *info)
+{
+    infiltratr_copy_string(
+        policy->clock_mode,
+        sizeof(policy->clock_mode),
+        info->id);
+}
+
+static void assign_calendar(
+    InfiltratrTemporalPolicyV3 *policy,
+    const InfiltratrTemporalCalendarInfo *info)
+{
+    infiltratr_copy_string(
+        policy->calendar,
+        sizeof(policy->calendar),
+        info->id);
+}
+
+static void assign_location(
+    InfiltratrTemporalPolicyV3 *policy,
+    bool configured,
+    double latitude,
+    double longitude)
+{
+    policy->location_configured = configured;
+    policy->latitude = latitude;
+    policy->longitude = longitude;
+}
 
 /*
  * Persist-before-publish is the central model invariant. A failed write must
@@ -20,174 +109,265 @@
  * only its own field, then publishes. Two processes editing unrelated fields
  * therefore merge instead of silently replacing one another's fresh changes.
  */
-static bool begin_candidate(SsDateTimeModel *model,
-                            InfiltratrTemporalPolicyV3 *candidate)
+static bool begin_candidate(
+    SsDateTimeModel *model,
+    InfiltratrTemporalPolicyV3 *candidate)
 {
+    SsDateTimeModelPrivate *private_state = model_private(model);
     bool found = false;
 
-    if (model == NULL || candidate == NULL ||
-        model->store == NULL || model->store->save == NULL || model->saving) {
+    if (private_state == NULL || candidate == NULL ||
+        private_state->store == NULL || private_state->store->save == NULL ||
+        private_state->saving) {
         return false;
     }
 
-    model->saving = true;
-    if (model->store->begin_update != NULL) {
-        if (!model->store->begin_update()) {
-            model->saving = false;
+    private_state->saving = true;
+    if (private_state->store->begin_update != NULL) {
+        if (!private_state->store->begin_update()) {
+            private_state->saving = false;
             return false;
         }
-        if (model->store->load == NULL ||
-            !model->store->load(candidate, &found)) {
-            if (model->store->end_update != NULL) {
-                model->store->end_update();
-            }
-            model->saving = false;
+        if (private_state->store->load == NULL ||
+            !private_state->store->load(candidate, &found)) {
+            private_state->store->end_update();
+            private_state->saving = false;
             return false;
         }
     } else {
-        *candidate = model->policy;
+        *candidate = private_state->policy;
     }
     return true;
 }
 
-static bool save_candidate(SsDateTimeModel *model,
-                           const InfiltratrTemporalPolicyV3 *candidate)
+static bool save_candidate(
+    SsDateTimeModel *model,
+    const InfiltratrTemporalPolicyV3 *candidate)
 {
+    SsDateTimeModelPrivate *private_state = model_private(model);
     bool saved;
 
-    if (model == NULL || candidate == NULL || !model->saving ||
-        model->store == NULL || model->store->save == NULL) {
+    if (private_state == NULL || candidate == NULL ||
+        !private_state->saving || private_state->store == NULL ||
+        private_state->store->save == NULL) {
         return false;
     }
 
-    saved = model->store->save(candidate);
-    if (model->store->begin_update != NULL &&
-        model->store->end_update != NULL) {
-        model->store->end_update();
+    saved = private_state->store->save(candidate);
+    if (private_state->store->begin_update != NULL) {
+        private_state->store->end_update();
     }
-    model->saving = false;
+    private_state->saving = false;
     if (!saved) {
         return false;
     }
-    model->policy = *candidate;
-    model->persisted_policy_present = true;
+    private_state->policy = *candidate;
+    private_state->persisted_policy_present = true;
     return true;
 }
 
-bool ss_date_time_model_init(SsDateTimeModel *model,
-                             const SsTemporalPolicyStore *store)
+bool ss_date_time_model_init(
+    SsDateTimeModel *model,
+    const SsTemporalPolicyStore *store)
 {
+    SsDateTimeModelPrivate *private_state;
+
     if (model == NULL || store == NULL || store->load == NULL ||
         store->save == NULL ||
-        ((store->begin_update == NULL) != (store->end_update == NULL)) ||
-        !infiltratr_temporal_policy_v3_default(&model->policy)) {
+        ((store->begin_update == NULL) != (store->end_update == NULL))) {
         return false;
     }
-    model->store = store;
-    model->persisted_policy_present = false;
-    model->saving = false;
+
+    memset(model, 0, sizeof(*model));
+    private_state = model_private(model);
+    if (private_state == NULL ||
+        !infiltratr_temporal_policy_v3_default(&private_state->policy)) {
+        return false;
+    }
+    private_state->store = store;
     return ss_date_time_model_reload(model);
 }
 
 bool ss_date_time_model_reload(SsDateTimeModel *model)
 {
+    SsDateTimeModelPrivate *private_state = model_private(model);
     InfiltratrTemporalPolicyV3 loaded;
     bool found = false;
 
-    if (model == NULL || model->store == NULL || model->store->load == NULL || model->saving ||
+    if (private_state == NULL || private_state->store == NULL ||
+        private_state->store->load == NULL || private_state->saving ||
         !infiltratr_temporal_policy_v3_default(&loaded) ||
-        !model->store->load(&loaded, &found)) {
+        !private_state->store->load(&loaded, &found)) {
         return false;
     }
-    model->policy = loaded;
-    model->persisted_policy_present = found;
+    private_state->policy = loaded;
+    private_state->persisted_policy_present = found;
     return true;
 }
 
 const InfiltratrTemporalPolicyV3 *
 ss_date_time_model_policy(const SsDateTimeModel *model)
 {
-    return model != NULL ? &model->policy : NULL;
+    const SsDateTimeModelPrivate *private_state = model_private_const(model);
+    return private_state != NULL ? &private_state->policy : NULL;
 }
 
-bool ss_date_time_model_set_clock_mode(SsDateTimeModel *model,
-                                       const char *clock_mode)
+bool ss_date_time_model_has_persisted_policy(const SsDateTimeModel *model)
 {
-    const InfiltratrTemporalClockModeInfo *info;
+    const SsDateTimeModelPrivate *private_state = model_private_const(model);
+    return private_state != NULL && private_state->persisted_policy_present;
+}
+
+bool ss_date_time_model_is_saving(const SsDateTimeModel *model)
+{
+    const SsDateTimeModelPrivate *private_state = model_private_const(model);
+    return private_state != NULL && private_state->saving;
+}
+
+bool ss_date_time_model_normalize_unpersisted_clock_mode(
+    SsDateTimeModel *model,
+    const char *clock_mode)
+{
+    SsDateTimeModelPrivate *private_state = model_private(model);
+    const InfiltratrTemporalClockModeInfo *info = valid_clock_mode(clock_mode);
+
+    if (private_state == NULL || info == NULL || private_state->saving ||
+        private_state->persisted_policy_present) {
+        return false;
+    }
+    assign_clock_mode(&private_state->policy, info);
+    return true;
+}
+
+bool ss_date_time_model_set_clock_mode(
+    SsDateTimeModel *model,
+    const char *clock_mode)
+{
+    const InfiltratrTemporalClockModeInfo *info = valid_clock_mode(clock_mode);
     InfiltratrTemporalPolicyV3 candidate;
 
-    if (model == NULL) {
+    if (model == NULL || info == NULL || !begin_candidate(model, &candidate)) {
         return false;
     }
-    info = infiltratr_temporal_clock_mode_find(clock_mode);
-    if (info == NULL) {
-        return false;
-    }
-
-    if (!begin_candidate(model, &candidate)) {
-        return false;
-    }
-    infiltratr_copy_string(candidate.clock_mode,
-                           sizeof(candidate.clock_mode),
-                           info->id);
+    assign_clock_mode(&candidate, info);
     return save_candidate(model, &candidate);
 }
 
-bool ss_date_time_model_set_calendar(SsDateTimeModel *model,
-                                     const char *calendar_id)
+bool ss_date_time_model_set_calendar(
+    SsDateTimeModel *model,
+    const char *calendar_id)
 {
-    const InfiltratrTemporalCalendarInfo *info;
+    const InfiltratrTemporalCalendarInfo *info = valid_calendar(calendar_id);
     InfiltratrTemporalPolicyV3 candidate;
 
-    if (model == NULL) {
+    if (model == NULL || info == NULL || !begin_candidate(model, &candidate)) {
         return false;
     }
-    info = infiltratr_temporal_calendar_find(calendar_id);
-    if (info == NULL) {
-        return false;
-    }
-
-    if (!begin_candidate(model, &candidate)) {
-        return false;
-    }
-    infiltratr_copy_string(candidate.calendar,
-                           sizeof(candidate.calendar),
-                           info->id);
+    assign_calendar(&candidate, info);
     return save_candidate(model, &candidate);
 }
 
-bool ss_date_time_model_set_show_seconds(SsDateTimeModel *model,
-                                         bool show_seconds)
+bool ss_date_time_model_set_show_seconds(
+    SsDateTimeModel *model,
+    bool show_seconds)
 {
     InfiltratrTemporalPolicyV3 candidate;
 
-    if (model == NULL) {
-        return false;
-    }
-    if (!begin_candidate(model, &candidate)) {
+    if (model == NULL || !begin_candidate(model, &candidate)) {
         return false;
     }
     candidate.show_seconds = show_seconds;
     return save_candidate(model, &candidate);
 }
 
-bool ss_date_time_model_set_location(SsDateTimeModel *model,
-                                     bool configured,
-                                     double latitude,
-                                     double longitude)
+bool ss_date_time_model_set_location(
+    SsDateTimeModel *model,
+    bool configured,
+    double latitude,
+    double longitude)
 {
     InfiltratrTemporalPolicyV3 candidate;
 
-    if (model == NULL || !isfinite(latitude) || !isfinite(longitude) ||
-        latitude < -90.0 || latitude > 90.0 ||
-        longitude < -180.0 || longitude > 180.0) {
+    if (model == NULL || !valid_location(latitude, longitude) ||
+        !begin_candidate(model, &candidate)) {
         return false;
     }
-    if (!begin_candidate(model, &candidate)) {
-        return false;
-    }
-    candidate.location_configured = configured;
-    candidate.latitude = latitude;
-    candidate.longitude = longitude;
+    assign_location(&candidate, configured, latitude, longitude);
     return save_candidate(model, &candidate);
+}
+
+SsDateTimePolicyDraft *ss_date_time_policy_draft_new(
+    const InfiltratrTemporalPolicyV3 *base_policy)
+{
+    SsDateTimePolicyDraft *draft;
+
+    if (base_policy == NULL) {
+        return NULL;
+    }
+    draft = calloc(1U, sizeof(*draft));
+    if (draft != NULL) {
+        draft->policy = *base_policy;
+    }
+    return draft;
+}
+
+void ss_date_time_policy_draft_free(SsDateTimePolicyDraft *draft)
+{
+    free(draft);
+}
+
+const InfiltratrTemporalPolicyV3 *ss_date_time_policy_draft_policy(
+    const SsDateTimePolicyDraft *draft)
+{
+    return draft != NULL ? &draft->policy : NULL;
+}
+
+bool ss_date_time_policy_draft_set_clock_mode(
+    SsDateTimePolicyDraft *draft,
+    const char *clock_mode)
+{
+    const InfiltratrTemporalClockModeInfo *info = valid_clock_mode(clock_mode);
+
+    if (draft == NULL || info == NULL) {
+        return false;
+    }
+    assign_clock_mode(&draft->policy, info);
+    return true;
+}
+
+bool ss_date_time_policy_draft_set_calendar(
+    SsDateTimePolicyDraft *draft,
+    const char *calendar_id)
+{
+    const InfiltratrTemporalCalendarInfo *info = valid_calendar(calendar_id);
+
+    if (draft == NULL || info == NULL) {
+        return false;
+    }
+    assign_calendar(&draft->policy, info);
+    return true;
+}
+
+bool ss_date_time_policy_draft_set_show_seconds(
+    SsDateTimePolicyDraft *draft,
+    bool show_seconds)
+{
+    if (draft == NULL) {
+        return false;
+    }
+    draft->policy.show_seconds = show_seconds;
+    return true;
+}
+
+bool ss_date_time_policy_draft_set_location(
+    SsDateTimePolicyDraft *draft,
+    bool configured,
+    double latitude,
+    double longitude)
+{
+    if (draft == NULL || !valid_location(latitude, longitude)) {
+        return false;
+    }
+    assign_location(&draft->policy, configured, latitude, longitude);
+    return true;
 }
