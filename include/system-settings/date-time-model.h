@@ -16,7 +16,6 @@
 #endif
 
 #include <stdbool.h>
-#include <stddef.h>
 #include <infiltratr/temporal.h>
 #include "system-settings/temporal-policy-store.h"
 
@@ -24,25 +23,25 @@
 extern "C" {
 #endif
 
-/*
- * Keep the model stack-allocatable without exposing its authority fields.
- * date-time-model.c verifies at compile time that its private representation
- * fits this storage and that max_align_t supplies sufficient alignment.
- */
-#define SS_DATE_TIME_MODEL_STORAGE_SIZE 1024U
-typedef union SsDateTimeModel {
-    max_align_t _alignment;
-    unsigned char _storage[SS_DATE_TIME_MODEL_STORAGE_SIZE];
+typedef struct SsDateTimeModelPrivate SsDateTimeModelPrivate;
+
+typedef struct SsDateTimeModel {
+    SsDateTimeModelPrivate *_private;
 } SsDateTimeModel;
+
+#define SS_DATE_TIME_MODEL_INIT { NULL }
 
 typedef struct SsDateTimePolicyDraft SsDateTimePolicyDraft;
 
 /**
- * Initialise a model and immediately reconcile it with the supplied store.
- * The store pointer is borrowed and must outlive the model.
+ * Initialise a zero-initialised model and immediately reconcile it with the
+ * supplied store. The store pointer is borrowed and must outlive the model.
+ * Call ss_date_time_model_clear() before reinitialising or leaving scope.
  */
 bool ss_date_time_model_init(SsDateTimeModel *model,
                              const SsTemporalPolicyStore *store);
+/** Release the private model state and return the handle to its empty state. */
+void ss_date_time_model_clear(SsDateTimeModel *model);
 /**
  * Reload authoritative state from the store.
  *
