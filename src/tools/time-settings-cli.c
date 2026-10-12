@@ -57,7 +57,7 @@ static bool command_touches_location(int argc, char **argv)
 
 int main(int argc, char **argv)
 {
-    SsDateTimeModel model;
+    SsDateTimeModel model = SS_DATE_TIME_MODEL_INIT;
     SsDateTimePolicyDraft *draft = NULL;
     int index;
     int exit_code = 0;
@@ -300,6 +300,7 @@ done:
         locality_locked = false;
     }
     ss_date_time_policy_draft_free(draft);
+    ss_date_time_model_clear(&model);
     if (exit_code != 0) {
         return exit_code;
     }
