@@ -9,19 +9,6 @@
 #include <stdio.h>
 #include <string.h>
 
-/* A command is one transaction: validation must not publish early options
- * when a later option is malformed. The staging store owns no external state. */
-static bool stage_load(InfiltratrTemporalPolicyV3 *policy, bool *found)
-{
-    *found = false;
-    return infiltratr_temporal_policy_v3_default(policy);
-}
-
-static bool stage_save(const InfiltratrTemporalPolicyV3 *policy)
-{
-    return policy != NULL;
-}
-
 static void print_usage(const char *program)
 {
     fprintf(stderr,
@@ -71,26 +58,22 @@ static bool command_touches_location(int argc, char **argv)
 int main(int argc, char **argv)
 {
     SsDateTimeModel model;
+    SsDateTimePolicyDraft *draft = NULL;
     int index;
     int exit_code = 0;
     bool platform_locked = false;
     bool locality_locked = false;
     bool location_change_requested = false;
     bool location_clear_requested = false;
+    bool output_persisted = false;
     InfiltratrTemporalPolicyV3 original_policy;
+    InfiltratrTemporalPolicyV3 output_policy;
 #ifndef _WIN32
     SsLocationMetadata location_candidate = {0};
     bool location_staged = false;
 #endif
     const SsTemporalPolicyStore *platform =
         ss_platform_temporal_policy_store();
-    static const SsTemporalPolicyStore staging = {
-        .load = stage_load,
-        .save = stage_save,
-        .begin_update = NULL,
-        .end_update = NULL,
-        .compatibility_matches = NULL
-    };
 
     /*
      * Location-changing commands take the locality lock before the policy
@@ -134,18 +117,37 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    original_policy = model.policy;
-    model.store = &staging;
+    {
+        const InfiltratrTemporalPolicyV3 *authoritative =
+            ss_date_time_model_policy(&model);
+        if (authoritative == NULL) {
+            fputs("Unable to read temporal presentation policy.\n", stderr);
+            exit_code = 1;
+            goto done;
+        }
+        original_policy = *authoritative;
+        output_policy = *authoritative;
+        output_persisted = ss_date_time_model_has_persisted_policy(&model);
+        draft = ss_date_time_policy_draft_new(authoritative);
+    }
+    if (draft == NULL) {
+        fputs("Unable to stage temporal presentation policy.\n", stderr);
+        exit_code = 1;
+        goto done;
+    }
+
     for (index = 1; index < argc; ++index) {
         if (strcmp(argv[index], "--clock") == 0 && index + 1 < argc) {
-            if (!ss_date_time_model_set_clock_mode(&model, argv[++index])) {
+            if (!ss_date_time_policy_draft_set_clock_mode(
+                    draft, argv[++index])) {
                 fputs("Unable to set clock mode.\n", stderr);
                 exit_code = 2;
                 goto done;
             }
         } else if (strcmp(argv[index], "--calendar") == 0 &&
                    index + 1 < argc) {
-            if (!ss_date_time_model_set_calendar(&model, argv[++index])) {
+            if (!ss_date_time_policy_draft_set_calendar(
+                    draft, argv[++index])) {
                 fputs("Unable to set calendar.\n", stderr);
                 exit_code = 2;
                 goto done;
@@ -163,7 +165,7 @@ int main(int argc, char **argv)
                 exit_code = 2;
                 goto done;
             }
-            if (!ss_date_time_model_set_show_seconds(&model, show)) {
+            if (!ss_date_time_policy_draft_set_show_seconds(draft, show)) {
                 fputs("Unable to set seconds policy.\n", stderr);
                 exit_code = 2;
                 goto done;
@@ -179,8 +181,8 @@ int main(int argc, char **argv)
                     latitude_text, -90.0, 90.0, &latitude) ||
                 !infiltratr_parse_double_range(
                     longitude_text, -180.0, 180.0, &longitude) ||
-                !ss_date_time_model_set_location(
-                    &model, true, latitude, longitude)) {
+                !ss_date_time_policy_draft_set_location(
+                    draft, true, latitude, longitude)) {
                 fputs("Unable to set geographic location.\n", stderr);
                 exit_code = 2;
                 goto done;
@@ -197,9 +199,14 @@ int main(int argc, char **argv)
             location_candidate.longitude = longitude;
 #endif
         } else if (strcmp(argv[index], "--clear-location") == 0) {
-            if (!ss_date_time_model_set_location(
-                    &model, false,
-                    model.policy.latitude, model.policy.longitude)) {
+            const InfiltratrTemporalPolicyV3 *candidate =
+                ss_date_time_policy_draft_policy(draft);
+            if (candidate == NULL ||
+                !ss_date_time_policy_draft_set_location(
+                    draft,
+                    false,
+                    candidate->latitude,
+                    candidate->longitude)) {
                 fputs("Unable to clear geographic location.\n", stderr);
                 exit_code = 2;
                 goto done;
@@ -214,6 +221,14 @@ int main(int argc, char **argv)
     }
 
     if (argc > 1) {
+        const InfiltratrTemporalPolicyV3 *candidate =
+            ss_date_time_policy_draft_policy(draft);
+
+        if (candidate == NULL) {
+            fputs("Unable to read staged temporal presentation policy.\n", stderr);
+            exit_code = 2;
+            goto done;
+        }
 #ifndef _WIN32
         if (location_change_requested && !location_clear_requested) {
             if (!ss_location_metadata_stage(&location_candidate)) {
@@ -226,7 +241,7 @@ int main(int argc, char **argv)
 #endif
 
         if (platform == NULL || platform->save == NULL ||
-            !platform->save(&model.policy)) {
+            !platform->save(candidate)) {
 #ifndef _WIN32
             if (location_staged) {
                 ss_location_metadata_discard_staged();
@@ -237,7 +252,8 @@ int main(int argc, char **argv)
             exit_code = 2;
             goto done;
         }
-        model.persisted_policy_present = true;
+        output_policy = *candidate;
+        output_persisted = true;
 
 #ifndef _WIN32
         if (location_change_requested) {
@@ -268,7 +284,7 @@ int main(int argc, char **argv)
 #endif
 
         if (platform->compatibility_matches != NULL &&
-            !platform->compatibility_matches(&model.policy)) {
+            !platform->compatibility_matches(candidate)) {
             fputs(
                 "Temporal policy was saved, but native desktop compatibility settings did not fully synchronize.\n",
                 stderr);
@@ -283,6 +299,7 @@ done:
         release_locality_transaction();
         locality_locked = false;
     }
+    ss_date_time_policy_draft_free(draft);
     if (exit_code != 0) {
         return exit_code;
     }
@@ -294,13 +311,12 @@ done:
            "latitude=%.6f\n"
            "longitude=%.6f\n"
            "source=%s\n",
-           model.policy.clock_mode,
-           model.policy.calendar,
-           model.policy.show_seconds ? "true" : "false",
-           model.policy.location_configured ? "true" : "false",
-           model.policy.latitude,
-           model.policy.longitude,
-           model.persisted_policy_present
-               ? "infiltrator-policy" : "platform-default");
+           output_policy.clock_mode,
+           output_policy.calendar,
+           output_policy.show_seconds ? "true" : "false",
+           output_policy.location_configured ? "true" : "false",
+           output_policy.latitude,
+           output_policy.longitude,
+           output_persisted ? "infiltrator-policy" : "platform-default");
     return 0;
 }
