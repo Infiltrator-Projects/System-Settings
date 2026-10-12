@@ -7,7 +7,7 @@
 static SsSystemTimeService *service;
 static bool ready;
 static bool completed;
-static bool completion_success;
+static SsSystemTimeResult completion_result;
 static gchar *completion_error;
 static GDBusMethodInvocation *pending;
 static const char *expected_method;
@@ -86,10 +86,12 @@ static void method_call(
 
 static void on_ready(
     SsSystemTimeService *value,
+    SsSystemTimeResult result,
     const char *error,
     gpointer data)
 {
     (void)data;
+    g_assert_cmpint(result, ==, SS_SYSTEM_TIME_RESULT_OK);
     g_assert_null(error);
     g_assert_nonnull(value);
     service = value;
@@ -110,11 +112,11 @@ static void on_changed(
 
 static void on_record_complete(
     SsSystemTimeService *value G_GNUC_UNUSED,
-    bool success,
+    SsSystemTimeResult result,
     const char *error,
     gpointer data G_GNUC_UNUSED)
 {
-    completion_success = success;
+    completion_result = result;
     g_clear_pointer(&completion_error, g_free);
     completion_error = g_strdup(error);
     completed = true;
@@ -122,16 +124,19 @@ static void on_record_complete(
 
 static void on_lifetime_complete(
     SsSystemTimeService *value,
-    bool success,
+    SsSystemTimeResult result,
     const char *error,
     gpointer data G_GNUC_UNUSED)
 {
     SsSystemTimeState state;
 
-    g_assert_true(success);
+    g_assert_cmpint(result, ==, SS_SYSTEM_TIME_RESULT_OK);
     g_assert_null(error);
     /* The initiating owner has already released its reference. */
-    g_assert_true(ss_system_time_service_read(value, &state));
+    g_assert_cmpint(
+        ss_system_time_service_read(value, &state),
+        ==,
+        SS_SYSTEM_TIME_RESULT_OK);
     g_assert_cmpstr(state.timezone, ==, "Australia/Melbourne");
     completed = true;
 }
@@ -140,7 +145,7 @@ static void reset_completion(const char *method)
 {
     expected_method = method;
     completed = false;
-    completion_success = false;
+    completion_result = SS_SYSTEM_TIME_RESULT_PROTOCOL_ERROR;
     g_clear_pointer(&completion_error, g_free);
     g_assert_null(pending);
 }
@@ -273,8 +278,10 @@ int main(void)
     }
 
     SsSystemTimeState initial;
-    g_assert_true(ss_system_time_service_read(
-        service, &initial));
+    g_assert_cmpint(
+        ss_system_time_service_read(service, &initial),
+        ==,
+        SS_SYSTEM_TIME_RESULT_OK);
     g_assert_true(initial.available);
     g_assert_cmpstr(
         initial.timezone, ==, "Australia/Melbourne");
@@ -289,6 +296,10 @@ int main(void)
         g_main_context_iteration(NULL, TRUE);
     }
     g_assert_false(observed_state.available);
+    g_assert_cmpint(
+        ss_system_time_service_read(service, &initial),
+        ==,
+        SS_SYSTEM_TIME_RESULT_UNAVAILABLE);
 
     before = observed_changes;
     change_bus_name(connection, "RequestName");
@@ -311,7 +322,7 @@ int main(void)
     wait_pending();
     finish_success();
     wait_completed();
-    g_assert_true(completion_success);
+    g_assert_cmpint(completion_result, ==, SS_SYSTEM_TIME_RESULT_OK);
     g_assert_null(completion_error);
 
     reset_completion("SetTime");
@@ -324,7 +335,7 @@ int main(void)
     wait_pending();
     finish_success();
     wait_completed();
-    g_assert_true(completion_success);
+    g_assert_cmpint(completion_result, ==, SS_SYSTEM_TIME_RESULT_OK);
     g_assert_null(completion_error);
 
     reset_completion("SetNTP");
@@ -337,10 +348,48 @@ int main(void)
     wait_pending();
     finish_denied();
     wait_completed();
-    g_assert_false(completion_success);
+    g_assert_cmpint(
+        completion_result,
+        ==,
+        SS_SYSTEM_TIME_RESULT_PERMISSION_DENIED);
     g_assert_nonnull(completion_error);
     g_assert_nonnull(strstr(
         completion_error, "Authorisation denied"));
+
+    /* Validation failures are typed and may complete synchronously. */
+    completed = false;
+    completion_result = SS_SYSTEM_TIME_RESULT_OK;
+    g_clear_pointer(&completion_error, g_free);
+    ss_system_time_service_set_timezone_async(
+        service,
+        "",
+        NULL,
+        on_record_complete,
+        NULL);
+    g_assert_true(completed);
+    g_assert_cmpint(
+        completion_result,
+        ==,
+        SS_SYSTEM_TIME_RESULT_INVALID_ARGUMENT);
+    g_assert_nonnull(completion_error);
+
+    /* Cancellation is distinct from denial and transport/service failure. */
+    reset_completion("SetNTP");
+    g_autoptr(GCancellable) cancellable = g_cancellable_new();
+    ss_system_time_service_set_ntp_async(
+        service,
+        false,
+        cancellable,
+        on_record_complete,
+        NULL);
+    wait_pending();
+    g_cancellable_cancel(cancellable);
+    wait_completed();
+    g_assert_cmpint(
+        completion_result,
+        ==,
+        SS_SYSTEM_TIME_RESULT_CANCELLED);
+    finish_success();
 
     /* Outstanding calls own the service through their completion callback. */
     reset_completion("SetNTP");
