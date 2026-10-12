@@ -117,11 +117,14 @@ jobs:
           grep -Eq 'libgeocode-glib-2-0|libgeocode-glib0' <<<"$depends"
           rm -rf "$root"
 
-      - name: Upload Debian package
+      - name: Upload exact tested release assets
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: infiltrator-system-settings-deb
-          path: build/*.deb
+          name: system-settings-release-assets
+          path: |
+            build/infiltrator-system-settings_*.deb
+            build/source-assets-check/System-Settings-*-native.run
+            build/source-assets-check/System-Settings-*-source.zip
           if-no-files-found: error
 
   static-analysis:
