@@ -12,7 +12,6 @@
 #include <gio/gio.h>
 
 typedef struct HomeStatusTicker {
-    GtkWidget *owner;
     GtkLabel *uptime;
     GtkLabel *date_timezone;
     GtkLabel *region_value;
@@ -337,7 +336,6 @@ void ss_home_status_attach(
         return;
     }
     ticker = g_new0(HomeStatusTicker, 1);
-    ticker->owner = owner;
     ticker->uptime = uptime;
     ticker->date_timezone = date_timezone;
     ticker->region_value = region_value;

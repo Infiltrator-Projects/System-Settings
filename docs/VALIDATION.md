@@ -265,7 +265,7 @@ A release commit must:
 
 ## Current regression coverage
 
-CTest contains eighteen System Settings project tests on Linux when Xvfb is
+CTest contains twenty System Settings project tests on Linux when Xvfb is
 available. Coverage includes private-bus timedated success, denial,
 owner-loss/reacquisition and outstanding-call lifetime; transactional CLI
 rollback/provenance; cross-process policy merge races through both the model and

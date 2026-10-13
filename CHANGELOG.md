@@ -5,6 +5,12 @@ history is preserved unchanged in [`CHANGELOG-legacy.md`](CHANGELOG-legacy.md).
 The 0.4.60-0.4.69 overlap is intentional: it closes gaps in the historical file
 while keeping the original record immutable.
 
+## 0.4.90 — 2026-10-13
+
+- Complete a second repository-wide brittleness pass against the canonical Infiltrator Engineering Philosophy and remove dead Home status ownership state that had no lifecycle or behavioural contract.
+- Reconcile maintained validation documentation with the actual twenty-test Linux CTest suite.
+- Revalidate the deliberate transaction, async-lifetime, Common-provenance, packaging and exact-artifact release boundaries; retain them where their complexity protects stronger correctness guarantees rather than replacing them with weaker abstractions.
+
 ## 0.4.89 — 2026-10-13
 
 - Qualify the Linux release package under the existing `generic` build profile rather than the source-aware default CMake profile, so installed UI assets and module manifests are the sole runtime authority and published Debian binaries no longer embed the CI checkout path.
