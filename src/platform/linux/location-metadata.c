@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#define _POSIX_C_SOURCE 200809L
 /**
  * @file location-metadata.c
  * @brief Durable Linux persistence for user-selected locality metadata.
@@ -17,11 +16,8 @@
 #include <infiltratr/temporal.h>
 #include <glib/gstdio.h>
 
-#include <errno.h>
-#include <fcntl.h>
 #include <math.h>
 #include <string.h>
-#include <unistd.h>
 
 static SsLinuxAdvisoryLock locality_transaction_lock =
     SS_LINUX_ADVISORY_LOCK_INIT;
@@ -200,32 +196,24 @@ static bool metadata_save_path(
     }
 
     directory = g_path_get_dirname(path);
-    if (g_mkdir_with_parents(directory, 0700) != 0 && errno != EEXIST) {
+    if (directory == NULL ||
+        infiltratr_mkdir_parents(directory, 0700U) != 0) {
         return false;
     }
     /*
-     * g_mkdir_with_parents() does not tighten an already existing directory.
-     * Locality metadata is private user state, so repair the leaf directory
-     * mode before publishing the file as well as creating new directories
-     * with 0700.
+     * Creating missing components with 0700 is not enough when the leaf
+     * already exists with wider permissions. Repair that product-specific
+     * privacy invariant before Common atomically publishes private file bytes.
      */
     if (g_chmod(directory, 0700) != 0) {
         return false;
     }
 
-    /*
-     * CONSISTENT requests replacement through a temporary file and DURABLE
-     * requests publication to stable storage. Metadata is private user state,
-     * hence mode 0600.
-     */
-    return g_file_set_contents_full(
-        path,
-        data,
-        (gssize)length,
-        G_FILE_SET_CONTENTS_CONSISTENT |
-            G_FILE_SET_CONTENTS_DURABLE,
-        0600,
-        NULL);
+    return infiltratr_atomic_file_write_bytes(
+               path,
+               INFILTRATR_ATOMIC_FILE_PRIVATE,
+               data,
+               (size_t)length) == 0;
 }
 
 SsLocationMetadataLoadStatus
@@ -247,54 +235,29 @@ bool ss_location_metadata_save(const SsLocationMetadata *metadata)
     return metadata_save_path(path, metadata);
 }
 
-static bool remove_metadata_path(
-    const char *path,
-    const char *durability_warning)
+static bool remove_metadata_path(const char *path)
 {
-    g_autofree gchar *directory = NULL;
-    int directory_fd;
+    int failure;
 
     if (path == NULL || path[0] == '\0') {
         return false;
     }
-    directory = g_path_get_dirname(path);
-    if (directory == NULL) {
-        return false;
+
+    failure = infiltratr_unlink_durable(path, true);
+    if (failure == 0) {
+        return true;
     }
 
-    directory_fd = open(directory, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
-    if (directory_fd < 0) {
-        return errno == ENOENT;
-    }
-
-    if (unlink(path) != 0) {
-        const int saved_errno = errno;
-        (void)close(directory_fd);
-        if (saved_errno == ENOENT) {
-            return true;
-        }
-        errno = saved_errno;
-        return false;
-    }
-
-    /*
-     * Once unlink succeeds the running system has committed the namespace
-     * change. Sync the parent for crash durability, but do not turn a
-     * post-unlink fsync failure into a request to roll policy back.
-     */
-    if (fsync(directory_fd) != 0 && durability_warning != NULL) {
-        g_warning("%s", durability_warning);
-    }
-    (void)close(directory_fd);
-    return true;
+    g_warning(
+        "Unable to durably remove locality persistence state: %s",
+        g_strerror(failure));
+    return false;
 }
 
 bool ss_location_metadata_clear(void)
 {
     g_autofree gchar *path = ss_location_metadata_path_alloc();
-    return remove_metadata_path(
-        path,
-        "Locality metadata was removed, but its parent directory could not be synchronized.");
+    return remove_metadata_path(path);
 }
 
 bool ss_location_metadata_stage(const SsLocationMetadata *metadata)
@@ -307,9 +270,7 @@ bool ss_location_metadata_discard_staged(void)
 {
     g_autofree gchar *path = metadata_pending_path();
 
-    return remove_metadata_path(
-        path,
-        "The locality transaction journal was removed, but its parent directory could not be synchronized.");
+    return remove_metadata_path(path);
 }
 
 bool ss_location_metadata_finish_staged(void)
@@ -324,16 +285,14 @@ bool ss_location_metadata_finish_staged(void)
     if (!ss_location_metadata_save(&staged)) {
         return false;
     }
-    if (!remove_metadata_path(
-            path,
-            "The committed locality journal was removed, but its parent directory could not be synchronized.")) {
-        /*
-         * location.ini is already the durable committed metadata. Retaining a
-         * stale matching journal is cleanup debt and recovery is idempotent;
-         * never roll the policy back after metadata publication succeeded.
-         */
-        g_warning("Unable to remove committed locality transaction journal; cleanup will be retried.");
-    }
+
+    /*
+     * location.ini is already the durable committed metadata. A journal
+     * cleanup failure must not roll that successful publication back: recovery
+     * is idempotent and will retry any surviving or resurrected matching
+     * journal. remove_metadata_path() reports the durability failure itself.
+     */
+    (void)remove_metadata_path(path);
     return true;
 }
 

@@ -8,9 +8,8 @@
 #include "system-settings/cinnamon-interface.h"
 #include "linux-advisory-lock.h"
 
-#include <errno.h>
-#include <glib/gstdio.h>
 #include <infiltratr/core.h>
+#include <infiltratr/posix.h>
 #include <infiltratr/temporal_posix.h>
 
 static SsLinuxAdvisoryLock update_lock = SS_LINUX_ADVISORY_LOCK_INIT;
@@ -180,25 +179,28 @@ static bool platform_save(const InfiltratrTemporalPolicyV3 *policy)
 static bool platform_clear(void)
 {
     g_autofree gchar *path = NULL;
+    int failure;
 
     /*
-     * Common owns validated load/save and the canonical XDG contract. Its
-     * pinned API intentionally has no deletion primitive, while System
-     * Settings alone needs deletion to restore pre-transaction policy absence.
-     * Derive the documented canonical location from GLib's XDG authority here
-     * rather than introducing a second persistence implementation.
+     * Common owns the generic durable namespace-mutation primitive as well as
+     * validated temporal load/save. The temporal path helper is caller-buffer
+     * based, so keep this allocation-backed XDG derivation to avoid imposing a
+     * product path-length ceiling, then delegate deletion and parent-directory
+     * durability to Common. Missing policy remains idempotent success.
      */
     path = g_build_filename(
         g_get_user_config_dir(), "infiltrator", "presentation.conf", NULL);
     if (path == NULL) {
         return false;
     }
-    if (g_unlink(path) == 0 || errno == ENOENT) {
+
+    failure = infiltratr_unlink_durable(path, true);
+    if (failure == 0) {
         return true;
     }
 
-    g_warning("Unable to remove the temporal policy during transaction rollback: %s",
-              g_strerror(errno));
+    g_warning("Unable to durably remove the temporal policy during transaction rollback: %s",
+              g_strerror(failure));
     return false;
 }
 

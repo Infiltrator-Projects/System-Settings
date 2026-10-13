@@ -5,6 +5,12 @@ history is preserved unchanged in [`CHANGELOG-legacy.md`](CHANGELOG-legacy.md).
 The 0.4.60-0.4.69 overlap is intentional: it closes gaps in the historical file
 while keeping the original record immutable.
 
+## 0.4.96 — 2026-10-14
+
+- Complete the forensic persistence pass by consolidating Linux locality directory creation, private atomic metadata publication and durable namespace removal onto Common 1.19.41's tested POSIX primitives instead of maintaining overlapping GLib/local mechanisms.
+- Make temporal-policy rollback deletion fulfill the store's durable-clear contract: policy absence now reports success only after Common has published the unlink through the parent directory, while an already-missing policy remains idempotent success.
+- Re-audit module ownership, async lifetime, transaction/recovery, platform authority, build/test boundaries and exact-tested-artifact publication; retain deliberate complexity where it protects stronger contracts rather than replacing it with weaker abstractions.
+
 ## 0.4.95 — 2026-10-14
 
 - Make the two-file locality transaction restore policy provenance as well as values: the Date & Time model now retains the temporal-policy update lock across locality metadata publication, and rollback removes the explicit policy again when the transaction began from platform defaults instead of materialising a shadow copy of those defaults.
