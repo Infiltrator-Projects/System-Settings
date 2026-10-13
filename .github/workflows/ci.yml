@@ -35,7 +35,7 @@ jobs:
           sudo apt-get install -y libgtk-4-dev libgeocode-glib-dev pkg-config xvfb dbus-x11
 
       - name: Configure
-        run: cmake -S . -B build -DBUILD_TESTING=ON -DSYSTEM_SETTINGS_WARNINGS_AS_ERRORS=ON
+        run: cmake -S . -B build -DBUILD_TESTING=ON -DSYSTEM_SETTINGS_WARNINGS_AS_ERRORS=ON -DSYSTEM_SETTINGS_BUILD_PROFILE=generic
 
       - name: Build
         shell: bash
@@ -98,6 +98,11 @@ jobs:
           grep -aFq '/usr/share/infiltrator/system-settings/ui' "$binary"
           if grep -aFq '/usr/local/share/infiltrator/system-settings/ui' "$binary"; then
             echo "Packaged binary still contains the wrong /usr/local UI asset path." >&2
+            exit 1
+          fi
+          if grep -aFq "${GITHUB_WORKSPACE}/assets/ui" "$binary" ||
+             grep -aFq "${GITHUB_WORKSPACE}/modules" "$binary"; then
+            echo "Qualified package embeds a development checkout fallback." >&2
             exit 1
           fi
           diff -u \
@@ -354,7 +359,7 @@ jobs:
             sha256sum -c SHA256SUMS
           )
 
-      - name: Publish or repair release
+      - name: Publish or complete release
         if: steps.classify.outputs.candidate == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -377,10 +382,39 @@ jobs:
             exit 1
           fi
 
+          expected_names="$(
+            find release-assets -maxdepth 1 -type f -printf '%f\n' | sort
+          )"
+          verify="$(mktemp -d)"
+          trap 'rm -rf "$verify"' EXIT
+
           if gh release view "$tag" >/dev/null 2>&1; then
-            # A rerun repairs a partial upload from this run's immutable tested
-            # artifact bundle rather than rebuilding or reaching into another run.
-            gh release upload "$tag" "${assets[@]}" --clobber
+            # Existing published bytes are immutable. A rerun may complete a
+            # partial release by adding a missing expected asset, but it must
+            # never replace an asset that already exists under this tag.
+            existing_names="$(
+              gh release view "$tag" --json assets --jq '.assets[].name' | sort
+            )"
+            while IFS= read -r existing_name; do
+              [[ -z "$existing_name" ]] && continue
+              if ! grep -Fxq -- "$existing_name" <<< "$expected_names"; then
+                echo "Release $tag contains unexpected immutable asset $existing_name." >&2
+                exit 1
+              fi
+            done <<< "$existing_names"
+
+            for asset in "${assets[@]}"; do
+              name="$(basename "$asset")"
+              if grep -Fxq -- "$name" <<< "$existing_names"; then
+                gh release download "$tag" --pattern "$name" --dir "$verify"
+                if ! cmp "$asset" "$verify/$name"; then
+                  echo "Published asset $name differs from the exact tested bytes; refusing to replace it." >&2
+                  exit 1
+                fi
+              else
+                gh release upload "$tag" "$asset"
+              fi
+            done
           else
             gh release create "$tag" "${assets[@]}" \
               --target "$sha" \
@@ -388,14 +422,11 @@ jobs:
               --generate-notes
           fi
 
-          expected_names="$(
-            find release-assets -maxdepth 1 -type f -printf '%f\n' | sort
-          )"
           actual_names="$(gh release view "$tag" --json assets --jq '.assets[].name' | sort)"
           test "$actual_names" = "$expected_names"
 
-          verify="$(mktemp -d)"
-          trap 'rm -rf "$verify"' EXIT
+          rm -rf "$verify"
+          mkdir -p "$verify"
           gh release download "$tag" --dir "$verify"
           for asset in "${assets[@]}"; do
             cmp "$asset" "$verify/$(basename "$asset")"
