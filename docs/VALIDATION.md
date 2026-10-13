@@ -98,15 +98,19 @@ The replacement Date & Time module adds specific invariants:
   relabelling the Gregorian date;
 - missing Calendar runtime support degrades to an explicit unavailable preview
   without preventing policy editing or conventional previews;
-- the Calendar preview bridge is exercised against a shared-library fixture so
-  dynamic symbol discovery, specialised clock formatting and non-Gregorian
-  chronology rendering are regression-tested independently of the installed
-  desktop environment;
-- Linux runtime discovery covers Debian/Mint multiarch library placement and
-  can recover after Calendar becomes available while System Settings is open;
-- the Date & Time panel owns exactly one Calendar preview provider for its
-  lifetime, so specialised clock and non-Gregorian previews are available
-  immediately rather than depending on a timedated property-change event.
+- Common's Calendar date-provider bridge is exercised against a shared-library
+  fixture so trusted runtime discovery, the bounded pure-C date ABI and
+  non-Gregorian chronology rendering are regression-tested independently of the
+  installed desktop environment; specialised clock formatting remains a
+  separate Common clock-formatter contract and does not depend on Calendar;
+- Common's POSIX date provider owns Debian/Mint multiarch runtime discovery,
+  validation and bounded retry/recovery when Calendar becomes available;
+  System Settings must consume that provider rather than growing a second
+  product-local loader;
+- the Date & Time preview owns exactly one lightweight Common date provider for
+  its lifetime and creates it lazily for non-Gregorian date formatting; clock
+  previews continue to use Common's clock formatter independently of that
+  optional provider.
 
 The build contains an architectural CMake guard for the first invariant and
 unit coverage for the conventional/native clock-policy mapping.
