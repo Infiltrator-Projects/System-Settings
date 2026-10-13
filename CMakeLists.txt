@@ -67,9 +67,6 @@ endif()
 
 set(SYSTEM_SETTINGS_COMMON_DIR
     "${CMAKE_CURRENT_SOURCE_DIR}/src/vendor/infiltratr-common")
-set(SYSTEM_SETTINGS_COMMON_EXPECTED_VERSION "1.19.41")
-set(SYSTEM_SETTINGS_COMMON_EXPECTED_COMMIT
-    "b0387b7ab5d71cda60748e2506b85cdc0e6b5e8b")
 
 if(NOT EXISTS "${SYSTEM_SETTINGS_COMMON_DIR}/CMakeLists.txt" OR
    NOT EXISTS "${SYSTEM_SETTINGS_COMMON_DIR}/VERSION")
@@ -79,17 +76,28 @@ file(READ "${SYSTEM_SETTINGS_COMMON_DIR}/VERSION"
     SYSTEM_SETTINGS_COMMON_VERSION)
 string(STRIP "${SYSTEM_SETTINGS_COMMON_VERSION}"
     SYSTEM_SETTINGS_COMMON_VERSION)
-if(NOT SYSTEM_SETTINGS_COMMON_VERSION STREQUAL
-   SYSTEM_SETTINGS_COMMON_EXPECTED_VERSION)
+if(NOT SYSTEM_SETTINGS_COMMON_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
     message(FATAL_ERROR
-        "System Settings requires Common "
-        "${SYSTEM_SETTINGS_COMMON_EXPECTED_VERSION}; found "
-        "${SYSTEM_SETTINGS_COMMON_VERSION}")
+        "Pinned Common VERSION is malformed: ${SYSTEM_SETTINGS_COMMON_VERSION}")
 endif()
+
+# The repository gitlink is the single Common revision authority. Do not mirror
+# that SHA (or the Common version) here: duplicated pins drift during upgrades.
+# Official source archives carry the gitlink-derived commit marker plus a full
+# byte manifest because the parent Git metadata is intentionally absent there.
 find_package(Git QUIET)
 set(SYSTEM_SETTINGS_COMMON_PROVENANCE
     "${SYSTEM_SETTINGS_COMMON_DIR}/.system-settings-common-commit")
-if(GIT_FOUND AND EXISTS "${SYSTEM_SETTINGS_COMMON_DIR}/.git")
+if(GIT_FOUND AND
+   EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.git" AND
+   EXISTS "${SYSTEM_SETTINGS_COMMON_DIR}/.git")
+    execute_process(
+        COMMAND "${GIT_EXECUTABLE}" -C "${CMAKE_CURRENT_SOURCE_DIR}"
+                rev-parse ":src/vendor/infiltratr-common"
+        RESULT_VARIABLE SYSTEM_SETTINGS_COMMON_GITLINK_RESULT
+        OUTPUT_VARIABLE SYSTEM_SETTINGS_COMMON_EXPECTED_COMMIT
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET)
     execute_process(
         COMMAND "${GIT_EXECUTABLE}" -C "${SYSTEM_SETTINGS_COMMON_DIR}"
                 rev-parse HEAD
@@ -97,12 +105,13 @@ if(GIT_FOUND AND EXISTS "${SYSTEM_SETTINGS_COMMON_DIR}/.git")
         OUTPUT_VARIABLE SYSTEM_SETTINGS_COMMON_COMMIT
         OUTPUT_STRIP_TRAILING_WHITESPACE
         ERROR_QUIET)
-    if(NOT SYSTEM_SETTINGS_COMMON_GIT_RESULT EQUAL 0 OR
+    if(NOT SYSTEM_SETTINGS_COMMON_GITLINK_RESULT EQUAL 0 OR
+       NOT SYSTEM_SETTINGS_COMMON_GIT_RESULT EQUAL 0 OR
        NOT SYSTEM_SETTINGS_COMMON_COMMIT STREQUAL
            SYSTEM_SETTINGS_COMMON_EXPECTED_COMMIT)
         message(FATAL_ERROR
-            "System Settings requires Common commit "
-            "${SYSTEM_SETTINGS_COMMON_EXPECTED_COMMIT}; found "
+            "Checked-out Common does not match the repository gitlink: "
+            "expected ${SYSTEM_SETTINGS_COMMON_EXPECTED_COMMIT}; found "
             "${SYSTEM_SETTINGS_COMMON_COMMIT}")
     endif()
 elseif(EXISTS "${SYSTEM_SETTINGS_COMMON_PROVENANCE}")
@@ -110,12 +119,12 @@ elseif(EXISTS "${SYSTEM_SETTINGS_COMMON_PROVENANCE}")
         SYSTEM_SETTINGS_COMMON_COMMIT)
     string(STRIP "${SYSTEM_SETTINGS_COMMON_COMMIT}"
         SYSTEM_SETTINGS_COMMON_COMMIT)
-    if(NOT SYSTEM_SETTINGS_COMMON_COMMIT STREQUAL
-       SYSTEM_SETTINGS_COMMON_EXPECTED_COMMIT)
+    string(LENGTH "${SYSTEM_SETTINGS_COMMON_COMMIT}"
+        SYSTEM_SETTINGS_COMMON_COMMIT_LENGTH)
+    if(NOT SYSTEM_SETTINGS_COMMON_COMMIT_LENGTH EQUAL 40 OR
+       NOT SYSTEM_SETTINGS_COMMON_COMMIT MATCHES "^[0-9a-fA-F]+$")
         message(FATAL_ERROR
-            "Exported Common provenance does not match required commit "
-            "${SYSTEM_SETTINGS_COMMON_EXPECTED_COMMIT}; found "
-            "${SYSTEM_SETTINGS_COMMON_COMMIT}")
+            "Exported Common provenance marker is malformed.")
     endif()
 
     set(SYSTEM_SETTINGS_COMMON_HASH_MANIFEST
@@ -247,13 +256,13 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         PUBLIC InfiltratrCommon::Common PkgConfig::GIO2)
 
     add_library(system-settings-linux-ui STATIC
-        src/shell/linux/linux-ui-helpers.c
+        src/ui/linux/linux-ui-helpers.c
         src/shell/linux/linux-theme.c)
     ss_configure(system-settings-linux-ui)
     target_compile_definitions(system-settings-linux-ui PRIVATE
         SYSTEM_SETTINGS_GENERIC_SHELL=1)
     target_include_directories(system-settings-linux-ui PUBLIC
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux")
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/ui/linux")
     target_link_libraries(system-settings-linux-ui PUBLIC
         PkgConfig::GTK4
         InfiltratrCommon::Portable)
@@ -310,7 +319,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         src/app/home-temporal-provider.c)
     ss_configure(system-settings-linux-modules)
     target_include_directories(system-settings-linux-modules
-        PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux"
+        PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/src/app"
         PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/modules/date-time")
     target_link_libraries(system-settings-linux-modules PRIVATE
         system-settings-date-time-linux
@@ -405,6 +414,30 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
             "Date & Time must consume Linux UI through system-settings-linux-ui; "
             "it must not add the shell source directory directly.")
     endif()
+    get_target_property(
+        SS_LINUX_UI_PUBLIC_INCLUDES
+        system-settings-linux-ui
+        INTERFACE_INCLUDE_DIRECTORIES)
+    list(FIND SS_LINUX_UI_PUBLIC_INCLUDES "${SS_SHELL_SOURCE_INCLUDE}"
+        SS_LINUX_UI_SHELL_INCLUDE_INDEX)
+    if(NOT SS_LINUX_UI_SHELL_INCLUDE_INDEX EQUAL -1)
+        message(FATAL_ERROR
+            "Shared Linux UI infrastructure must not expose the shell source directory.")
+    endif()
+    get_target_property(
+        SS_MODULE_ADAPTER_PUBLIC_INCLUDES
+        system-settings-linux-modules
+        INTERFACE_INCLUDE_DIRECTORIES)
+    list(FIND SS_MODULE_ADAPTER_PUBLIC_INCLUDES "${SS_SHELL_SOURCE_INCLUDE}"
+        SS_MODULE_ADAPTER_SHELL_INCLUDE_INDEX)
+    if(NOT SS_MODULE_ADAPTER_SHELL_INCLUDE_INDEX EQUAL -1)
+        message(FATAL_ERROR
+            "The module composition adapter must not expose shell-owned headers.")
+    endif()
+    unset(SS_MODULE_ADAPTER_SHELL_INCLUDE_INDEX)
+    unset(SS_MODULE_ADAPTER_PUBLIC_INCLUDES)
+    unset(SS_LINUX_UI_SHELL_INCLUDE_INDEX)
+    unset(SS_LINUX_UI_PUBLIC_INCLUDES)
     unset(SS_DATE_TIME_SHELL_INCLUDE_INDEX)
     unset(SS_SHELL_SOURCE_INCLUDE)
     unset(SS_DATE_TIME_DIRECT_INCLUDES)
@@ -553,8 +586,6 @@ if(BUILD_TESTING)
         add_executable(home-temporal-provider-test
             tests/home-temporal-provider-test.c)
         ss_configure(home-temporal-provider-test)
-        target_include_directories(home-temporal-provider-test PRIVATE
-            "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux")
         target_link_libraries(home-temporal-provider-test PRIVATE
             system-settings-linux-modules PkgConfig::GTK4)
         add_test(NAME home-temporal-provider

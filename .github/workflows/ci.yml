@@ -4,8 +4,6 @@ name: System Settings CI
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 # Build and analysis jobs remain read-only. Only the final publish job receives
@@ -81,16 +79,13 @@ jobs:
           root="$(mktemp -d)"
           dpkg-deb -x "$deb" "$root"
           marker="$root/usr/share/infiltrator/policy-providers/temporal-v3"
-          test -f "$marker"
-          grep -qx 'provider=infiltrator-system-settings' "$marker"
-          grep -qx 'policy-version=3' "$marker"
-          grep -qx 'contract=infiltratr-temporal-v3' "$marker"
           desktop="$root/usr/share/applications/org.infiltrator.SystemSettings.desktop"
           icon="$root/usr/share/icons/hicolor/scalable/apps/org.infiltrator.SystemSettings.svg"
-          test -f "$desktop"
-          test -f "$icon"
-          grep -qx 'Icon=org.infiltrator.SystemSettings' "$desktop"
-          grep -q '#00ADEF' "$icon"
+          module_manifest="$root/usr/share/infiltrator/system-settings/modules/date-time.settings-module"
+          cmp data/temporal-v3.provider "$marker"
+          cmp data/org.infiltrator.SystemSettings.desktop "$desktop"
+          cmp data/org.infiltrator.SystemSettings.svg "$icon"
+          cmp modules/date-time.settings-module "$module_manifest"
           ui="$root/usr/share/infiltrator/system-settings/ui"
           binary="$root/usr/bin/system-settings"
           test -x "$binary"
@@ -99,10 +94,13 @@ jobs:
             echo "Packaged binary still contains the wrong /usr/local UI asset path." >&2
             exit 1
           fi
-          for asset in hero-asset.png overview-asset.png date-asset.png region-asset.png network-asset.png theme-light.png theme-dark.png theme-follow.png; do
-            test -s "$ui/$asset"
+          diff -u \
+            <(find assets/ui -maxdepth 1 -type f -printf '%f\n' | LC_ALL=C sort) \
+            <(find "$ui" -maxdepth 1 -type f -printf '%f\n' | LC_ALL=C sort)
+          while IFS= read -r asset; do
+            test -n "$asset"
             cmp "assets/ui/$asset" "$ui/$asset"
-          done
+          done < <(find assets/ui -maxdepth 1 -type f -printf '%f\n' | LC_ALL=C sort)
           depends="$(dpkg-deb --field "$deb" Depends)"
           grep -Eq 'libgeocode-glib-2-0|libgeocode-glib0' <<<"$depends"
           rm -rf "$root"

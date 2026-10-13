@@ -301,7 +301,7 @@ A module must refresh authoritative state after a write where practical rather t
 
 ## Repository policy
 
-Normal development stays on `main`. The project does not use long-lived feature branches as an architectural workflow.
+Development is direct to `main`. The repository keeps no standing development or feature branches; each `main` revision must remain coherent enough to run the authoritative validation path.
 
 Documentation is part of the implementation contract. A feature is not complete when code exists but architecture, behaviour, validation or privilege semantics are undocumented.
 
@@ -332,9 +332,6 @@ are `--clock MODE`, `--calendar ID`, `--seconds on|off`, `--location LAT LON` an
 `--clear-location`. One invocation validates all options before one persistent
 write; malformed later options leave the existing file unchanged. This CLI
 edits presentation preferences, not the protected operating-system clock.
-
-See [the September 2026 audit](docs/AUDIT-2026-09-25.md) for findings, coverage,
-validation evidence and remaining product gaps.
 
 ## Documentation map
 

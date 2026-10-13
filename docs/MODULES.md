@@ -39,7 +39,7 @@ Current Linux wiring is:
 ```text
 system-settings-linux-shell
        |
-       +-- builtin-module-host.h          generic registry/lifecycle contract
+       +-- src/app/builtin-module-host.h  generic registry/lifecycle contract
                |
                v
        system-settings-linux-modules     composition adapter
@@ -50,9 +50,10 @@ system-settings-linux-shell
                system-settings-date-time-linux
 ```
 
-The generic shell does not include the private Date & Time bridge. The
-composition adapter is the only production unit outside the module that knows
-that bridge. Date & Time domain headers reject compilation when included by a
+The generic shell does not include the private Date & Time bridge. Its
+composition contracts (`builtin-module-host.h` and `home-temporal-provider.h`)
+are owned by `src/app`, not by the shell source tree. The composition adapter is
+the only production unit outside the module that knows that bridge. Date & Time domain headers reject compilation when included by a
 target marked `SYSTEM_SETTINGS_GENERIC_SHELL`, while CMake separately prevents
 the generic shell/executable from directly linking the Date & Time or platform
 targets. This makes the boundary a compiler/link contract rather than a

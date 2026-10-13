@@ -1,0 +1,16 @@
+# Out-of-tree and local CMake build products.
+/build/
+/build-*/
+/cmake-build-*/
+/out/
+/dist/
+/compile_commands.json
+/CMakeUserPresets.json
+
+# Editor/patch debris must never become repository content.
+*.user
+*.swp
+*.swo
+*~
+*.orig
+*.rej
