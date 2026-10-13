@@ -5,6 +5,12 @@ history is preserved unchanged in [`CHANGELOG-legacy.md`](CHANGELOG-legacy.md).
 The 0.4.60-0.4.69 overlap is intentional: it closes gaps in the historical file
 while keeping the original record immutable.
 
+## 0.4.88 — 2026-10-13
+
+- Remove the last duplicated module-manifest filename assumption from Debian integration validation: CI now derives the expected manifest set from `modules/` and compares every packaged manifest byte-for-byte.
+- Make the release gate enforce the documented repository topology itself: a releasable current `main` must have exactly one remote branch, `main`, so branch debris can no longer coexist with a green published release.
+- Re-audit architecture, build profiles, Common provenance, tests, sanitizers, native/source installers and exact-tested-byte release promotion; retain deliberate explicit packaging allowlists and standalone installer duplication where they provide stronger review or bootstrap boundaries rather than replacing them with weaker automatic discovery.
+
 ## 0.4.87 — 2026-10-13
 
 - Complete a repository-wide brittleness pass: move reusable Linux UI helpers out of shell ownership, move built-in module composition contracts into `src/app`, and enforce those boundaries at CMake configure time.

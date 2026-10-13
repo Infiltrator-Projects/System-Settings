@@ -81,11 +81,17 @@ jobs:
           marker="$root/usr/share/infiltrator/policy-providers/temporal-v3"
           desktop="$root/usr/share/applications/org.infiltrator.SystemSettings.desktop"
           icon="$root/usr/share/icons/hicolor/scalable/apps/org.infiltrator.SystemSettings.svg"
-          module_manifest="$root/usr/share/infiltrator/system-settings/modules/date-time.settings-module"
+          module_dir="$root/usr/share/infiltrator/system-settings/modules"
           cmp data/temporal-v3.provider "$marker"
           cmp data/org.infiltrator.SystemSettings.desktop "$desktop"
           cmp data/org.infiltrator.SystemSettings.svg "$icon"
-          cmp modules/date-time.settings-module "$module_manifest"
+          diff -u \
+            <(find modules -maxdepth 1 -type f -name '*.settings-module' -printf '%f\n' | LC_ALL=C sort) \
+            <(find "$module_dir" -maxdepth 1 -type f -name '*.settings-module' -printf '%f\n' | LC_ALL=C sort)
+          while IFS= read -r manifest; do
+            test -n "$manifest"
+            cmp "modules/$manifest" "$module_dir/$manifest"
+          done < <(find modules -maxdepth 1 -type f -name '*.settings-module' -printf '%f\n' | LC_ALL=C sort)
           ui="$root/usr/share/infiltrator/system-settings/ui"
           binary="$root/usr/bin/system-settings"
           test -x "$binary"
@@ -276,6 +282,15 @@ jobs:
           set -euo pipefail
           expected="${{ github.sha }}"
           test "$(git rev-parse HEAD)" = "$expected"
+
+          mapfile -t branch_refs < <(
+            git ls-remote --heads origin | awk '{print $2}' | LC_ALL=C sort
+          )
+          if [[ ${#branch_refs[@]} -ne 1 || "${branch_refs[0]}" != "refs/heads/main" ]]; then
+            printf 'Release requires exactly one remote branch, refs/heads/main. Found:\n' >&2
+            printf '  %s\n' "${branch_refs[@]}" >&2
+            exit 1
+          fi
 
           version="$(tr -d '[:space:]' < VERSION)"
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
