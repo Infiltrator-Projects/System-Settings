@@ -258,7 +258,8 @@ A release commit must:
 - include only modules whose advertised read/write contracts meet their evidence requirements;
 - build release assets from the exact tested revision;
 - retain the exact pinned Common commit: Git checkouts verify the submodule HEAD, while official exported source carries the pinned commit marker plus a complete per-file SHA-256 manifest; CMake validates every exported Common byte and rejects uncovered extra files before configuration continues;
-- retain immutable published tags/assets, with reruns requiring the exact expected asset-name set and comparing every published DEB/native/source/checksum asset byte-for-byte against the rebuilt artifacts;
+- retain immutable published tags/assets: a rerun may add a missing expected asset to complete a partial publication, but it never replaces an existing asset; every existing published DEB/native/source/checksum byte must match the current run's exact tested bundle or publication fails;
+- ensure qualified package binaries use installed resources only and contain no development checkout fallback for UI assets or module manifests;
 - build release archives/packages from the release commit epoch and prove reproducibility by rebuilding the Debian package and source/native assets twice in CI;
 - verify the native installer payload by comparing the complete extracted source tree against the exact exported tree before accepting the asset.
 
