@@ -9,7 +9,8 @@
  * state or module-specific navigation metadata.
  */
 
-#include "shell-window-private.h"
+#include "shell-window.h"
+#include "builtin-module-host.h"
 
 #include "home-page.h"
 #include "linux-theme.h"
@@ -25,14 +26,25 @@
 #include <stdbool.h>
 #include <stdio.h>
 
-#ifndef SYSTEM_SETTINGS_MODULE_DIR
-#define SYSTEM_SETTINGS_MODULE_DIR "/usr/share/infiltrator/system-settings/modules"
-#endif
-#ifndef SYSTEM_SETTINGS_MODULE_SOURCE_DIR
-#define SYSTEM_SETTINGS_MODULE_SOURCE_DIR ""
-#endif
-
 #define SS_HOME_PAGE_ID "home"
+
+
+typedef struct ShellModulePage {
+    gchar *page_id;
+    gchar *title;
+    GtkListBoxRow *row;
+    GtkScrolledWindow *container;
+} ShellModulePage;
+
+typedef struct ShellSearchState {
+    GtkListBox *list;
+    GtkWindow *parent;
+    GtkStack *stack;
+    GtkListBoxRow *home_row;
+    SsBuiltinModuleHost *module_host;
+    GHashTable *module_pages;
+    gchar *query;
+} ShellSearchState;
 
 typedef enum ShellNavigationAction {
     SHELL_NAVIGATION_ACTION_NONE,
@@ -208,7 +220,7 @@ static void shell_window_owned_state_free(gpointer data)
     g_free(owned);
 }
 
-gboolean navigation_filter(GtkListBoxRow *row, gpointer user_data)
+static gboolean navigation_filter(GtkListBoxRow *row, gpointer user_data)
 {
     ShellSearchState *state = user_data;
     ShellNavigationData *navigation;
@@ -224,7 +236,7 @@ gboolean navigation_filter(GtkListBoxRow *row, gpointer user_data)
                navigation->search_text, state->query);
 }
 
-void on_search_changed(GtkSearchEntry *entry, gpointer user_data)
+static void on_search_changed(GtkSearchEntry *entry, gpointer user_data)
 {
     ShellSearchState *state = user_data;
     const char *text;
@@ -277,7 +289,7 @@ static bool ensure_module_page(
     return true;
 }
 
-bool shell_open_page(ShellSearchState *state, const char *page_id)
+static bool shell_open_page(ShellSearchState *state, const char *page_id)
 {
     ShellModulePage *module_page;
     bool ready = true;
@@ -590,7 +602,8 @@ static GtkWidget *make_module_scroller(void)
 static void append_builtin_module_rows(
     GtkListBox *list,
     GtkStack *stack,
-    ShellSearchState *search_state)
+    ShellSearchState *search_state,
+    const char *manifest_directory)
 {
     const size_t module_count = ss_builtin_module_host_module_count();
 
@@ -612,7 +625,10 @@ static void append_builtin_module_rows(
         }
 
         ss_shell_module_metadata_load(
-            manifest_filename, page_id, &metadata);
+            manifest_filename,
+            page_id,
+            manifest_directory,
+            &metadata);
 
         row = make_navigation_row(
             metadata.icon,
@@ -642,7 +658,8 @@ static GtkWidget *build_sidebar(
     GtkWindow *parent,
     GtkStack *stack,
     GtkSearchEntry *search_entry,
-    ShellSearchState *search_state)
+    ShellSearchState *search_state,
+    const char *manifest_directory)
 {
     const InfiltratrProjectInfo *info = ss_project_info();
     GtkWidget *sidebar = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
@@ -757,7 +774,7 @@ static GtkWidget *build_sidebar(
 
     gtk_list_box_append(GTK_LIST_BOX(list), home_row);
     append_builtin_module_rows(
-        GTK_LIST_BOX(list), stack, search_state);
+        GTK_LIST_BOX(list), stack, search_state, manifest_directory);
     gtk_list_box_append(GTK_LIST_BOX(list), region_row);
     gtk_list_box_append(GTK_LIST_BOX(list), appearance_row);
     gtk_list_box_append(GTK_LIST_BOX(list), sound_row);
@@ -991,8 +1008,10 @@ void ss_shell_window_activate(GtkApplication *application, gpointer user_data)
     SsHomeTemporalProvider *home_temporal_provider;
     ShellWindowOwnedState *owned;
     SsHomePageContext home_context;
-
-    (void)user_data;
+    const SsShellActivationContext *activation = user_data;
+    const char *manifest_directory = activation != NULL
+        ? activation->module_manifest_directory
+        : NULL;
 
     window = gtk_application_get_active_window(application);
     if (window != NULL) {
@@ -1064,7 +1083,12 @@ void ss_shell_window_activate(GtkApplication *application, gpointer user_data)
 
     gtk_box_append(
         GTK_BOX(root),
-        build_sidebar(window, stack, search_entry, search_state));
+        build_sidebar(
+            window,
+            stack,
+            search_entry,
+            search_state,
+            manifest_directory));
 
     home_context = (SsHomePageContext){
         .temporal_provider = home_temporal_provider,

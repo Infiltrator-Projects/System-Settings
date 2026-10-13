@@ -271,15 +271,18 @@ owner-loss/reacquisition and outstanding-call lifetime; transactional CLI
 rollback/provenance; cross-process policy merge races through both the model and
 CLI; atomic policy-file observation; locality crash-journal recovery; Home
 temporal read-failure resilience; native installer/source-asset-builder smoke
-tests; and the existing model, parsing, persistence, Calendar-runtime and
-regional-context tests. The shell is exercised at ordinary and 2× GDK scale,
+tests; and the existing model, parsing, persistence, Common/Calendar date-provider
+integration and regional-context tests. The shell is exercised at ordinary and 2× GDK scale,
 including the complete content-plus-custom-titlebar 1024×768 minimum allocation
 budget, a 2× logical-desktop budget, an accessibility-enabled GTK run,
 visible-page timer ownership, live desktop-theme following, external
 temporal-policy and locality-metadata reload, manual-draft preservation,
 locality rollback, manifest-derived search, advisory-only locality/time-zone
-inference, navigation synchronisation and neutral missing-art fallbacks. Tests
-use isolated files and a memory settings backend where appropriate.
+inference, navigation synchronisation and neutral missing-art fallbacks. The
+black-box shell regression supplies its temporary manifest directory through an
+explicit activation-scoped context rather than process environment state; the
+production bootstrap passes no override. Tests use isolated files and a memory
+settings backend where appropriate.
 
 Manual acceptance still includes real Mint polkit cancellation/denial, network
 geocoding, screen-reader interaction and DST fold choice.

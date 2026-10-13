@@ -14,6 +14,7 @@ typedef struct SsShellModuleMetadata {
 void ss_shell_module_metadata_load(
     const char *manifest_filename,
     const char *page_id,
+    const char *manifest_directory,
     SsShellModuleMetadata *out);
 void ss_shell_module_metadata_clear(SsShellModuleMetadata *metadata);
 

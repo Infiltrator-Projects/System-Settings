@@ -26,7 +26,6 @@
 static SsLinuxAdvisoryLock locality_transaction_lock =
     SS_LINUX_ADVISORY_LOCK_INIT;
 
-#define SS_LOCALITY_LOCK_WAIT_USEC (250 * 1000)
 #define SS_LOCK_RETRY_USEC 5000
 
 /* Resolve through GLib's XDG configuration directory contract. */
@@ -83,7 +82,7 @@ bool ss_location_metadata_transaction_begin(void)
         &locality_transaction_lock,
         directory,
         lock_path,
-        SS_LOCALITY_LOCK_WAIT_USEC,
+        SS_LINUX_ADVISORY_LOCK_MAX_WAIT_USEC,
         SS_LOCK_RETRY_USEC);
     if (result == SS_LINUX_ADVISORY_LOCK_BUSY) {
         g_debug("Locality metadata transaction lock is busy.");

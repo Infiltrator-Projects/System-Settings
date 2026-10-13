@@ -5,7 +5,6 @@
  */
 
 #include "home-page.h"
-#include "home-page-private.h"
 #include "home-status.h"
 #include "linux-ui-helpers.h"
 #include "shell-command.h"
@@ -21,6 +20,26 @@
 #ifndef SYSTEM_SETTINGS_UI_SOURCE_DIR
 #define SYSTEM_SETTINGS_UI_SOURCE_DIR ""
 #endif
+
+
+typedef struct HomeTemporalTicker {
+    GtkWidget *owner;
+    GtkLabel *clock;
+    GtkLabel *date;
+    GtkLabel *system_time;
+    SsHomeTemporalProvider *temporal_provider;
+    guint source_id;
+    guint interval_ms;
+} HomeTemporalTicker;
+
+typedef struct HomeAdaptiveLayout {
+    GtkWidget *hero;
+    GtkFlowBox *features;
+    GtkFlowBox *primary_grid;
+    GtkFlowBox *status_grid;
+    GtkFlowBox *appearance_previews;
+    guint applied_columns;
+} HomeAdaptiveLayout;
 
 typedef struct HomeProgramAction {
     gchar *program;
@@ -344,21 +363,13 @@ static GtkWidget *make_ui_asset_picture(
 {
     g_autofree gchar *path = NULL;
     GtkWidget *picture;
-    const char *override_dir;
-    bool override_active;
-    const char *asset_dir;
-
     if (filename == NULL || filename[0] == '\0') {
         return NULL;
     }
 
-    override_dir = g_getenv("SYSTEM_SETTINGS_UI_ASSET_DIR_OVERRIDE");
-    override_active = override_dir != NULL && override_dir[0] != '\0';
-    asset_dir = override_active ? override_dir : SYSTEM_SETTINGS_UI_ASSET_DIR;
-
-    path = g_build_filename(asset_dir, filename, NULL);
+    path = g_build_filename(SYSTEM_SETTINGS_UI_ASSET_DIR, filename, NULL);
     if (!g_file_test(path, G_FILE_TEST_IS_REGULAR) &&
-        !override_active && SYSTEM_SETTINGS_UI_SOURCE_DIR[0] != '\0') {
+        SYSTEM_SETTINGS_UI_SOURCE_DIR[0] != '\0') {
         g_clear_pointer(&path, g_free);
         path = g_build_filename(
             SYSTEM_SETTINGS_UI_SOURCE_DIR, filename, NULL);
@@ -370,7 +381,7 @@ static GtkWidget *make_ui_asset_picture(
         return NULL;
     }
 
-    picture = gtk_picture_new_for_filename(path);
+    picture = ss_linux_ui_picture_new_for_filename(path);
     g_object_set_data_full(
         G_OBJECT(picture),
         "system-settings-ui-asset-path",
@@ -389,7 +400,7 @@ static GtkWidget *make_ui_asset_picture(
     return picture;
 }
 
-GtkWidget *make_visual_panel(
+static GtkWidget *make_visual_panel(
     const char *filename,
     int width,
     int height,
@@ -443,12 +454,12 @@ static GtkWidget *make_theme_preview(
     return box;
 }
 
-guint home_layout_columns_for_width(int width)
+static guint home_layout_columns_for_width(int width)
 {
     return width >= 720 ? 2U : 1U;
 }
 
-void home_layout_apply_width(HomeAdaptiveLayout *layout, int width)
+static void home_layout_apply_width(HomeAdaptiveLayout *layout, int width)
 {
     const guint columns = home_layout_columns_for_width(width);
 

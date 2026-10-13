@@ -13,7 +13,6 @@
 
 static SsLinuxAdvisoryLock update_lock = SS_LINUX_ADVISORY_LOCK_INIT;
 
-#define SS_POLICY_LOCK_WAIT_USEC (250 * 1000)
 #define SS_LOCK_RETRY_USEC 5000
 
 static bool begin_update(void)
@@ -40,7 +39,7 @@ static bool begin_update(void)
         &update_lock,
         directory,
         lock_path,
-        SS_POLICY_LOCK_WAIT_USEC,
+        SS_LINUX_ADVISORY_LOCK_MAX_WAIT_USEC,
         SS_LOCK_RETRY_USEC);
     if (result == SS_LINUX_ADVISORY_LOCK_BUSY) {
         g_debug("Temporal policy update lock is busy.");

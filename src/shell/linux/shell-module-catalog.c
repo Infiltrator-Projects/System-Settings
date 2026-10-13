@@ -15,15 +15,15 @@
 #define SYSTEM_SETTINGS_MODULE_SOURCE_DIR ""
 #endif
 
-static GKeyFile *load_module_manifest(const char *manifest_filename)
+static GKeyFile *load_module_manifest(
+    const char *manifest_filename,
+    const char *manifest_directory)
 {
-    const char *override_dir =
-        g_getenv("SYSTEM_SETTINGS_MODULE_DIR_OVERRIDE");
-    const bool override_active =
-        override_dir != NULL && override_dir[0] != '\0';
+    const bool explicit_directory =
+        manifest_directory != NULL && manifest_directory[0] != '\0';
     const char *directories[] = {
-        override_active ? override_dir : SYSTEM_SETTINGS_MODULE_SOURCE_DIR,
-        override_active ? NULL : SYSTEM_SETTINGS_MODULE_DIR,
+        explicit_directory ? manifest_directory : SYSTEM_SETTINGS_MODULE_SOURCE_DIR,
+        explicit_directory ? NULL : SYSTEM_SETTINGS_MODULE_DIR,
         NULL
     };
 
@@ -51,7 +51,7 @@ static GKeyFile *load_module_manifest(const char *manifest_filename)
 
         /* Missing is an expected fallback condition; malformed or unreadable
          * manifests are not. Keep the shell resilient while retaining enough
-         * evidence to diagnose a broken installation or development override. */
+         * evidence to diagnose a broken installation or explicit qualification root. */
         if (error != NULL &&
             !(error->domain == G_FILE_ERROR &&
               error->code == G_FILE_ERROR_NOENT)) {
@@ -146,6 +146,7 @@ void ss_shell_module_metadata_clear(SsShellModuleMetadata *metadata)
 void ss_shell_module_metadata_load(
     const char *manifest_filename,
     const char *page_id,
+    const char *manifest_directory,
     SsShellModuleMetadata *out)
 {
     g_autoptr(GKeyFile) manifest = NULL;
@@ -155,7 +156,7 @@ void ss_shell_module_metadata_load(
         return;
     }
     ss_shell_module_metadata_clear(out);
-    manifest = load_module_manifest(manifest_filename);
+    manifest = load_module_manifest(manifest_filename, manifest_directory);
     out->title = manifest_string_or_fallback(manifest, "Title", page_id);
     out->summary = manifest_string_or_fallback(
         manifest, "Summary", "Settings module");

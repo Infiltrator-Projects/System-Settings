@@ -264,7 +264,12 @@ static bool begin_update(void)
         goto done;
     }
 
-    /* Match the POSIX bounded wait: fail quickly instead of freezing UI. */
+    /*
+     * Windows currently exposes this store through CLI/test surfaces rather
+     * than the GTK main thread. A short ~250 ms retry budget smooths transient
+     * LockFileEx overlap while remaining bounded; Linux separately enforces a
+     * stricter 50 ms GTK-thread ceiling.
+     */
     for (unsigned int attempt = 0U; attempt < 25U; ++attempt) {
         if (LockFileEx(
                 update_lock_file,

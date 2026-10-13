@@ -136,16 +136,21 @@ static GtkListBoxRow *find_row_with_label(GtkWidget *widget, const char *label)
 
 static void exercise_window(
     GtkApplication *app,
-    ExerciseExpectations *expectations)
+    ExerciseExpectations *expectations,
+    const char *module_directory)
 {
-    ss_shell_window_activate(app, NULL);
+    const SsShellActivationContext activation = {
+        .module_manifest_directory = module_directory
+    };
+
+    ss_shell_window_activate(app, (gpointer)&activation);
     drain_main_context();
 
     GtkWindow *window = gtk_application_get_active_window(app);
     g_assert_nonnull(window);
     g_object_ref(window);
 
-    ss_shell_window_activate(app, NULL);
+    ss_shell_window_activate(app, (gpointer)&activation);
     drain_main_context();
     g_assert_cmpuint(g_list_length(gtk_application_get_windows(app)), ==, 1U);
 
@@ -306,22 +311,13 @@ int main(void)
         "DBUS_SYSTEM_BUS_ADDRESS",
         "unix:path=/nonexistent/ss-test-bus",
         TRUE);
-    g_setenv(
-        "SYSTEM_SETTINGS_UI_ASSET_DIR_OVERRIDE",
-        SYSTEM_SETTINGS_UI_SOURCE_DIR,
-        TRUE);
-    g_setenv(
-        "SYSTEM_SETTINGS_MODULE_DIR_OVERRIDE",
-        module_dir,
-        TRUE);
-
     gtk_init();
     g_autoptr(GtkApplication) app = gtk_application_new(
         "org.infiltrator.SystemSettings.Test",
         G_APPLICATION_NON_UNIQUE);
     g_assert_true(g_application_register(G_APPLICATION(app), NULL, NULL));
 
-    exercise_window(app, &expectations);
-    exercise_window(app, &expectations);
+    exercise_window(app, &expectations, module_dir);
+    exercise_window(app, &expectations, module_dir);
     return 0;
 }

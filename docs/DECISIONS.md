@@ -72,7 +72,7 @@ This file records durable architectural choices for System Settings.
 
 **Rationale.** This avoids duplicated generic code without turning Common into a collection of application-specific backends.
 
-**Consequence.** Presentation primitives may move to Common; NetworkManager policy does not.
+**Consequence.** Presentation primitives and generic provider discovery belong in Common when its contract is at least as strong; System Settings consumes Common's POSIX Calendar date provider rather than maintaining a second loader. NetworkManager policy does not move merely to reduce local code.
 
 ## ADR-009 — Apply semantics follow risk and transaction shape
 

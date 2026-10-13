@@ -160,24 +160,25 @@ prematurely freezing an ABI around GTK widgets.
 
 System Settings owns the temporal selection. Common 1.19.41 renders every
 clock mode through `infiltratr_temporal_format_clock_mode()`. Gregorian dates
-use GLib's local date formatter. Non-Gregorian chronology previews use the
-optional `libcalendar-plus.so.0` runtime ABI.
+use GLib's local date formatter. Calendar remains the chronology/date-rendering
+authority for non-Gregorian previews, while Common owns the optional POSIX
+runtime bridge used to reach it.
 
-The Calendar bridge now exposes only the chronology/date-format ABI required
-for non-Gregorian previews. The retired Calendar-owned clock-format compatibility
-surface has been removed: every clock preview is rendered by Common. Without
-Calendar, non-Gregorian dates explicitly report preview unavailable; clock
-selection, clock rendering and persistence remain available.
+The bridge is the stable bounded pure-C `calendar_plus_format_date_v1` contract.
+Common validates the selected calendar identifier, discovers only trusted
+system-owned `libcalendar-plus.so.0` files in explicit library roots (including
+the compile-time multiarch child), binds the versioned renderer, validates its
+bounded UTF-8 output and throttles failed discovery to at most once per minute.
+There is no bare-soname fallback through environment-controlled loader search
+paths and no GObject type lifetime crosses the library boundary.
 
-Discovery checks fixed system library roots and their compile-time multiarch
-child only. It does not recursively scan directories and does not fall back to
-bare-soname loader resolution through environment-controlled search paths. This
-optional runtime executes with ordinary user authority; it is not the future
-trusted module loader. Missing-runtime discovery backs off exponentially from five seconds to a
-sixty-second ceiling, so an absent optional Calendar runtime cannot become a
-recurring GTK-thread filesystem scan. Accepted Linux runtimes remain resident
-because GLib retains registered static GType callbacks after provider teardown;
-replacing an already loaded runtime requires restarting the process. Each provider still releases its objects and loader reference.
+System Settings therefore carries no second runtime loader, discovery policy,
+retry state or Calendar object cache. It keeps one lightweight Common provider
+per long-lived preview owner and asks Common to render only when a non-Gregorian
+date cache misses. Without Calendar, the affected date explicitly reports
+`preview unavailable`; clock selection, Common clock rendering and persistence
+remain available. The optional Calendar runtime executes with ordinary user
+authority and is unrelated to the future trusted settings-module loader.
 
 ### Current lifecycle and persistence boundaries
 

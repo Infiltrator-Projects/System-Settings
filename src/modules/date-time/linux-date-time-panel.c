@@ -13,7 +13,6 @@
 
 #include "linux-date-time-panel-private.h"
 #include "linux-ui-helpers.h"
-#include "calendar-preview-provider.h"
 
 #include "system-settings/cinnamon-interface.h"
 #include "system-settings/date-time-model.h"
@@ -107,14 +106,6 @@ void ss_linux_date_time_panel_set_status(
 {
     set_status(state, message, error);
 }
-
-/*
- * The preview bridge belongs to the Date & Time panel, not to timedated
- * notifications or control-list construction. Keep one provider for the
- * lifetime of the panel so every specialised clock and calendar follows the
- * same runtime-discovery/retry path.
- */
-
 
 static gchar *temporal_policy_path(void)
 {

@@ -194,8 +194,9 @@ selected non-Gregorian calendar is misleading.
 
 Common provides the authoritative formatter for every supported clock mode,
 including the specialised historical and astronomical systems. Calendar remains
-the implementation owner of non-Gregorian chronology/date arithmetic, and System
-Settings may consume Calendar's stable date-format runtime ABI for those previews
+the implementation owner of non-Gregorian chronology/date arithmetic. Common's
+POSIX temporal adapter owns trusted discovery and validation of Calendar's stable,
+bounded pure-C date-renderer ABI; System Settings consumes that Common provider
 while remaining the authority for which clock/calendar is selected.
 
 If the optional chronology provider is unavailable, the affected non-Gregorian

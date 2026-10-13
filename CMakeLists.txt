@@ -270,7 +270,6 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         InfiltratrCommon::Portable)
 
     add_library(system-settings-date-time-linux STATIC
-        src/modules/date-time/calendar-preview-provider.c
         src/modules/date-time/home-temporal-presentation.c
         src/modules/date-time/policy-file-observer.c
         src/modules/date-time/linux-date-time-panel.c
@@ -307,12 +306,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         InfiltratrCommon::Common
         InfiltratrCommon::Portable
         PkgConfig::GTK4
-        PkgConfig::GEOCODE
-        ${CMAKE_DL_LIBS})
-    if(CMAKE_LIBRARY_ARCHITECTURE)
-        target_compile_definitions(system-settings-date-time-linux PRIVATE
-            SYSTEM_SETTINGS_LIBRARY_ARCHITECTURE="${CMAKE_LIBRARY_ARCHITECTURE}")
-    endif()
+        PkgConfig::GEOCODE)
 
     # Composition root for today's built-in modules. Shell code consumes only
     # builtin-module-host.h; private module headers never enter the shell target.
@@ -556,17 +550,8 @@ if(BUILD_TESTING)
         ss_configure(linux-shell-test)
         target_include_directories(linux-shell-test PRIVATE
             "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux")
-        target_compile_definitions(linux-shell-test PRIVATE
-            SYSTEM_SETTINGS_UI_ASSET_DIR="${CMAKE_INSTALL_FULL_DATADIR}/infiltrator/system-settings/ui"
-            SYSTEM_SETTINGS_UI_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/ui"
-            SYSTEM_SETTINGS_MODULE_DIR="${CMAKE_INSTALL_FULL_DATADIR}/infiltrator/system-settings/modules"
-            SYSTEM_SETTINGS_MODULE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/modules")
         target_link_libraries(linux-shell-test PRIVATE
             system-settings-linux-shell
-            system-settings-linux-ui
-            system-settings-app
-            system-settings-core
-            system-settings-platform
             PkgConfig::GTK4)
         find_program(SS_XVFB_RUN xvfb-run)
         if(SS_XVFB_RUN)
@@ -663,32 +648,23 @@ if(BUILD_TESTING)
             PkgConfig::GIO2)
         add_test(NAME location-concurrency COMMAND location-concurrency-test)
 
-        add_library(calendar-preview-runtime-fixture SHARED
-            tests/calendar-preview-runtime-fixture.c)
-        ss_configure(calendar-preview-runtime-fixture)
-        target_link_libraries(calendar-preview-runtime-fixture PRIVATE
-            PkgConfig::GIO2)
-        set_target_properties(calendar-preview-runtime-fixture PROPERTIES
+        add_library(calendar-date-runtime-fixture SHARED
+            tests/calendar-date-runtime-fixture.c)
+        ss_configure(calendar-date-runtime-fixture)
+        target_link_libraries(calendar-date-runtime-fixture PRIVATE
+            InfiltratrCommon::Portable)
+        set_target_properties(calendar-date-runtime-fixture PROPERTIES
             PREFIX ""
-            OUTPUT_NAME "calendar-preview-runtime-fixture")
+            OUTPUT_NAME "calendar-date-runtime-fixture")
 
-        add_executable(calendar-preview-provider-test
-            tests/calendar-preview-provider-test.c
-            src/modules/date-time/calendar-preview-provider.c)
-        ss_configure(calendar-preview-provider-test)
-        target_include_directories(calendar-preview-provider-test PRIVATE
-            "${CMAKE_CURRENT_SOURCE_DIR}/src/modules/date-time")
-        target_link_libraries(calendar-preview-provider-test PRIVATE
-            InfiltratrCommon::Common
-            PkgConfig::GIO2
-            ${CMAKE_DL_LIBS})
-        if(CMAKE_LIBRARY_ARCHITECTURE)
-            target_compile_definitions(calendar-preview-provider-test PRIVATE
-                SYSTEM_SETTINGS_LIBRARY_ARCHITECTURE="${CMAKE_LIBRARY_ARCHITECTURE}")
-        endif()
-        add_test(NAME calendar-preview-provider
-            COMMAND calendar-preview-provider-test
-                $<TARGET_FILE:calendar-preview-runtime-fixture>)
+        add_executable(calendar-date-provider-test
+            tests/calendar-date-provider-test.c)
+        ss_configure(calendar-date-provider-test)
+        target_link_libraries(calendar-date-provider-test PRIVATE
+            InfiltratrCommon::Common)
+        add_test(NAME calendar-date-provider
+            COMMAND calendar-date-provider-test
+                $<TARGET_FILE:calendar-date-runtime-fixture>)
     endif()
 endif()
 
