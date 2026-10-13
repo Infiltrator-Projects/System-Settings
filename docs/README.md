@@ -8,6 +8,7 @@ This directory is the maintained engineering map for System Settings. Each docum
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — component boundaries, data flow, module lifecycle, concurrency and platform integration.
 - [DESIGN.md](DESIGN.md) — user-facing interaction model, navigation, search, apply behaviour, presentation and accessibility.
+- [UI-VISION.md](UI-VISION.md) — current visual north star and product-specific graphical direction; subordinate to Design, accessibility/platform requirements and Common's canonical design contract.
 - [MODULES.md](MODULES.md) — module discovery, manifests, ABI, lifecycle, deep links, state and trust requirements.
 - [PRESENTATION_POLICY.md](PRESENTATION_POLICY.md) — system-wide user presentation policy, beginning with temporal/clock/calendar formatting.
 - [PLATFORM_COMPATIBILITY.md](PLATFORM_COMPATIBILITY.md) — shared cross-platform authority, capability, adapter, UI/ABI and handoff rules.
@@ -38,6 +39,7 @@ When two documents appear to overlap, choose one owner:
 - Mint/Cinnamon-specific mapping → Mint Compatibility;
 - Windows-specific mapping → Windows Compatibility;
 - interaction and visual behaviour → Design;
+- product-specific visual north star and graphical direction → UI Vision, within Design/Common constraints;
 - why a durable choice was made → Decisions;
 - not-yet-complete work → Roadmap;
 - proof and acceptance → Validation.
