@@ -398,8 +398,8 @@ static void show_help(void)
 {
     puts("System Settings native installer");
     puts("Usage: ./System-Settings-VERSION-native.run [--extract DIRECTORY|--build-only]");
-    puts("Default: build for this CPU with LTO and GCC PGO when available, test, package, then install through APT.");
-    puts("Build prerequisites: build-essential cmake pkg-config libgtk-4-dev libgeocode-glib-dev xvfb dbus-x11");
+    puts("Default: build for this CPU with LTO and GCC PGO, test, package, then install through APT.");
+    puts("Build prerequisites: GCC, build-essential, cmake, pkg-config, libgtk-4-dev, libgeocode-glib-dev, xvfb, dbus-x11");
 }
 
 int main(int argc, char **argv)
@@ -423,7 +423,6 @@ int main(int argc, char **argv)
     char final_flags[PATH_MAX + 128U];
     char jobs[32];
     long processors;
-    const bool use_pgo = compiler_supports_gcc_pgo();
     bool build_only = false;
 
     if (argc == 2 &&
@@ -469,7 +468,7 @@ int main(int argc, char **argv)
             return EXIT_FAILURE;
         }
     }
-    if (!use_pgo) {
+    if (!compiler_supports_gcc_pgo()) {
         fail("the native profile requires GCC so LTO and trained PGO are both guaranteed.");
     }
 
@@ -507,30 +506,20 @@ int main(int argc, char **argv)
         fail("could not create the PGO training directory.");
     }
 
-    if (use_pgo) {
-        if (snprintf(
-                generate_flags,
-                sizeof(generate_flags),
-                "-O3 -DNDEBUG -march=native -mtune=native -flto -fprofile-generate=%s",
-                pgo) <= 0 ||
-            snprintf(
-                final_flags,
-                sizeof(final_flags),
-                "-O3 -DNDEBUG -march=native -mtune=native -flto -fprofile-use=%s -fprofile-correction -Wno-missing-profile",
-                pgo) <= 0 ||
-            strlen(generate_flags) >= sizeof(generate_flags) - 1U ||
-            strlen(final_flags) >= sizeof(final_flags) - 1U) {
-            (void)remove_tree(work);
-            fail("native PGO flags are too long.");
-        }
-    } else {
-        if (snprintf(
-                final_flags,
-                sizeof(final_flags),
-                "-O3 -DNDEBUG -march=native -mtune=native -flto") <= 0) {
-            (void)remove_tree(work);
-            fail("native optimization flags are invalid.");
-        }
+    if (snprintf(
+            generate_flags,
+            sizeof(generate_flags),
+            "-O3 -DNDEBUG -march=native -mtune=native -flto -fprofile-generate=%s",
+            pgo) <= 0 ||
+        snprintf(
+            final_flags,
+            sizeof(final_flags),
+            "-O3 -DNDEBUG -march=native -mtune=native -flto -fprofile-use=%s -fprofile-correction -Wno-missing-profile",
+            pgo) <= 0 ||
+        strlen(generate_flags) >= sizeof(generate_flags) - 1U ||
+        strlen(final_flags) >= sizeof(final_flags) - 1U) {
+        (void)remove_tree(work);
+        fail("native PGO flags are too long.");
     }
 
     processors = sysconf(_SC_NPROCESSORS_ONLN);
@@ -568,22 +557,20 @@ int main(int argc, char **argv)
             profile_data_argument,
             sizeof(profile_data_argument),
             "-DSYSTEM_SETTINGS_NATIVE_PROFILE_DATA_DIR=");
-        if (use_pgo) {
-            if (snprintf(
-                    build_profile_argument,
-                    sizeof(build_profile_argument),
-                    "-DSYSTEM_SETTINGS_BUILD_PROFILE=generic") <= 0 ||
-                snprintf(
-                    c_flags_argument,
-                    sizeof(c_flags_argument),
-                    "-DCMAKE_C_FLAGS_RELEASE=%s",
-                    generate_flags) <= 0 ||
-                run_command(NULL, configure_argv) != 0 ||
-                run_command(NULL, build_argv) != 0 ||
-                run_command(NULL, test_argv) != 0) {
-                (void)remove_tree(work);
-                fail("native PGO training build or test suite failed.");
-            }
+        if (snprintf(
+                build_profile_argument,
+                sizeof(build_profile_argument),
+                "-DSYSTEM_SETTINGS_BUILD_PROFILE=generic") <= 0 ||
+            snprintf(
+                c_flags_argument,
+                sizeof(c_flags_argument),
+                "-DCMAKE_C_FLAGS_RELEASE=%s",
+                generate_flags) <= 0 ||
+            run_command(NULL, configure_argv) != 0 ||
+            run_command(NULL, build_argv) != 0 ||
+            run_command(NULL, test_argv) != 0) {
+            (void)remove_tree(work);
+            fail("native PGO training build or test suite failed.");
         }
 
         if (snprintf(

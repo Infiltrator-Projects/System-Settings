@@ -286,8 +286,8 @@ A passing fixture is not proof of those cases.
 Manual Gregorian time rejects GLib's normalisation of nonexistent DST wall
 times; repeated wall times use GLib's documented standard-time occurrence.
 
-Ordinary `main` pushes use the configured self-hosted Linux and Windows runner
-labels. Release commits use hosted GitHub runners for the full release gate, and
-release publication remains hosted. If a self-hosted runner is offline, GitHub
-may queue the ordinary push job until an eligible runner becomes available; the
-workflow does not claim transparent migration of an already-routed job.
+All automated `main` and pull-request gates run on explicit GitHub-hosted
+Ubuntu 24.04 and `windows-latest` runners. Release publication is the final
+hosted job in the same workflow and consumes the exact tested release bundle;
+there is no alternate self-hosted execution path hidden behind runner-condition
+branches.
