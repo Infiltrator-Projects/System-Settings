@@ -12,12 +12,12 @@
 
 #include "system-settings/native-clock-policy.h"
 
-#include <infiltratr/temporal.h>
+#include <infiltratr/temporal_posix.h>
 
 #include <stdint.h>
 #include <string.h>
 
-static SsCalendarPreviewProvider *ensure_calendar_preview_provider(
+static InfiltratrTemporalDateProvider *ensure_calendar_date_provider(
     SsLinuxDateTimePanel *state)
 {
     if (state == NULL) {
@@ -26,7 +26,7 @@ static SsCalendarPreviewProvider *ensure_calendar_preview_provider(
 
     if (ss_linux_date_time_preview_state(state)->calendar_provider == NULL) {
         ss_linux_date_time_preview_state(state)->calendar_provider =
-            ss_calendar_preview_provider_new();
+            infiltratr_temporal_posix_date_provider_new();
     }
     return ss_linux_date_time_preview_state(state)->calendar_provider;
 }
@@ -169,7 +169,7 @@ gboolean ss_linux_date_time_preview_refresh(gpointer user_data)
             infiltratr_temporal_calendar_find(policy->calendar);
         g_autofree gchar *gregorian =
             g_date_time_format(now, "%A, %e %B %Y");
-        g_autofree gchar *selected_date = NULL;
+        char selected_date[INFILTRATR_TEMPORAL_DATE_CAPACITY];
         g_autofree gchar *summary = NULL;
         bool cacheable = false;
 
@@ -181,14 +181,16 @@ gboolean ss_linux_date_time_preview_refresh(gpointer user_data)
                     gregorian != NULL ? gregorian : "");
                 cacheable = true;
             } else {
-                selected_date =
-                    ss_calendar_preview_provider_format_date(
-                        ensure_calendar_preview_provider(state),
+                if (infiltratr_temporal_posix_format_date(
+                        ensure_calendar_date_provider(state),
                         policy->calendar,
                         year,
                         month,
-                        day);
-                if (selected_date != NULL) {
+                        day,
+                        "full",
+                        selected_date,
+                        sizeof(selected_date),
+                        NULL)) {
                     summary = g_strdup_printf(
                         "%s • %s",
                         calendar->name,
@@ -311,7 +313,7 @@ static void on_panel_unmapped(
 
 void ss_linux_date_time_preview_init(SsLinuxDateTimePanel *panel)
 {
-    (void)ensure_calendar_preview_provider(panel);
+    (void)ensure_calendar_date_provider(panel);
 }
 
 void ss_linux_date_time_preview_attach(SsLinuxDateTimePanel *panel)
@@ -349,7 +351,7 @@ void ss_linux_date_time_preview_dispose(SsLinuxDateTimePanel *panel)
         preview->idle_id = 0U;
     }
     g_clear_pointer(&preview->date_calendar, g_free);
-    ss_calendar_preview_provider_free(preview->calendar_provider);
+    infiltratr_temporal_posix_date_provider_free(preview->calendar_provider);
     preview->calendar_provider = NULL;
     preview->date_cache_valid = false;
 }

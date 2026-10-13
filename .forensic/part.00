@@ -1,0 +1,135 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 5d96eed..4b493cb 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -5,6 +5,12 @@ history is preserved unchanged in [`CHANGELOG-legacy.md`](CHANGELOG-legacy.md).
+ The 0.4.60-0.4.69 overlap is intentional: it closes gaps in the historical file
+ while keeping the original record immutable.
+ 
++## 0.4.92 — 2026-10-13
++
++- Replace the product-local Calendar/GObject runtime loader with Common 1.19.41's stronger POSIX date-provider contract. System Settings now consumes the stable bounded `calendar_plus_format_date_v1` ABI, removing duplicated trusted-root discovery, retry state, object caching, test hooks, direct `dl` ownership and the `RTLD_NODELETE` lifetime workaround.
++- Remove stale compatibility and white-box surfaces left by earlier iterations: the hidden GTK constructor alias, two same-translation-unit private headers, unused shell path fallbacks and process-environment module/UI resource overrides. The shell regression now injects its manifest root explicitly and links only through the shell boundary.
++- Reconcile lock-budget comments/callers with the actual platform contracts, replace the old Calendar provider regression with a Common/Calendar integration fixture, and re-document the resulting dependency, validation and runtime-ownership boundaries.
++
+ ## 0.4.91 — 2026-10-13
+ 
+ - Complete the follow-up forensic boundary pass by removing shell-owned theme installation from the module-safe Linux UI helper target; Date & Time now depends only on the reusable GTK helper implementation rather than inheriting shell presentation machinery through the build graph.
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 39ef9aa..46bfcc0 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -270,7 +270,6 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+         InfiltratrCommon::Portable)
+ 
+     add_library(system-settings-date-time-linux STATIC
+-        src/modules/date-time/calendar-preview-provider.c
+         src/modules/date-time/home-temporal-presentation.c
+         src/modules/date-time/policy-file-observer.c
+         src/modules/date-time/linux-date-time-panel.c
+@@ -307,12 +306,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+         InfiltratrCommon::Common
+         InfiltratrCommon::Portable
+         PkgConfig::GTK4
+-        PkgConfig::GEOCODE
+-        ${CMAKE_DL_LIBS})
+-    if(CMAKE_LIBRARY_ARCHITECTURE)
+-        target_compile_definitions(system-settings-date-time-linux PRIVATE
+-            SYSTEM_SETTINGS_LIBRARY_ARCHITECTURE="${CMAKE_LIBRARY_ARCHITECTURE}")
+-    endif()
++        PkgConfig::GEOCODE)
+ 
+     # Composition root for today's built-in modules. Shell code consumes only
+     # builtin-module-host.h; private module headers never enter the shell target.
+@@ -556,17 +550,8 @@ if(BUILD_TESTING)
+         ss_configure(linux-shell-test)
+         target_include_directories(linux-shell-test PRIVATE
+             "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux")
+-        target_compile_definitions(linux-shell-test PRIVATE
+-            SYSTEM_SETTINGS_UI_ASSET_DIR="${CMAKE_INSTALL_FULL_DATADIR}/infiltrator/system-settings/ui"
+-            SYSTEM_SETTINGS_UI_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets/ui"
+-            SYSTEM_SETTINGS_MODULE_DIR="${CMAKE_INSTALL_FULL_DATADIR}/infiltrator/system-settings/modules"
+-            SYSTEM_SETTINGS_MODULE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/modules")
+         target_link_libraries(linux-shell-test PRIVATE
+             system-settings-linux-shell
+-            system-settings-linux-ui
+-            system-settings-app
+-            system-settings-core
+-            system-settings-platform
+             PkgConfig::GTK4)
+         find_program(SS_XVFB_RUN xvfb-run)
+         if(SS_XVFB_RUN)
+@@ -663,32 +648,23 @@ if(BUILD_TESTING)
+             PkgConfig::GIO2)
+         add_test(NAME location-concurrency COMMAND location-concurrency-test)
+ 
+-        add_library(calendar-preview-runtime-fixture SHARED
+-            tests/calendar-preview-runtime-fixture.c)
+-        ss_configure(calendar-preview-runtime-fixture)
+-        target_link_libraries(calendar-preview-runtime-fixture PRIVATE
+-            PkgConfig::GIO2)
+-        set_target_properties(calendar-preview-runtime-fixture PROPERTIES
++        add_library(calendar-date-runtime-fixture SHARED
++            tests/calendar-date-runtime-fixture.c)
++        ss_configure(calendar-date-runtime-fixture)
++        target_link_libraries(calendar-date-runtime-fixture PRIVATE
++            InfiltratrCommon::Portable)
++        set_target_properties(calendar-date-runtime-fixture PROPERTIES
+             PREFIX ""
+-            OUTPUT_NAME "calendar-preview-runtime-fixture")
+-
+-        add_executable(calendar-preview-provider-test
+-            tests/calendar-preview-provider-test.c
+-            src/modules/date-time/calendar-preview-provider.c)
+-        ss_configure(calendar-preview-provider-test)
+-        target_include_directories(calendar-preview-provider-test PRIVATE
+-            "${CMAKE_CURRENT_SOURCE_DIR}/src/modules/date-time")
+-        target_link_libraries(calendar-preview-provider-test PRIVATE
+-            InfiltratrCommon::Common
+-            PkgConfig::GIO2
+-            ${CMAKE_DL_LIBS})
+-        if(CMAKE_LIBRARY_ARCHITECTURE)
+-            target_compile_definitions(calendar-preview-provider-test PRIVATE
+-                SYSTEM_SETTINGS_LIBRARY_ARCHITECTURE="${CMAKE_LIBRARY_ARCHITECTURE}")
+-        endif()
+-        add_test(NAME calendar-preview-provider
+-            COMMAND calendar-preview-provider-test
+-                $<TARGET_FILE:calendar-preview-runtime-fixture>)
++            OUTPUT_NAME "calendar-date-runtime-fixture")
++
++        add_executable(calendar-date-provider-test
++            tests/calendar-date-provider-test.c)
++        ss_configure(calendar-date-provider-test)
++        target_link_libraries(calendar-date-provider-test PRIVATE
++            InfiltratrCommon::Common)
++        add_test(NAME calendar-date-provider
++            COMMAND calendar-date-provider-test
++                $<TARGET_FILE:calendar-date-runtime-fixture>)
+     endif()
+ endif()
+ 
+diff --git a/docs/ARCHITECTURE.md b/docs/ARCHITECTURE.md
+index 6ff1d54..0adfdd8 100644
+--- a/docs/ARCHITECTURE.md
++++ b/docs/ARCHITECTURE.md
+@@ -160,24 +160,25 @@ prematurely freezing an ABI around GTK widgets.
+ 
+ System Settings owns the temporal selection. Common 1.19.41 renders every
+ clock mode through `infiltratr_temporal_format_clock_mode()`. Gregorian dates
+-use GLib's local date formatter. Non-Gregorian chronology previews use the
+-optional `libcalendar-plus.so.0` runtime ABI.
+-
+-The Calendar bridge now exposes only the chronology/date-format ABI required
+-for non-Gregorian previews. The retired Calendar-owned clock-format compatibility
+-surface has been removed: every clock preview is rendered by Common. Without
+-Calendar, non-Gregorian dates explicitly report preview unavailable; clock
+-selection, clock rendering and persistence remain available.
+-
+-Discovery checks fixed system library roots and their compile-time multiarch
+-child only. It does not recursively scan directories and does not fall back to
+-bare-soname loader resolution through environment-controlled search paths. This
+-optional runtime executes with ordinary user authority; it is not the future
+-trusted module loader. Missing-runtime discovery backs off exponentially from five seconds to a
+-sixty-second ceiling, so an absent optional Calendar runtime cannot become a
+-recurring GTK-thread filesystem scan. Accepted Linux runtimes remain resident
+-because GLib retains registered static GType callbacks after provi

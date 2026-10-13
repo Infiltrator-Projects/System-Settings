@@ -16,15 +16,9 @@ GtkWidget *ss_linux_ui_make_setting_tile(const char *icon_name,
 
 /*
  * Large dashboard artwork must not be decoded synchronously while the shell is
- * still constructing its first frame. Keep the normal GtkPicture contract for
- * callers, but defer the actual filename load to low-priority main-loop work.
- * main.c historically called gtk_picture_new_for_filename() directly in many
- * places; this compatibility alias removes that old first-paint stall without
- * duplicating asset-loading policy throughout the shell.
+ * still constructing its first frame. Callers opt into this product policy
+ * explicitly; the helper never masquerades as a GTK API.
  */
 GtkWidget *ss_linux_ui_picture_new_for_filename(const char *filename);
-#ifndef SYSTEM_SETTINGS_LINUX_UI_HELPERS_IMPLEMENTATION
-#define gtk_picture_new_for_filename ss_linux_ui_picture_new_for_filename
-#endif
 
 #endif

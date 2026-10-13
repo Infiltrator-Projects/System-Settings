@@ -1,0 +1,149 @@
+der teardown;
+-replacing an already loaded runtime requires restarting the process. Each provider still releases its objects and loader reference.
++use GLib's local date formatter. Calendar remains the chronology/date-rendering
++authority for non-Gregorian previews, while Common owns the optional POSIX
++runtime bridge used to reach it.
++
++The bridge is the stable bounded pure-C `calendar_plus_format_date_v1` contract.
++Common validates the selected calendar identifier, discovers only trusted
++system-owned `libcalendar-plus.so.0` files in explicit library roots (including
++the compile-time multiarch child), binds the versioned renderer, validates its
++bounded UTF-8 output and throttles failed discovery to at most once per minute.
++There is no bare-soname fallback through environment-controlled loader search
++paths and no GObject type lifetime crosses the library boundary.
++
++System Settings therefore carries no second runtime loader, discovery policy,
++retry state or Calendar object cache. It keeps one lightweight Common provider
++per long-lived preview owner and asks Common to render only when a non-Gregorian
++date cache misses. Without Calendar, the affected date explicitly reports
++`preview unavailable`; clock selection, Common clock rendering and persistence
++remain available. The optional Calendar runtime executes with ordinary user
++authority and is unrelated to the future trusted settings-module loader.
+ 
+ ### Current lifecycle and persistence boundaries
+ 
+diff --git a/docs/DECISIONS.md b/docs/DECISIONS.md
+index 0fe8e4f..4b55952 100644
+--- a/docs/DECISIONS.md
++++ b/docs/DECISIONS.md
+@@ -72,7 +72,7 @@ This file records durable architectural choices for System Settings.
+ 
+ **Rationale.** This avoids duplicated generic code without turning Common into a collection of application-specific backends.
+ 
+-**Consequence.** Presentation primitives may move to Common; NetworkManager policy does not.
++**Consequence.** Presentation primitives and generic provider discovery belong in Common when its contract is at least as strong; System Settings consumes Common's POSIX Calendar date provider rather than maintaining a second loader. NetworkManager policy does not move merely to reduce local code.
+ 
+ ## ADR-009 — Apply semantics follow risk and transaction shape
+ 
+diff --git a/docs/PRESENTATION_POLICY.md b/docs/PRESENTATION_POLICY.md
+index fae4239..ba93422 100644
+--- a/docs/PRESENTATION_POLICY.md
++++ b/docs/PRESENTATION_POLICY.md
+@@ -194,8 +194,9 @@ selected non-Gregorian calendar is misleading.
+ 
+ Common provides the authoritative formatter for every supported clock mode,
+ including the specialised historical and astronomical systems. Calendar remains
+-the implementation owner of non-Gregorian chronology/date arithmetic, and System
+-Settings may consume Calendar's stable date-format runtime ABI for those previews
++the implementation owner of non-Gregorian chronology/date arithmetic. Common's
++POSIX temporal adapter owns trusted discovery and validation of Calendar's stable,
++bounded pure-C date-renderer ABI; System Settings consumes that Common provider
+ while remaining the authority for which clock/calendar is selected.
+ 
+ If the optional chronology provider is unavailable, the affected non-Gregorian
+diff --git a/docs/VALIDATION.md b/docs/VALIDATION.md
+index f2625ef..99bb48a 100644
+--- a/docs/VALIDATION.md
++++ b/docs/VALIDATION.md
+@@ -271,15 +271,18 @@ owner-loss/reacquisition and outstanding-call lifetime; transactional CLI
+ rollback/provenance; cross-process policy merge races through both the model and
+ CLI; atomic policy-file observation; locality crash-journal recovery; Home
+ temporal read-failure resilience; native installer/source-asset-builder smoke
+-tests; and the existing model, parsing, persistence, Calendar-runtime and
+-regional-context tests. The shell is exercised at ordinary and 2× GDK scale,
++tests; and the existing model, parsing, persistence, Common/Calendar date-provider
++integration and regional-context tests. The shell is exercised at ordinary and 2× GDK scale,
+ including the complete content-plus-custom-titlebar 1024×768 minimum allocation
+ budget, a 2× logical-desktop budget, an accessibility-enabled GTK run,
+ visible-page timer ownership, live desktop-theme following, external
+ temporal-policy and locality-metadata reload, manual-draft preservation,
+ locality rollback, manifest-derived search, advisory-only locality/time-zone
+-inference, navigation synchronisation and neutral missing-art fallbacks. Tests
+-use isolated files and a memory settings backend where appropriate.
++inference, navigation synchronisation and neutral missing-art fallbacks. The
++black-box shell regression supplies its temporary manifest directory through an
++explicit activation-scoped context rather than process environment state; the
++production bootstrap passes no override. Tests use isolated files and a memory
++settings backend where appropriate.
+ 
+ Manual acceptance still includes real Mint polkit cancellation/denial, network
+ geocoding, screen-reader interaction and DST fold choice.
+diff --git a/src/modules/date-time/linux-date-time-panel.c b/src/modules/date-time/linux-date-time-panel.c
+index e2b9cf8..fc829f0 100644
+--- a/src/modules/date-time/linux-date-time-panel.c
++++ b/src/modules/date-time/linux-date-time-panel.c
+@@ -13,7 +13,6 @@
+ 
+ #include "linux-date-time-panel-private.h"
+ #include "linux-ui-helpers.h"
+-#include "calendar-preview-provider.h"
+ 
+ #include "system-settings/cinnamon-interface.h"
+ #include "system-settings/date-time-model.h"
+@@ -108,14 +107,6 @@ void ss_linux_date_time_panel_set_status(
+     set_status(state, message, error);
+ }
+ 
+-/*
+- * The preview bridge belongs to the Date & Time panel, not to timedated
+- * notifications or control-list construction. Keep one provider for the
+- * lifetime of the panel so every specialised clock and calendar follows the
+- * same runtime-discovery/retry path.
+- */
+-
+-
+ static gchar *temporal_policy_path(void)
+ {
+     return g_build_filename(
+diff --git a/src/platform/linux/location-metadata.c b/src/platform/linux/location-metadata.c
+index 8160707..7883a9d 100644
+--- a/src/platform/linux/location-metadata.c
++++ b/src/platform/linux/location-metadata.c
+@@ -26,7 +26,6 @@
+ static SsLinuxAdvisoryLock locality_transaction_lock =
+     SS_LINUX_ADVISORY_LOCK_INIT;
+ 
+-#define SS_LOCALITY_LOCK_WAIT_USEC (250 * 1000)
+ #define SS_LOCK_RETRY_USEC 5000
+ 
+ /* Resolve through GLib's XDG configuration directory contract. */
+@@ -83,7 +82,7 @@ bool ss_location_metadata_transaction_begin(void)
+         &locality_transaction_lock,
+         directory,
+         lock_path,
+-        SS_LOCALITY_LOCK_WAIT_USEC,
++        SS_LINUX_ADVISORY_LOCK_MAX_WAIT_USEC,
+         SS_LOCK_RETRY_USEC);
+     if (result == SS_LINUX_ADVISORY_LOCK_BUSY) {
+         g_debug("Locality metadata transaction lock is busy.");
+diff --git a/src/platform/linux/temporal-policy-store.c b/src/platform/linux/temporal-policy-store.c
+index 721054c..17dac12 100644
+--- a/src/platform/linux/temporal-policy-store.c
++++ b/src/platform/linux/temporal-policy-store.c
+@@ -13,7 +13,6 @@
+ 
+ static SsLinuxAdvisoryLock update_lock = SS_LINUX_ADVISORY_LOCK_INIT;
+ 
+-#define SS_POLICY_LOCK_WAIT_USEC (250 * 1000)
+ #define SS_LOCK_RETRY_USEC 5000
+ 
+ static bool begin_update(void)
+@@ -40,7 +39,7 @@ static bool begin_update(void)
+         &update_lock,
+         directory,
+         lock_path,
+-        SS_POLICY_LOCK_WAIT_USEC,
++        SS_LINUX_ADVISORY_LOCK_MAX_WAIT_USEC,
+         SS_LOCK_RETRY_USEC);
+     if (result == SS_LINUX_ADVISORY_LOCK_BUSY) {
+         g_debug("Temporal poli

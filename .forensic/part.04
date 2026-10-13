@@ -1,0 +1,182 @@
+_ref(window);
+ 
+-    ss_shell_window_activate(app, NULL);
++    ss_shell_window_activate(app, (gpointer)&activation);
+     drain_main_context();
+     g_assert_cmpuint(g_list_length(gtk_application_get_windows(app)), ==, 1U);
+ 
+@@ -306,22 +311,13 @@ int main(void)
+         "DBUS_SYSTEM_BUS_ADDRESS",
+         "unix:path=/nonexistent/ss-test-bus",
+         TRUE);
+-    g_setenv(
+-        "SYSTEM_SETTINGS_UI_ASSET_DIR_OVERRIDE",
+-        SYSTEM_SETTINGS_UI_SOURCE_DIR,
+-        TRUE);
+-    g_setenv(
+-        "SYSTEM_SETTINGS_MODULE_DIR_OVERRIDE",
+-        module_dir,
+-        TRUE);
+-
+     gtk_init();
+     g_autoptr(GtkApplication) app = gtk_application_new(
+         "org.infiltrator.SystemSettings.Test",
+         G_APPLICATION_NON_UNIQUE);
+     g_assert_true(g_application_register(G_APPLICATION(app), NULL, NULL));
+ 
+-    exercise_window(app, &expectations);
+-    exercise_window(app, &expectations);
++    exercise_window(app, &expectations, module_dir);
++    exercise_window(app, &expectations, module_dir);
+     return 0;
+ }
+diff --git a/.github/workflows/ci.yml b/.github/workflows/ci.yml
+new file mode 100644
+index 0000000..5dcf3f0
+--- /dev/null
++++ b/.github/workflows/ci.yml
+@@ -0,0 +1,437 @@
++# SPDX-License-Identifier: GPL-3.0-or-later
++name: System Settings CI
++
++on:
++  push:
++    branches: [main]
++  workflow_dispatch:
++
++# Build and analysis jobs remain read-only. Only the final publish job receives
++# contents: write, after every required gate in this same workflow run passes.
++permissions:
++  contents: read
++  actions: read
++
++jobs:
++  linux:
++    name: Linux build, test and package
++    runs-on: ubuntu-24.04
++    timeout-minutes: 30
++    env:
++      PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
++    steps:
++      - name: Check out source and exact pinned Common
++        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
++        with:
++          submodules: recursive
++
++      - name: Set reproducible build epoch
++        shell: bash
++        run: echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct HEAD)" >> "$GITHUB_ENV"
++
++      - name: Install Linux UI dependencies
++        run: |
++          sudo apt-get update
++          sudo apt-get install -y libgtk-4-dev libgeocode-glib-dev pkg-config xvfb dbus-x11
++
++      - name: Configure
++        run: cmake -S . -B build -DBUILD_TESTING=ON -DSYSTEM_SETTINGS_WARNINGS_AS_ERRORS=ON -DSYSTEM_SETTINGS_BUILD_PROFILE=generic
++
++      - name: Build
++        shell: bash
++        run: cmake --build build --config Release --parallel "$(($(nproc)>1?$(nproc)-1:1))"
++
++      - name: Test
++        run: ctest --test-dir build -C Release --output-on-failure
++
++      - name: Build reproducible Debian package
++        run: |
++          set -euo pipefail
++          cd build
++          cpack -G DEB
++          deb="$(find . -maxdepth 1 -type f -name 'infiltrator-system-settings_*.deb' -print -quit)"
++          test -n "$deb"
++          cp "$deb" "$RUNNER_TEMP/system-settings-first.deb"
++          rm -f "$deb"
++          cpack -G DEB
++          deb="$(find . -maxdepth 1 -type f -name 'infiltrator-system-settings_*.deb' -print -quit)"
++          cmp "$RUNNER_TEMP/system-settings-first.deb" "$deb"
++
++      - name: Validate reproducible native release assets
++        run: |
++          set -euo pipefail
++          rm -rf build/source-assets-check build/source-assets-check-2
++          ./build/system-settings-source-asset-builder build/source-assets-check
++          ./build/system-settings-source-asset-builder build/source-assets-check-2
++          native="System-Settings-$(cat VERSION)-native.run"
++          source="System-Settings-$(cat VERSION)-source.zip"
++          test -s "build/source-assets-check/$native"
++          test -s "build/source-assets-check/$source"
++          cmp "build/source-assets-check/$native" "build/source-assets-check-2/$native"
++          cmp "build/source-assets-check/$source" "build/source-assets-check-2/$source"
++          "build/source-assets-check/$native" --build-only
++
++      - name: Validate Debian integration assets
++        run: |
++          set -euo pipefail
++          deb="$(find build -maxdepth 1 -type f -name '*.deb' -print -quit)"
++          test -n "$deb"
++          root="$(mktemp -d)"
++          dpkg-deb -x "$deb" "$root"
++          marker="$root/usr/share/infiltrator/policy-providers/temporal-v3"
++          desktop="$root/usr/share/applications/org.infiltrator.SystemSettings.desktop"
++          icon="$root/usr/share/icons/hicolor/scalable/apps/org.infiltrator.SystemSettings.svg"
++          module_dir="$root/usr/share/infiltrator/system-settings/modules"
++          cmp data/temporal-v3.provider "$marker"
++          cmp data/org.infiltrator.SystemSettings.desktop "$desktop"
++          cmp data/org.infiltrator.SystemSettings.svg "$icon"
++          diff -u \
++            <(find modules -maxdepth 1 -type f -name '*.settings-module' -printf '%f\n' | LC_ALL=C sort) \
++            <(find "$module_dir" -maxdepth 1 -type f -name '*.settings-module' -printf '%f\n' | LC_ALL=C sort)
++          while IFS= read -r manifest; do
++            test -n "$manifest"
++            cmp "modules/$manifest" "$module_dir/$manifest"
++          done < <(find modules -maxdepth 1 -type f -name '*.settings-module' -printf '%f\n' | LC_ALL=C sort)
++          ui="$root/usr/share/infiltrator/system-settings/ui"
++          binary="$root/usr/bin/system-settings"
++          test -x "$binary"
++          grep -aFq '/usr/share/infiltrator/system-settings/ui' "$binary"
++          if grep -aFq '/usr/local/share/infiltrator/system-settings/ui' "$binary"; then
++            echo "Packaged binary still contains the wrong /usr/local UI asset path." >&2
++            exit 1
++          fi
++          if grep -aFq "${GITHUB_WORKSPACE}/assets/ui" "$binary" ||
++             grep -aFq "${GITHUB_WORKSPACE}/modules" "$binary"; then
++            echo "Qualified package embeds a development checkout fallback." >&2
++            exit 1
++          fi
++          diff -u \
++            <(find assets/ui -maxdepth 1 -type f -printf '%f\n' | LC_ALL=C sort) \
++            <(find "$ui" -maxdepth 1 -type f -printf '%f\n' | LC_ALL=C sort)
++          while IFS= read -r asset; do
++            test -n "$asset"
++            cmp "assets/ui/$asset" "$ui/$asset"
++          done < <(find assets/ui -maxdepth 1 -type f -printf '%f\n' | LC_ALL=C sort)
++          depends="$(dpkg-deb --field "$deb" Depends)"
++          grep -Eq 'libgeocode-glib-2-0|libgeocode-glib0' <<<"$depends"
++          rm -rf "$root"
++
++      - name: Stage exact tested release bundle
++        shell: bash
++        run: |
++          set -euo pipefail
++          version="$(tr -d '[:space:]' < VERSION)"
++          bundle="build/release-assets"
++          deb="$(find build -maxdepth 1 -type f -name "infiltrator-system-settings_${version}_*.deb" -print -quit)"
++          native="build/source-assets-check/System-Settings-${version}-native.run"
++          source="build/source-assets-check/System-Settings-${version}-source.zip"
++          test -s "$deb"
++          test -s "$native"
++          test -s "$source"
++          rm -rf "$bundle"
++          mkdir -p "$bundle"
++          cp "$deb" "$native" "$source" "$bundle/"
++          test "$(find "$bundle" -maxdepth 1 -type f | wc -l)" -eq 3
++
++      - name: Upload exact tested release bundle
++        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
++        with:
++          name: system-settings-release-assets
++          path: build/release-assets/*
++          if-no-files-found: error
++
++  static-analysis:
++    name: Cla

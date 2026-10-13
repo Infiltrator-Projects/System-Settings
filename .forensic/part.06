@@ -1,0 +1,107 @@
+e == 'true'
++        shell: bash
++        run: |
++          set -euo pipefail
++          mapfile -t tested_assets < <(
++            find release-assets -maxdepth 1 -type f -print | sort
++          )
++          if [[ ${#tested_assets[@]} -eq 0 ]]; then
++            echo "CI release bundle is empty." >&2
++            exit 1
++          fi
++          for asset in "${tested_assets[@]}"; do
++            test -s "$asset"
++          done
++
++          # CI owns the asset contract. Publication adds only the checksum file;
++          # it never rebuilds or renames the already-tested release bytes.
++          (
++            cd release-assets
++            rm -f SHA256SUMS
++            mapfile -t names < <(
++              find . -maxdepth 1 -type f -printf '%f\n' | sort
++            )
++            if [[ ${#names[@]} -eq 0 ]]; then
++              echo "CI release bundle contained no publishable files." >&2
++              exit 1
++            fi
++            sha256sum "${names[@]}" > SHA256SUMS
++            sha256sum -c SHA256SUMS
++          )
++
++      - name: Publish or complete release
++        if: steps.classify.outputs.candidate == 'true'
++        env:
++          GH_TOKEN: ${{ github.token }}
++        shell: bash
++        run: |
++          set -euo pipefail
++          version="${{ steps.classify.outputs.version }}"
++          tag="${{ steps.classify.outputs.tag }}"
++          sha="${{ steps.classify.outputs.sha }}"
++
++          mapfile -t assets < <(
++            find release-assets -maxdepth 1 -type f -print | sort
++          )
++          test -s release-assets/SHA256SUMS
++          [[ ${#assets[@]} -ge 2 ]]
++
++          tag_target="$(git ls-remote origin "refs/tags/$tag" | awk '{print $1}')"
++          if [[ -n "$tag_target" && "$tag_target" != "$sha" ]]; then
++            echo "Tag $tag already points to $tag_target, not tested commit $sha." >&2
++            exit 1
++          fi
++
++          expected_names="$(
++            find release-assets -maxdepth 1 -type f -printf '%f\n' | sort
++          )"
++          verify="$(mktemp -d)"
++          trap 'rm -rf "$verify"' EXIT
++
++          if gh release view "$tag" >/dev/null 2>&1; then
++            # Existing published bytes are immutable. A rerun may complete a
++            # partial release by adding a missing expected asset, but it must
++            # never replace an asset that already exists under this tag.
++            existing_names="$(
++              gh release view "$tag" --json assets --jq '.assets[].name' | sort
++            )"
++            while IFS= read -r existing_name; do
++              [[ -z "$existing_name" ]] && continue
++              if ! grep -Fxq -- "$existing_name" <<< "$expected_names"; then
++                echo "Release $tag contains unexpected immutable asset $existing_name." >&2
++                exit 1
++              fi
++            done <<< "$existing_names"
++
++            for asset in "${assets[@]}"; do
++              name="$(basename "$asset")"
++              if grep -Fxq -- "$name" <<< "$existing_names"; then
++                gh release download "$tag" --pattern "$name" --dir "$verify"
++                if ! cmp "$asset" "$verify/$name"; then
++                  echo "Published asset $name differs from the exact tested bytes; refusing to replace it." >&2
++                  exit 1
++                fi
++              else
++                gh release upload "$tag" "$asset"
++              fi
++            done
++          else
++            gh release create "$tag" "${assets[@]}" \
++              --target "$sha" \
++              --title "System Settings $version" \
++              --generate-notes
++          fi
++
++          actual_names="$(gh release view "$tag" --json assets --jq '.assets[].name' | sort)"
++          test "$actual_names" = "$expected_names"
++
++          rm -rf "$verify"
++          mkdir -p "$verify"
++          gh release download "$tag" --dir "$verify"
++          for asset in "${assets[@]}"; do
++            cmp "$asset" "$verify/$(basename "$asset")"
++          done
++          (cd "$verify" && sha256sum -c SHA256SUMS)
++
++# Central APT publication remains owned by Infiltrator-Repository. It discovers
++# verified GitHub releases and publishes its own signed catalogue independently.

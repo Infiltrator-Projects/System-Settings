@@ -3,13 +3,12 @@
  * @file home-temporal-presentation.c
  * @brief Authoritative temporal formatting for the Home dashboard.
  *
- * Home uses a long-lived presenter so clock ticks never rediscover Calendar,
- * recreate GSettings, reread policy storage, or reformat a calendar date that
+ * Home uses a long-lived presenter so clock ticks never recreate the Calendar
+ * provider or GSettings, reread policy storage, or reformat a calendar date that
  * has not changed. Policy-file and Cinnamon changes invalidate cached state
  * through native observers.
  */
 #include "home-temporal-presentation.h"
-#include "calendar-preview-provider.h"
 #include "policy-file-observer.h"
 
 #include "system-settings/cinnamon-interface.h"
@@ -17,6 +16,7 @@
 #include "system-settings/temporal-policy-store.h"
 
 #include <gio/gio.h>
+#include <infiltratr/temporal_posix.h>
 #include <string.h>
 
 struct SsHomeTemporalPresenter {
@@ -29,7 +29,7 @@ struct SsHomeTemporalPresenter {
     guint policy_reload_retry_id;
     guint policy_reload_retry_seconds;
     gchar *policy_path;
-    SsCalendarPreviewProvider *calendar_provider;
+    InfiltratrTemporalDateProvider *calendar_provider;
     gchar *cached_date_text;
     gchar *cached_calendar_id;
     gint cached_year;
@@ -88,10 +88,10 @@ static gchar *format_clock(
 static gchar *format_date_with_provider(
     const InfiltratrTemporalPolicyV3 *policy,
     GDateTime *now,
-    SsCalendarPreviewProvider *provider)
+    InfiltratrTemporalDateProvider *provider)
 {
     const InfiltratrTemporalCalendarInfo *calendar;
-    gchar *formatted;
+    char formatted[INFILTRATR_TEMPORAL_DATE_CAPACITY];
 
     if (policy == NULL || now == NULL) return NULL;
     if (strcmp(policy->calendar, "gregorian") == 0) {
@@ -100,12 +100,18 @@ static gchar *format_date_with_provider(
     calendar = infiltratr_temporal_calendar_find(policy->calendar);
     if (calendar == NULL) return NULL;
 
-    formatted = ss_calendar_preview_provider_format_date(
-        provider, policy->calendar,
-        g_date_time_get_year(now),
-        g_date_time_get_month(now),
-        g_date_time_get_day_of_month(now));
-    if (formatted != NULL) return formatted;
+    if (infiltratr_temporal_posix_format_date(
+            provider,
+            policy->calendar,
+            g_date_time_get_year(now),
+            g_date_time_get_month(now),
+            g_date_time_get_day_of_month(now),
+            "full",
+            formatted,
+            sizeof(formatted),
+            NULL)) {
+        return g_strdup(formatted);
+    }
     return g_strdup_printf("%s — preview unavailable", calendar->name);
 }
 
@@ -113,7 +119,7 @@ static bool format_into(
     const InfiltratrTemporalPolicyV3 *policy,
     GDateTime *now,
     bool use_24h,
-    SsCalendarPreviewProvider *provider,
+    InfiltratrTemporalDateProvider *provider,
     SsHomeTemporalPresentation *out)
 {
     SsHomeTemporalPresentation candidate = {0};
@@ -166,10 +172,19 @@ static gchar *presenter_format_date(
     } else {
         const InfiltratrTemporalCalendarInfo *calendar =
             infiltratr_temporal_calendar_find(presenter->policy.calendar);
-        formatted = ss_calendar_preview_provider_format_date(
-            presenter->calendar_provider,
-            presenter->policy.calendar,
-            year, month, day);
+        char buffer[INFILTRATR_TEMPORAL_DATE_CAPACITY];
+        if (infiltratr_temporal_posix_format_date(
+                presenter->calendar_provider,
+                presenter->policy.calendar,
+                year,
+                month,
+                day,
+                "full",
+                buffer,
+                sizeof(buffer),
+                NULL)) {
+            formatted = g_strdup(buffer);
+        }
         if (formatted == NULL) {
             return calendar != NULL
                 ? g_strdup_printf(
@@ -241,13 +256,13 @@ bool ss_home_temporal_presentation_format(
     bool use_24h,
     SsHomeTemporalPresentation *out)
 {
-    SsCalendarPreviewProvider *provider;
+    InfiltratrTemporalDateProvider *provider;
     bool ok;
 
     if (policy == NULL || now == NULL || out == NULL) return false;
-    provider = ss_calendar_preview_provider_new();
+    provider = infiltratr_temporal_posix_date_provider_new();
     ok = format_into(policy, now, use_24h, provider, out);
-    ss_calendar_preview_provider_free(provider);
+    infiltratr_temporal_posix_date_provider_free(provider);
     return ok;
 }
 
@@ -362,7 +377,7 @@ SsHomeTemporalPresenter *ss_home_temporal_presenter_new(void)
             presenter->settings, "changed",
             G_CALLBACK(on_presenter_settings_changed), presenter);
     }
-    presenter->calendar_provider = ss_calendar_preview_provider_new();
+    presenter->calendar_provider = infiltratr_temporal_posix_date_provider_new();
     (void)presenter_reload_policy(presenter);
 
     policy_path = g_build_filename(
@@ -402,7 +417,7 @@ void ss_home_temporal_presenter_free(
     g_clear_pointer(&presenter->policy_path, g_free);
     g_clear_pointer(&presenter->cached_date_text, g_free);
     g_clear_pointer(&presenter->cached_calendar_id, g_free);
-    ss_calendar_preview_provider_free(presenter->calendar_provider);
+    infiltratr_temporal_posix_date_provider_free(presenter->calendar_provider);
     g_free(presenter);
 }
 

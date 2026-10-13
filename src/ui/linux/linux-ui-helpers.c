@@ -1,5 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#define SYSTEM_SETTINGS_LINUX_UI_HELPERS_IMPLEMENTATION
 #include "linux-ui-helpers.h"
 
 #include <infiltratr/design.h>
