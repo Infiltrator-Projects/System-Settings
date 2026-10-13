@@ -5,6 +5,10 @@ history is preserved unchanged in [`CHANGELOG-legacy.md`](CHANGELOG-legacy.md).
 The 0.4.60-0.4.69 overlap is intentional: it closes gaps in the historical file
 while keeping the original record immutable.
 
+## 0.4.93 — 2026-10-13
+
+- Complete the post-fix forensic documentation pass by indexing the maintained UI north-star document in the canonical documentation ownership map, making its subordinate relationship to Design, accessibility/platform requirements and Common's design contract explicit rather than leaving a maintained policy document outside the map.
+
 ## 0.4.92 — 2026-10-13
 
 - Replace the product-local Calendar/GObject runtime loader with Common 1.19.41's stronger POSIX date-provider contract. System Settings now consumes the stable bounded `calendar_plus_format_date_v1` ABI, removing duplicated trusted-root discovery, retry state, object caching, test hooks, direct `dl` ownership and the `RTLD_NODELETE` lifetime workaround.
@@ -21,7 +25,7 @@ while keeping the original record immutable.
 
 - Complete a second repository-wide brittleness pass against the canonical Infiltrator Engineering Philosophy and remove dead Home status ownership state that had no lifecycle or behavioural contract.
 - Reconcile maintained validation documentation with the actual twenty-test Linux CTest suite.
-- Revalidate the deliberate transaction, async-lifetime, Common-provenance, packaging and exact-artifact release boundaries; retain them where their complexity protects stronger correctness guarantees rather than replacing them with weaker abstractions.
+- Revalidate the deliberate transaction, async-lifetime, Common-provenance, packaging and exact-tested-artifact release boundaries; retain them where their complexity protects stronger correctness guarantees rather than replacing them with weaker abstractions.
 
 ## 0.4.89 — 2026-10-13
 
