@@ -5,6 +5,12 @@ history is preserved unchanged in [`CHANGELOG-legacy.md`](CHANGELOG-legacy.md).
 The 0.4.60-0.4.69 overlap is intentional: it closes gaps in the historical file
 while keeping the original record immutable.
 
+## 0.4.89 — 2026-10-13
+
+- Qualify the Linux release package under the existing `generic` build profile rather than the source-aware default CMake profile, so installed UI assets and module manifests are the sole runtime authority and published Debian binaries no longer embed the CI checkout path.
+- Make same-SHA release reruns preserve published asset immutability: existing assets are byte-verified and never clobbered; only missing expected assets may be added to complete a partial publication.
+- Add package/release regression gates and align architecture/validation documentation with those enforced contracts.
+
 ## 0.4.88 — 2026-10-13
 
 - Remove the last duplicated module-manifest filename assumption from Debian integration validation: CI now derives the expected manifest set from `modules/` and compares every packaged manifest byte-for-byte.
