@@ -5,6 +5,12 @@ history is preserved unchanged in [`CHANGELOG-legacy.md`](CHANGELOG-legacy.md).
 The 0.4.60-0.4.69 overlap is intentional: it closes gaps in the historical file
 while keeping the original record immutable.
 
+## 0.4.91 — 2026-10-13
+
+- Complete the follow-up forensic boundary pass by removing shell-owned theme installation from the module-safe Linux UI helper target; Date & Time now depends only on the reusable GTK helper implementation rather than inheriting shell presentation machinery through the build graph.
+- Add a configure-time source-ownership invariant that rejects any future `src/shell/` implementation added to `system-settings-linux-ui`, making the intended shell/module boundary mechanically enforceable instead of merely documented.
+- Re-check the transaction, async-lifetime, Common provenance, packaging, reproducibility and exact-tested-artifact release mechanisms and retain them where their complexity protects stronger correctness guarantees.
+
 ## 0.4.90 — 2026-10-13
 
 - Complete a second repository-wide brittleness pass against the canonical Infiltrator Engineering Philosophy and remove dead Home status ownership state that had no lifecycle or behavioural contract.

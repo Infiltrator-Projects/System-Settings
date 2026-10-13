@@ -255,9 +255,11 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_link_libraries(system-settings-platform
         PUBLIC InfiltratrCommon::Common PkgConfig::GIO2)
 
+    # Module-safe GTK helpers only. Shell-owned presentation infrastructure,
+    # including the display-global theme provider, belongs to the shell target
+    # so modules cannot acquire shell implementation through this shared edge.
     add_library(system-settings-linux-ui STATIC
-        src/ui/linux/linux-ui-helpers.c
-        src/shell/linux/linux-theme.c)
+        src/ui/linux/linux-ui-helpers.c)
     ss_configure(system-settings-linux-ui)
     target_compile_definitions(system-settings-linux-ui PRIVATE
         SYSTEM_SETTINGS_GENERIC_SHELL=1)
@@ -340,6 +342,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         src/shell/linux/shell-command.c
         src/shell/linux/home-status.c
         src/shell/linux/home-page.c
+        src/shell/linux/linux-theme.c
         src/shell/linux/shell-module-catalog.c
         src/shell/linux/shell-window.c)
     ss_configure(system-settings-linux-shell)
@@ -425,6 +428,16 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
             "Shared Linux UI infrastructure must not expose the shell source directory.")
     endif()
     get_target_property(
+        SS_LINUX_UI_SOURCES
+        system-settings-linux-ui
+        SOURCES)
+    foreach(SS_LINUX_UI_SOURCE IN LISTS SS_LINUX_UI_SOURCES)
+        if(SS_LINUX_UI_SOURCE MATCHES "(^|/)src/shell/")
+            message(FATAL_ERROR
+                "Shared Linux UI infrastructure must not compile shell-owned source: ${SS_LINUX_UI_SOURCE}")
+        endif()
+    endforeach()
+    get_target_property(
         SS_MODULE_ADAPTER_PUBLIC_INCLUDES
         system-settings-linux-modules
         INTERFACE_INCLUDE_DIRECTORIES)
@@ -436,6 +449,8 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     endif()
     unset(SS_MODULE_ADAPTER_SHELL_INCLUDE_INDEX)
     unset(SS_MODULE_ADAPTER_PUBLIC_INCLUDES)
+    unset(SS_LINUX_UI_SOURCE)
+    unset(SS_LINUX_UI_SOURCES)
     unset(SS_LINUX_UI_SHELL_INCLUDE_INDEX)
     unset(SS_LINUX_UI_PUBLIC_INCLUDES)
     unset(SS_DATE_TIME_SHELL_INCLUDE_INDEX)
