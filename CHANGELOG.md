@@ -5,6 +5,10 @@ history is preserved unchanged in [`CHANGELOG-legacy.md`](CHANGELOG-legacy.md).
 The 0.4.60-0.4.69 overlap is intentional: it closes gaps in the historical file
 while keeping the original record immutable.
 
+## 0.4.94 — 2026-10-13
+
+- Correct the maintained Date & Time validation contract after the 0.4.92 Common-provider consolidation: Common now explicitly owns trusted Calendar runtime discovery, validation and retry/recovery; System Settings owns one lightweight Common date-provider instance per preview lifetime; and specialised clock formatting is documented and tested as an independent Common clock-formatter contract rather than a Calendar responsibility.
+
 ## 0.4.93 — 2026-10-13
 
 - Complete the post-fix forensic documentation pass by indexing the maintained UI north-star document in the canonical documentation ownership map, making its subordinate relationship to Design, accessibility/platform requirements and Common's design contract explicit rather than leaving a maintained policy document outside the map.
