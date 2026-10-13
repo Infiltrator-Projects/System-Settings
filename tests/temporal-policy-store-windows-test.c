@@ -127,6 +127,23 @@ static void check_no_stale_temporaries(const wchar_t *policy_path)
     CHECK(GetLastError() == ERROR_FILE_NOT_FOUND);
 }
 
+static void check_no_stale_tombstone(const wchar_t *policy_path)
+{
+    wchar_t tombstone[MAX_PATH + 16U];
+    DWORD attributes;
+    DWORD error;
+    int length = swprintf(
+        tombstone, sizeof(tombstone) / sizeof(tombstone[0]),
+        L"%ls.deleted", policy_path);
+
+    CHECK(length > 0 &&
+          (size_t)length < sizeof(tombstone) / sizeof(tombstone[0]));
+    attributes = GetFileAttributesW(tombstone);
+    error = GetLastError();
+    CHECK(attributes == INVALID_FILE_ATTRIBUTES);
+    CHECK(error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND);
+}
+
 int main(int argc, char **argv)
 {
     static const char valid[] =
@@ -220,7 +237,16 @@ int main(int argc, char **argv)
     }
     check_no_stale_temporaries(policy_path);
 
-    CHECK(DeleteFileW(policy_path));
+    /* Rollback clear publishes absence through a write-through rename. The
+     * canonical policy must disappear, normal cleanup leaves no tombstone, and
+     * a repeated clear remains idempotent. */
+    CHECK(ss_windows_temporal_policy_clear_file(policy_path));
+    found = true;
+    CHECK(ss_windows_temporal_policy_load_file(policy_path, &policy, &found));
+    CHECK(!found);
+    check_no_stale_tombstone(policy_path);
+    CHECK(ss_windows_temporal_policy_clear_file(policy_path));
+
     CHECK(RemoveDirectoryW(unique_path));
     return EXIT_SUCCESS;
 }

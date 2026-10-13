@@ -225,6 +225,59 @@ done:
     return ok;
 }
 
+bool ss_windows_temporal_policy_clear_file(const wchar_t *path)
+{
+    static const wchar_t suffix[] = L".deleted";
+    wchar_t *tombstone = NULL;
+    size_t path_length;
+    DWORD move_error;
+    bool ok = false;
+
+    if (path == NULL || path[0] == L'\0') {
+        return false;
+    }
+
+    path_length = wcslen(path);
+    tombstone = (wchar_t *)calloc(
+        path_length + sizeof(suffix) / sizeof(suffix[0]),
+        sizeof(wchar_t));
+    if (tombstone == NULL) {
+        return false;
+    }
+    memcpy(tombstone, path, path_length * sizeof(wchar_t));
+    memcpy(tombstone + path_length, suffix, sizeof(suffix));
+
+    /*
+     * DeleteFileW removes the live name but exposes no write-through contract.
+     * Rollback needs stronger semantics: first rename the active policy to a
+     * same-directory tombstone with MOVEFILE_WRITE_THROUGH. Windows documents
+     * that the move is on disk before this call returns, so the canonical
+     * policy path is durably absent before cleanup begins. A prior tombstone is
+     * bounded to one sibling and is safely replaced by the newer policy state.
+     */
+    if (!MoveFileExW(path, tombstone,
+                     MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)) {
+        move_error = GetLastError();
+        ok = move_error == ERROR_FILE_NOT_FOUND ||
+             move_error == ERROR_PATH_NOT_FOUND;
+        goto done;
+    }
+
+    ok = true;
+
+    /*
+     * Tombstone deletion is cleanup, not the commit point. If Windows or a
+     * transient scanner still holds the sibling open, leaving the bounded
+     * tombstone is safer than reporting rollback failure after durable policy
+     * absence has already been published. A later clear can replace it.
+     */
+    (void)DeleteFileW(tombstone);
+
+done:
+    free(tombstone);
+    return ok;
+}
+
 static bool begin_update(void)
 {
     wchar_t *directory = NULL;
@@ -361,18 +414,13 @@ static bool platform_clear(void)
 {
     wchar_t *directory = NULL;
     wchar_t *path = NULL;
-    bool ok = false;
+    bool ok;
 
     if (!build_paths(&directory, &path)) {
         return false;
     }
 
-    if (DeleteFileW(path)) {
-        ok = true;
-    } else {
-        const DWORD error = GetLastError();
-        ok = error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND;
-    }
+    ok = ss_windows_temporal_policy_clear_file(path);
 
     free(directory);
     free(path);

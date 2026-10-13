@@ -29,4 +29,10 @@ bool ss_windows_temporal_policy_save_file(
     const wchar_t *path,
     const InfiltratrTemporalPolicyV3 *policy);
 
+/**
+ * Durably publish absence of one policy path via a same-directory write-through
+ * rename. Tombstone cleanup is secondary to the committed absence contract.
+ */
+bool ss_windows_temporal_policy_clear_file(const wchar_t *path);
+
 #endif

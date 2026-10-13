@@ -5,6 +5,12 @@ history is preserved unchanged in [`CHANGELOG-legacy.md`](CHANGELOG-legacy.md).
 The 0.4.60-0.4.69 overlap is intentional: it closes gaps in the historical file
 while keeping the original record immutable.
 
+## 0.4.97 — 2026-10-14
+
+- Complete the required post-fix forensic pass by bringing Windows rollback clear semantics up to the same durable-absence contract as Linux: the live policy name is now removed through a same-directory `MOVEFILE_WRITE_THROUGH` rename before any cleanup is attempted, rather than relying on bare `DeleteFileW` completion.
+- Keep cleanup subordinate to the transaction commit point with one bounded tombstone name, so a transient scanner or sharing hold cannot turn an already-durable rollback into a false transaction failure or create unbounded release debris.
+- Add an isolated path-injected Windows clear regression covering existing-policy removal, observable absence, normal tombstone cleanup and idempotent repeated clear without touching the user's real LocalAppData policy.
+
 ## 0.4.96 — 2026-10-14
 
 - Complete the forensic persistence pass by consolidating Linux locality directory creation, private atomic metadata publication and durable namespace removal onto Common 1.19.41's tested POSIX primitives instead of maintaining overlapping GLib/local mechanisms.
@@ -58,7 +64,7 @@ while keeping the original record immutable.
 ## 0.4.87 — 2026-10-13
 
 - Complete a repository-wide brittleness pass: move reusable Linux UI helpers out of shell ownership, move built-in module composition contracts into `src/app`, and enforce those boundaries at CMake configure time.
-- Make the Common gitlink the single dependency-revision authority in Git checkouts; exported source archives retain their gitlink-derived provenance marker and complete SHA-256 byte manifest instead of duplicating the pin in CMake.
+- Make the Common gitlink the single dependency-revision authority in Git checkouts; exported source archives retain their gitlink-derived commit marker plus complete SHA-256 byte manifest instead of duplicating the pin in CMake.
 - Tighten Debian integration verification to compare source assets byte-for-byte and derive the packaged UI asset set from the source tree instead of maintaining a duplicated filename inventory.
 - Simplify repository/release machinery around the documented single-branch direct-to-`main` model, add focused repository ignores, align validation/module documentation with the enforced boundaries, and backfill the changelog so released versions are represented truthfully.
 
