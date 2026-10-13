@@ -65,6 +65,7 @@ int main(int argc, char **argv)
     bool locality_locked = false;
     bool location_change_requested = false;
     bool location_clear_requested = false;
+    bool original_persisted = false;
     bool output_persisted = false;
     InfiltratrTemporalPolicyV3 original_policy = {0};
     InfiltratrTemporalPolicyV3 output_policy = {0};
@@ -126,8 +127,10 @@ int main(int argc, char **argv)
             goto done;
         }
         original_policy = *authoritative;
+        original_persisted =
+            ss_date_time_model_has_persisted_policy(&model);
         output_policy = *authoritative;
-        output_persisted = ss_date_time_model_has_persisted_policy(&model);
+        output_persisted = original_persisted;
         draft = ss_date_time_policy_draft_new(authoritative);
     }
     if (draft == NULL) {
@@ -260,19 +263,22 @@ int main(int argc, char **argv)
                 ? ss_location_metadata_clear()
                 : ss_location_metadata_finish_staged();
             if (!metadata_ok) {
-                const bool rolled_back =
-                    platform->save(&original_policy);
+                const bool rolled_back = original_persisted
+                    ? platform->save(&original_policy)
+                    : (platform->clear != NULL && platform->clear());
                 if (rolled_back && location_staged) {
                     ss_location_metadata_discard_staged();
                 }
                 /*
-                 * If rollback failed, retain a staged locality journal so the
-                 * next System Settings process can reconcile it against the
-                 * policy that actually reached disk.
+                 * The policy lock is still held here, so no unrelated writer
+                 * can appear between the failed metadata publication and this
+                 * rollback. Restore absence when absence was the original
+                 * authority; copied platform defaults are not an equivalent
+                 * persistent state.
                  */
                 fputs(
                     rolled_back
-                        ? "Locality metadata could not be committed; the previous temporal policy was restored.\n"
+                        ? "Locality metadata could not be committed; the previous temporal policy state was restored.\n"
                         : "Locality metadata could not be committed and policy rollback failed; recovery is required.\n",
                     stderr);
                 exit_code = 3;

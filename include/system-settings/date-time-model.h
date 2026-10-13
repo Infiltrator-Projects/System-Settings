@@ -34,6 +34,25 @@ typedef struct SsDateTimeModel {
 typedef struct SsDateTimePolicyDraft SsDateTimePolicyDraft;
 
 /**
+ * Transaction token for the recovery-sensitive two-file locality commit.
+ *
+ * begin_location_update() holds the temporal-policy update lock after the
+ * policy write succeeds. The caller must then invoke exactly one of
+ * finish_location_update() or rollback_location_update(). Keeping the lock
+ * across the locality metadata publication makes the rollback snapshot the
+ * exact state immediately preceding this mutation; unrelated policy writers
+ * cannot be lost between commit and recovery.
+ */
+typedef struct SsDateTimeLocationUpdate {
+    SsDateTimeModel *_model;
+    InfiltratrTemporalPolicyV3 previous_policy;
+    bool previous_persisted_policy_present;
+    bool active;
+} SsDateTimeLocationUpdate;
+
+#define SS_DATE_TIME_LOCATION_UPDATE_INIT { 0 }
+
+/**
  * Initialise a zero-initialised model and immediately reconcile it with the
  * supplied store. The store pointer is borrowed and must outlive the model.
  * Call ss_date_time_model_clear() before reinitialising or leaving scope.
@@ -91,6 +110,37 @@ bool ss_date_time_model_set_location(SsDateTimeModel *model,
                                      bool configured,
                                      double latitude,
                                      double longitude);
+
+/**
+ * Begin a recovery-sensitive location update and retain the store update lock.
+ *
+ * On success the new policy is already durably published and @update is active.
+ * The caller owns a short external commit step (currently locality metadata)
+ * and must finish or roll back before returning to ordinary event processing.
+ */
+bool ss_date_time_model_begin_location_update(
+    SsDateTimeModel *model,
+    bool configured,
+    double latitude,
+    double longitude,
+    SsDateTimeLocationUpdate *update);
+/**
+ * Complete a successful external locality commit and release the update lock.
+ * Returns false for an invalid/inactive token and otherwise performs no write.
+ */
+bool ss_date_time_model_finish_location_update(
+    SsDateTimeModel *model,
+    SsDateTimeLocationUpdate *update);
+/**
+ * Restore the exact pre-update location transaction state and release the lock.
+ *
+ * If the transaction began without an explicit policy document, rollback uses
+ * the store's clear operation so platform-default provenance is restored rather
+ * than materialising a shadow policy containing copied defaults.
+ */
+bool ss_date_time_model_rollback_location_update(
+    SsDateTimeModel *model,
+    SsDateTimeLocationUpdate *update);
 
 /**
  * Create an isolated, non-authoritative policy draft from a committed policy.

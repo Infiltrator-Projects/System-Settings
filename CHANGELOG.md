@@ -5,6 +5,12 @@ history is preserved unchanged in [`CHANGELOG-legacy.md`](CHANGELOG-legacy.md).
 The 0.4.60-0.4.69 overlap is intentional: it closes gaps in the historical file
 while keeping the original record immutable.
 
+## 0.4.95 — 2026-10-14
+
+- Make the two-file locality transaction restore policy provenance as well as values: the Date & Time model now retains the temporal-policy update lock across locality metadata publication, and rollback removes the explicit policy again when the transaction began from platform defaults instead of materialising a shadow copy of those defaults.
+- Apply the same absence-preserving rollback rule to multi-option CLI locality transactions, add platform clear operations for Linux and Windows, and add regressions proving lock lifetime, successful completion, rollback failure release and restoration of the no-policy state.
+- Remove stale UI-owned temporal-policy rollback snapshots from both named-locality and custom-coordinate paths; rollback authority now lives at the model/persistence boundary that owns the exact pre-mutation state.
+
 ## 0.4.94 — 2026-10-13
 
 - Correct the maintained Date & Time validation contract after the 0.4.92 Common-provider consolidation: Common now explicitly owns trusted Calendar runtime discovery, validation and retry/recovery; System Settings owns one lightweight Common date-provider instance per preview lifetime; and specialised clock formatting is documented and tested as an independent Common clock-formatter contract rather than a Calendar responsibility.

@@ -32,6 +32,15 @@ typedef struct SsTemporalPolicyStore {
     bool (*load)(InfiltratrTemporalPolicyV3 *policy, bool *found);
     /** Persist one complete validated version-3 policy. */
     bool (*save)(const InfiltratrTemporalPolicyV3 *policy);
+    /**
+     * Durably remove the explicit policy document.
+     *
+     * Missing policy is already success. This operation exists for transaction
+     * recovery: rolling back an edit that began from platform defaults must
+     * restore policy absence rather than materialising those defaults as a new
+     * explicit Infiltrator policy.
+     */
+    bool (*clear)(void);
     /** Optional: acquire the platform's cross-process update lock. */
     bool (*begin_update)(void);
     /** Optional mate for begin_update(); called exactly once after acquisition. */

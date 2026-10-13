@@ -8,6 +8,8 @@
 #include "system-settings/cinnamon-interface.h"
 #include "linux-advisory-lock.h"
 
+#include <errno.h>
+#include <glib/gstdio.h>
 #include <infiltratr/core.h>
 #include <infiltratr/temporal_posix.h>
 
@@ -175,11 +177,37 @@ static bool platform_save(const InfiltratrTemporalPolicyV3 *policy)
     return true;
 }
 
+static bool platform_clear(void)
+{
+    g_autofree gchar *path = NULL;
+
+    /*
+     * Common owns validated load/save and the canonical XDG contract. Its
+     * pinned API intentionally has no deletion primitive, while System
+     * Settings alone needs deletion to restore pre-transaction policy absence.
+     * Derive the documented canonical location from GLib's XDG authority here
+     * rather than introducing a second persistence implementation.
+     */
+    path = g_build_filename(
+        g_get_user_config_dir(), "infiltrator", "presentation.conf", NULL);
+    if (path == NULL) {
+        return false;
+    }
+    if (g_unlink(path) == 0 || errno == ENOENT) {
+        return true;
+    }
+
+    g_warning("Unable to remove the temporal policy during transaction rollback: %s",
+              g_strerror(errno));
+    return false;
+}
+
 const SsTemporalPolicyStore *ss_platform_temporal_policy_store(void)
 {
     static const SsTemporalPolicyStore store = {
         .load = platform_load,
         .save = platform_save,
+        .clear = platform_clear,
         .begin_update = begin_update,
         .end_update = end_update,
         .compatibility_matches = platform_compatibility_matches

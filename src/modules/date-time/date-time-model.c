@@ -88,6 +88,19 @@ static void assign_location(
     policy->longitude = longitude;
 }
 
+static void release_update_lock(SsDateTimeModelPrivate *private_state)
+{
+    if (private_state == NULL || !private_state->saving) {
+        return;
+    }
+    if (private_state->store != NULL &&
+        private_state->store->begin_update != NULL &&
+        private_state->store->end_update != NULL) {
+        private_state->store->end_update();
+    }
+    private_state->saving = false;
+}
+
 /*
  * Persist-before-publish is the central model invariant. A failed write must
  * never make an uncommitted value visible through ss_date_time_model_policy().
@@ -99,7 +112,8 @@ static void assign_location(
  */
 static bool begin_candidate(
     SsDateTimeModel *model,
-    InfiltratrTemporalPolicyV3 *candidate)
+    InfiltratrTemporalPolicyV3 *candidate,
+    bool *persisted_policy_present)
 {
     SsDateTimeModelPrivate *private_state = model_private(model);
     bool found = false;
@@ -118,12 +132,16 @@ static bool begin_candidate(
         }
         if (private_state->store->load == NULL ||
             !private_state->store->load(candidate, &found)) {
-            private_state->store->end_update();
-            private_state->saving = false;
+            release_update_lock(private_state);
             return false;
         }
     } else {
         *candidate = private_state->policy;
+        found = private_state->persisted_policy_present;
+    }
+
+    if (persisted_policy_present != NULL) {
+        *persisted_policy_present = found;
     }
     return true;
 }
@@ -142,10 +160,7 @@ static bool save_candidate(
     }
 
     saved = private_state->store->save(candidate);
-    if (private_state->store->begin_update != NULL) {
-        private_state->store->end_update();
-    }
-    private_state->saving = false;
+    release_update_lock(private_state);
     if (!saved) {
         return false;
     }
@@ -186,6 +201,13 @@ void ss_date_time_model_clear(SsDateTimeModel *model)
     if (model == NULL) {
         return;
     }
+    /*
+     * An active reversible location update is a caller bug, but leaking its
+     * interprocess lock would make the failure contagious. Release ownership
+     * before discarding the model; the already-staged locality journal remains
+     * the crash/recovery authority for any half-completed two-file commit.
+     */
+    release_update_lock(model->_private);
     free(model->_private);
     model->_private = NULL;
 }
@@ -248,7 +270,8 @@ bool ss_date_time_model_set_clock_mode(
     const InfiltratrTemporalClockModeInfo *info = valid_clock_mode(clock_mode);
     InfiltratrTemporalPolicyV3 candidate;
 
-    if (model == NULL || info == NULL || !begin_candidate(model, &candidate)) {
+    if (model == NULL || info == NULL ||
+        !begin_candidate(model, &candidate, NULL)) {
         return false;
     }
     assign_clock_mode(&candidate, info);
@@ -262,7 +285,8 @@ bool ss_date_time_model_set_calendar(
     const InfiltratrTemporalCalendarInfo *info = valid_calendar(calendar_id);
     InfiltratrTemporalPolicyV3 candidate;
 
-    if (model == NULL || info == NULL || !begin_candidate(model, &candidate)) {
+    if (model == NULL || info == NULL ||
+        !begin_candidate(model, &candidate, NULL)) {
         return false;
     }
     assign_calendar(&candidate, info);
@@ -275,7 +299,7 @@ bool ss_date_time_model_set_show_seconds(
 {
     InfiltratrTemporalPolicyV3 candidate;
 
-    if (model == NULL || !begin_candidate(model, &candidate)) {
+    if (model == NULL || !begin_candidate(model, &candidate, NULL)) {
         return false;
     }
     candidate.show_seconds = show_seconds;
@@ -291,11 +315,110 @@ bool ss_date_time_model_set_location(
     InfiltratrTemporalPolicyV3 candidate;
 
     if (model == NULL || !valid_location(latitude, longitude) ||
-        !begin_candidate(model, &candidate)) {
+        !begin_candidate(model, &candidate, NULL)) {
         return false;
     }
     assign_location(&candidate, configured, latitude, longitude);
     return save_candidate(model, &candidate);
+}
+
+bool ss_date_time_model_begin_location_update(
+    SsDateTimeModel *model,
+    bool configured,
+    double latitude,
+    double longitude,
+    SsDateTimeLocationUpdate *update)
+{
+    SsDateTimeModelPrivate *private_state = model_private(model);
+    InfiltratrTemporalPolicyV3 candidate;
+    bool found = false;
+
+    if (private_state == NULL || update == NULL || update->active ||
+        !valid_location(latitude, longitude) ||
+        private_state->store == NULL ||
+        private_state->store->begin_update == NULL ||
+        private_state->store->end_update == NULL ||
+        private_state->store->clear == NULL ||
+        !begin_candidate(model, &candidate, &found)) {
+        return false;
+    }
+
+    update->_model = model;
+    update->previous_policy = candidate;
+    update->previous_persisted_policy_present = found;
+    update->active = false;
+
+    assign_location(&candidate, configured, latitude, longitude);
+    if (!private_state->store->save(&candidate)) {
+        release_update_lock(private_state);
+        update->_model = NULL;
+        return false;
+    }
+
+    /*
+     * The temporal policy is durable now, but the transaction is deliberately
+     * still open. Publish it in the model so the state accurately represents
+     * the disk while saving=true prevents any second mutation from entering
+     * before locality metadata is either committed or rolled back.
+     */
+    private_state->policy = candidate;
+    private_state->persisted_policy_present = true;
+    update->active = true;
+    return true;
+}
+
+bool ss_date_time_model_finish_location_update(
+    SsDateTimeModel *model,
+    SsDateTimeLocationUpdate *update)
+{
+    SsDateTimeModelPrivate *private_state = model_private(model);
+
+    if (private_state == NULL || update == NULL || !update->active ||
+        update->_model != model || !private_state->saving) {
+        return false;
+    }
+
+    release_update_lock(private_state);
+    update->active = false;
+    update->_model = NULL;
+    return true;
+}
+
+bool ss_date_time_model_rollback_location_update(
+    SsDateTimeModel *model,
+    SsDateTimeLocationUpdate *update)
+{
+    SsDateTimeModelPrivate *private_state = model_private(model);
+    bool restored;
+
+    if (private_state == NULL || update == NULL || !update->active ||
+        update->_model != model || !private_state->saving ||
+        private_state->store == NULL) {
+        return false;
+    }
+
+    if (update->previous_persisted_policy_present) {
+        restored = private_state->store->save(&update->previous_policy);
+    } else {
+        restored = private_state->store->clear != NULL &&
+            private_state->store->clear();
+    }
+
+    if (restored) {
+        private_state->policy = update->previous_policy;
+        private_state->persisted_policy_present =
+            update->previous_persisted_policy_present;
+    }
+
+    /*
+     * A failed rollback must not retain the lock indefinitely. The caller can
+     * reload after this returns false, while the staged locality journal lets a
+     * later process reconcile whichever durable policy actually survived.
+     */
+    release_update_lock(private_state);
+    update->active = false;
+    update->_model = NULL;
+    return restored;
 }
 
 SsDateTimePolicyDraft *ss_date_time_policy_draft_new(

@@ -34,7 +34,8 @@ int main(void)
     bool found = true;
     const SsTemporalPolicyStore *store = ss_platform_temporal_policy_store();
 
-    CHECK(store != NULL && store->load != NULL && store->save != NULL);
+    CHECK(store != NULL && store->load != NULL && store->save != NULL &&
+          store->clear != NULL);
     CHECK(mkdtemp(root) != NULL);
     CHECK(setenv("XDG_CONFIG_HOME", root, 1) == 0);
     CHECK(snprintf(directory, sizeof(directory), "%s/infiltrator", root) > 0);
@@ -61,7 +62,13 @@ int main(void)
     CHECK(strcmp(policy.clock_mode, "standard-24") == 0);
     CHECK(policy.show_seconds);
 
-    CHECK(unlink(path) == 0);
+    /* Transaction rollback must be able to restore the successful no-policy state. */
+    CHECK(store->clear());
+    found = true;
+    CHECK(store->load(&policy, &found));
+    CHECK(!found);
+    CHECK(store->clear());
+
     CHECK(rmdir(directory) == 0);
     CHECK(rmdir(root) == 0);
 

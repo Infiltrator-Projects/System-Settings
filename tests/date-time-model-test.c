@@ -21,6 +21,8 @@ static InfiltratrTemporalPolicyV3 persisted;
 static bool persisted_found;
 static bool fail_save;
 static bool fail_load;
+static bool fail_clear;
+static bool update_locked;
 static SsDateTimeModel *reenter_model;
 
 static bool fake_load(InfiltratrTemporalPolicyV3 *policy, bool *found)
@@ -48,6 +50,28 @@ static bool fake_save(const InfiltratrTemporalPolicyV3 *policy)
     return true;
 }
 
+static bool fake_clear(void)
+{
+    if (fail_clear)
+        return false;
+    persisted_found = false;
+    return true;
+}
+
+static bool fake_begin_update(void)
+{
+    if (update_locked)
+        return false;
+    update_locked = true;
+    return true;
+}
+
+static void fake_end_update(void)
+{
+    CHECK(update_locked);
+    update_locked = false;
+}
+
 static const InfiltratrTemporalPolicyV3 *policy_of(
     const SsDateTimeModel *model)
 {
@@ -61,16 +85,23 @@ int main(void)
 {
     static const SsTemporalPolicyStore store = {
         .load = fake_load,
-        .save = fake_save
+        .save = fake_save,
+        .clear = fake_clear,
+        .begin_update = fake_begin_update,
+        .end_update = fake_end_update
     };
     SsDateTimeModel model = SS_DATE_TIME_MODEL_INIT;
     SsDateTimeModel bootstrap_model = SS_DATE_TIME_MODEL_INIT;
     SsDateTimePolicyDraft *draft;
+    SsDateTimeLocationUpdate location_update =
+        SS_DATE_TIME_LOCATION_UPDATE_INIT;
     InfiltratrTemporalPolicyV3 before;
 
     persisted_found = false;
     fail_save = false;
     fail_load = false;
+    fail_clear = false;
+    update_locked = false;
     reenter_model = NULL;
 
     CHECK(ss_date_time_model_init(&model, &store));
@@ -165,6 +196,51 @@ int main(void)
     CHECK(strcmp(policy_of(&model)->clock_mode, before.clock_mode) == 0);
     CHECK(policy_of(&model)->show_seconds == before.show_seconds);
     ss_date_time_policy_draft_free(draft);
+
+    /*
+     * A reversible locality mutation retains the update lock until its external
+     * metadata half is resolved. Rolling back a platform-default starting state
+     * must restore absence, not create an explicit file containing defaults.
+     */
+    persisted_found = false;
+    CHECK(ss_date_time_model_reload(&bootstrap_model));
+    CHECK(ss_date_time_model_begin_location_update(
+        &bootstrap_model, true, -36.39, 145.36, &location_update));
+    CHECK(location_update.active);
+    CHECK(update_locked);
+    CHECK(ss_date_time_model_is_saving(&bootstrap_model));
+    CHECK(persisted_found);
+    CHECK(!ss_date_time_model_reload(&bootstrap_model));
+    CHECK(ss_date_time_model_rollback_location_update(
+        &bootstrap_model, &location_update));
+    CHECK(!location_update.active);
+    CHECK(!update_locked);
+    CHECK(!persisted_found);
+    CHECK(!ss_date_time_model_has_persisted_policy(&bootstrap_model));
+    CHECK(!policy_of(&bootstrap_model)->location_configured);
+
+    /* Successful completion keeps the new explicit policy and releases lock. */
+    CHECK(ss_date_time_model_begin_location_update(
+        &bootstrap_model, true, -37.8136, 144.9631, &location_update));
+    CHECK(update_locked);
+    CHECK(ss_date_time_model_finish_location_update(
+        &bootstrap_model, &location_update));
+    CHECK(!update_locked);
+    CHECK(persisted_found);
+    CHECK(policy_of(&bootstrap_model)->location_configured);
+
+    /* Rollback failure is explicit and still releases transaction ownership. */
+    CHECK(ss_date_time_model_reload(&bootstrap_model));
+    CHECK(ss_date_time_model_begin_location_update(
+        &bootstrap_model, true, -33.8688, 151.2093, &location_update));
+    fail_save = true;
+    CHECK(!ss_date_time_model_rollback_location_update(
+        &bootstrap_model, &location_update));
+    fail_save = false;
+    CHECK(!update_locked);
+    CHECK(!location_update.active);
+    CHECK(ss_date_time_model_reload(&bootstrap_model));
+    CHECK(policy_of(&bootstrap_model)->latitude == -33.8688);
 
     ss_date_time_model_clear(&bootstrap_model);
     ss_date_time_model_clear(&model);

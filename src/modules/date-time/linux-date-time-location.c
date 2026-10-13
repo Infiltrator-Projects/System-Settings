@@ -208,8 +208,8 @@ void on_location_result_activated(
     SsLinuxDateTimePanel *state = user_data;
     const SsLocationSearchResult *result;
     char timezone_id[SS_TIMEZONE_ID_CAPACITY] = {0};
-    const InfiltratrTemporalPolicyV3 *policy;
-    InfiltratrTemporalPolicyV3 previous_policy;
+    SsDateTimeLocationUpdate policy_update =
+        SS_DATE_TIME_LOCATION_UPDATE_INIT;
     SsLocationMetadata previous_metadata;
     bool previous_metadata_present;
     SsSystemTimeState current_system;
@@ -231,14 +231,6 @@ void on_location_result_activated(
             true);
         return;
     }
-    if (!ss_date_time_model_reload(&MODEL(state))) {
-        ss_location_metadata_transaction_end();
-        ss_linux_date_time_panel_set_status(
-            state,
-            "Could not reload the authoritative temporal policy before saving the locality.",
-            true);
-        return;
-    }
 
     if (!load_authoritative_location_metadata(
             &previous_metadata,
@@ -252,13 +244,6 @@ void on_location_result_activated(
     }
     LOCATION(state).metadata = previous_metadata;
     LOCATION(state).metadata_present = previous_metadata_present;
-
-    policy = ss_date_time_model_policy(&MODEL(state));
-    if (policy == NULL) {
-        ss_location_metadata_transaction_end();
-        return;
-    }
-    previous_policy = *policy;
 
     memset(
         &LOCATION(state).metadata,
@@ -309,11 +294,18 @@ void on_location_result_activated(
         return;
     }
 
-    if (!ss_date_time_model_set_location(
+    /*
+     * The model retains the temporal-policy lock after this durable write.
+     * Metadata publication or rollback therefore observes the exact policy
+     * state that preceded this location mutation; no unrelated policy writer
+     * can be overwritten by a stale rollback snapshot.
+     */
+    if (!ss_date_time_model_begin_location_update(
             &MODEL(state),
             true,
             result->latitude,
-            result->longitude)) {
+            result->longitude,
+            &policy_update)) {
         ss_location_metadata_discard_staged();
         LOCATION(state).metadata = previous_metadata;
         LOCATION(state).metadata_present = previous_metadata_present;
@@ -333,11 +325,8 @@ void on_location_result_activated(
     LOCATION(state).metadata_present =
         ss_location_metadata_finish_staged();
     if (!LOCATION(state).metadata_present) {
-        const bool restored = ss_date_time_model_set_location(
-            &MODEL(state),
-            previous_policy.location_configured,
-            previous_policy.latitude,
-            previous_policy.longitude);
+        const bool restored = ss_date_time_model_rollback_location_update(
+            &MODEL(state), &policy_update);
         const bool reloaded = restored
             ? true
             : ss_date_time_model_reload(&MODEL(state));
@@ -357,13 +346,23 @@ void on_location_result_activated(
         ss_linux_date_time_panel_set_status(
             state,
             restored
-                ? "The selected location could not be saved; the previous location and metadata were restored."
+                ? "The selected location could not be saved; the previous location, policy provenance and metadata were restored."
                 : (reloaded
                     ? "The selected location could not be saved and rollback persistence failed; authoritative policy was reloaded and previous metadata restored."
                     : "The selected location could not be saved, and neither rollback nor authoritative reload succeeded; previous metadata was restored in memory."),
             true);
         ss_location_metadata_transaction_end();
         ss_linux_date_time_panel_sync_controls(state);
+        return;
+    }
+
+    if (!ss_date_time_model_finish_location_update(
+            &MODEL(state), &policy_update)) {
+        ss_location_metadata_transaction_end();
+        ss_linux_date_time_panel_set_status(
+            state,
+            "Location was committed, but the temporal transaction could not be finalized.",
+            true);
         return;
     }
 
@@ -547,8 +546,8 @@ static gboolean commit_location_coordinates(gpointer user_data)
     SsLinuxDateTimePanel *state = user_data;
     double latitude;
     double longitude;
-    const InfiltratrTemporalPolicyV3 *policy;
-    InfiltratrTemporalPolicyV3 previous_policy;
+    SsDateTimeLocationUpdate policy_update =
+        SS_DATE_TIME_LOCATION_UPDATE_INIT;
     SsLocationMetadata previous_metadata;
     bool previous_metadata_present;
 
@@ -570,15 +569,6 @@ static gboolean commit_location_coordinates(gpointer user_data)
         ss_linux_date_time_panel_sync_controls(state);
         return G_SOURCE_REMOVE;
     }
-    if (!ss_date_time_model_reload(&MODEL(state))) {
-        ss_location_metadata_transaction_end();
-        ss_linux_date_time_panel_set_status(
-            state,
-            "Could not reload the authoritative temporal policy before saving custom coordinates.",
-            true);
-        ss_linux_date_time_panel_sync_controls(state);
-        return G_SOURCE_REMOVE;
-    }
 
     if (!load_authoritative_location_metadata(
             &previous_metadata,
@@ -593,13 +583,6 @@ static gboolean commit_location_coordinates(gpointer user_data)
     }
     LOCATION(state).metadata = previous_metadata;
     LOCATION(state).metadata_present = previous_metadata_present;
-
-    policy = ss_date_time_model_policy(&MODEL(state));
-    if (policy == NULL) {
-        ss_location_metadata_transaction_end();
-        return G_SOURCE_REMOVE;
-    }
-    previous_policy = *policy;
 
     memset(
         &LOCATION(state).metadata,
@@ -636,8 +619,8 @@ static gboolean commit_location_coordinates(gpointer user_data)
         return G_SOURCE_REMOVE;
     }
 
-    if (!ss_date_time_model_set_location(
-            &MODEL(state), true, latitude, longitude)) {
+    if (!ss_date_time_model_begin_location_update(
+            &MODEL(state), true, latitude, longitude, &policy_update)) {
         ss_location_metadata_discard_staged();
         LOCATION(state).metadata = previous_metadata;
         LOCATION(state).metadata_present = previous_metadata_present;
@@ -653,11 +636,8 @@ static gboolean commit_location_coordinates(gpointer user_data)
     LOCATION(state).metadata_present =
         ss_location_metadata_finish_staged();
     if (!LOCATION(state).metadata_present) {
-        const bool restored = ss_date_time_model_set_location(
-            &MODEL(state),
-            previous_policy.location_configured,
-            previous_policy.latitude,
-            previous_policy.longitude);
+        const bool restored = ss_date_time_model_rollback_location_update(
+            &MODEL(state), &policy_update);
         const bool reloaded = restored
             ? true
             : ss_date_time_model_reload(&MODEL(state));
@@ -677,13 +657,23 @@ static gboolean commit_location_coordinates(gpointer user_data)
         ss_linux_date_time_panel_set_status(
             state,
             restored
-                ? "Custom coordinates could not be saved; the previous location and metadata were restored."
+                ? "Custom coordinates could not be saved; the previous location, policy provenance and metadata were restored."
                 : (reloaded
                     ? "Custom coordinates could not be saved and rollback persistence failed; authoritative policy was reloaded and previous metadata restored."
                     : "Custom coordinates could not be saved, and neither rollback nor authoritative reload succeeded; previous metadata was restored in memory."),
             true);
         ss_location_metadata_transaction_end();
         ss_linux_date_time_panel_sync_controls(state);
+        return G_SOURCE_REMOVE;
+    }
+
+    if (!ss_date_time_model_finish_location_update(
+            &MODEL(state), &policy_update)) {
+        ss_location_metadata_transaction_end();
+        ss_linux_date_time_panel_set_status(
+            state,
+            "Custom coordinates were committed, but the temporal transaction could not be finalized.",
+            true);
         return G_SOURCE_REMOVE;
     }
 

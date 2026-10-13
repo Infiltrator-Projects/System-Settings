@@ -357,12 +357,34 @@ done:
     return ok;
 }
 
+static bool platform_clear(void)
+{
+    wchar_t *directory = NULL;
+    wchar_t *path = NULL;
+    bool ok = false;
+
+    if (!build_paths(&directory, &path)) {
+        return false;
+    }
+
+    if (DeleteFileW(path)) {
+        ok = true;
+    } else {
+        const DWORD error = GetLastError();
+        ok = error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND;
+    }
+
+    free(directory);
+    free(path);
+    return ok;
+}
 
 const SsTemporalPolicyStore *ss_platform_temporal_policy_store(void)
 {
     static const SsTemporalPolicyStore store = {
         .load = platform_load,
         .save = platform_save,
+        .clear = platform_clear,
         .begin_update = begin_update,
         .end_update = end_update,
         .compatibility_matches = NULL
