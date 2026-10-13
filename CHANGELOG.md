@@ -5,6 +5,12 @@ history is preserved unchanged in [`CHANGELOG-legacy.md`](CHANGELOG-legacy.md).
 The 0.4.60-0.4.69 overlap is intentional: it closes gaps in the historical file
 while keeping the original record immutable.
 
+## 0.4.98 — 2026-10-14
+
+- Rebuild the Linux Home dashboard around deterministic responsive peer rows instead of nested `GtkFlowBox` wrapping, so System Overview and Quick Actions remain side-by-side at ordinary desktop widths and the four live status surfaces retain intentional pairings.
+- Reduce the hero from competing marketing/feature overlays to one concise product identity surface, replace heuristic quick-action wrapping with a stable 2×2 grid, and tighten the page hierarchy around the documented graphical InfiltratorOS north star.
+- Preserve Common as the visual authority and retain live temporal/status observation, installed artwork, trusted external-tool handoffs and an explicit single-column adaptation for genuinely narrow content widths.
+
 ## 0.4.97 — 2026-10-14
 
 - Complete the required post-fix forensic pass by bringing Windows rollback clear semantics up to the same durable-absence contract as Linux: the live policy name is now removed through a same-directory `MOVEFILE_WRITE_THROUGH` rename before any cleanup is attempted, rather than relying on bare `DeleteFileW` completion.
