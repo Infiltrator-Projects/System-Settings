@@ -5,6 +5,12 @@ history is preserved unchanged in [`CHANGELOG-legacy.md`](CHANGELOG-legacy.md).
 The 0.4.60-0.4.69 overlap is intentional: it closes gaps in the historical file
 while keeping the original record immutable.
 
+## 0.4.99 — 2026-10-14
+
+- Reconcile the black-box Linux shell regression with the deliberate Home redesign: validate the new concise hero copy instead of preserving the retired marketing slogan as an accidental product contract.
+- Make the regression protect the structural fix itself by asserting that the primary dashboard row is an explicit `GtkBox` and Quick Actions is an explicit `GtkGrid`, preventing future visual work from silently reintroducing heuristic `GtkFlowBox` wrapping for those fixed relationships.
+- Preserve the 0.4.98 Home composition unchanged; this patch corrects validation ownership after CI correctly rejected the stale presentation expectation.
+
 ## 0.4.98 — 2026-10-14
 
 - Rebuild the Linux Home dashboard around deterministic responsive peer rows instead of nested `GtkFlowBox` wrapping, so System Overview and Quick Actions remain side-by-side at ordinary desktop widths and the four live status surfaces retain intentional pairings.

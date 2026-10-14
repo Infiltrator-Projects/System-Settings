@@ -66,6 +66,27 @@ static GtkWidget *find_widget_type(GtkWidget *widget, GType type)
     return NULL;
 }
 
+static GtkWidget *find_widget_css_class(
+    GtkWidget *widget,
+    const char *css_class)
+{
+    if (widget == NULL || css_class == NULL) {
+        return NULL;
+    }
+    if (gtk_widget_has_css_class(widget, css_class)) {
+        return widget;
+    }
+    for (GtkWidget *child = gtk_widget_get_first_child(widget);
+         child != NULL;
+         child = gtk_widget_get_next_sibling(child)) {
+        GtkWidget *match = find_widget_css_class(child, css_class);
+        if (match != NULL) {
+            return match;
+        }
+    }
+    return NULL;
+}
+
 /*
  * Walk children first so the smallest presentation subtree containing the
  * requested setting label wins. This keeps the regression black-box: it does
@@ -158,7 +179,21 @@ static void exercise_window(
     g_assert_nonnull(root);
     g_assert_true(subtree_has_label(root, "System Overview"));
     g_assert_true(subtree_has_label(root, "Quick Actions"));
-    g_assert_true(subtree_has_label(root, "Configure your system, your way."));
+    g_assert_true(subtree_has_label(
+        root,
+        "Your system at a glance. Open a setting and make it yours."));
+
+    /*
+     * Home's major composition is intentionally deterministic. These checks do
+     * not depend on private pointers or child indexes; they prove that the
+     * semantic primary row is a box and the action collection is a real grid,
+     * preventing a future styling pass from silently reintroducing heuristic
+     * GtkFlowBox wrapping for the relationships the product design fixes.
+     */
+    GtkWidget *primary_row = find_widget_css_class(root, "home-grid");
+    GtkWidget *quick_grid = find_widget_css_class(root, "quick-action-grid");
+    g_assert_true(GTK_IS_BOX(primary_row));
+    g_assert_true(GTK_IS_GRID(quick_grid));
 
     /*
      * The titlebar is deliberately outside gtk_window_get_child(). Search the
@@ -179,7 +214,8 @@ static void exercise_window(
      */
     GtkListBoxRow *date_row = find_row_with_label(root, "Temporal Test Module");
     g_assert_nonnull(date_row);
-    g_assert_true(subtree_has_label(GTK_WIDGET(date_row), "Manifest-driven test module"));
+    g_assert_true(subtree_has_label(
+        GTK_WIDGET(date_row), "Manifest-driven test module"));
     GtkWidget *parent = gtk_widget_get_parent(GTK_WIDGET(date_row));
     while (parent != NULL && !GTK_IS_LIST_BOX(parent)) {
         parent = gtk_widget_get_parent(parent);
