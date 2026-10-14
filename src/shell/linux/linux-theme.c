@@ -324,36 +324,30 @@ void ss_linux_theme_install(void)
         card, border,
         surface_hover);
 
+    /*
+     * Home uses image-led presentation, but Common remains the authority for
+     * palette, typography and suite geometry. Product-local CSS here is limited
+     * to composition-specific contrast, depth and component sizing.
+     */
     g_string_append_printf(
         css,
         ".home-page { padding: 16px; }\n"
-        ".home-hero { min-height: 300px; padding: 0; border: 0; border-radius: 18px; box-shadow: none; }\n"
-        ".hero-scene { min-width: 190px; min-height: 300px; }\n"
-        ".hero-copy-overlay { min-width: 0; padding: 20px 24px; margin: 16px; border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; background: rgba(0,0,0,0.52); }\n"
-        ".hero-brand-overlay { margin: 16px; padding: 14px 16px; background: rgba(0,0,0,0.46); border: 1px solid %s; border-radius: 12px; box-shadow: none; }\n"
-        ".hero-brand-overlay image { color: %s; }\n"
+        ".home-hero { min-height: 238px; padding: 0; border: 0; border-radius: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.10); }\n"
+        ".hero-scene { min-width: 190px; min-height: 238px; }\n"
+        ".hero-copy-overlay { min-width: 0; max-width: 470px; padding: 18px 22px; margin: 18px; border: 1px solid rgba(255,255,255,0.16); border-radius: 14px; background: rgba(0,0,0,0.58); box-shadow: 0 12px 32px rgba(0,0,0,0.18); }\n"
+        ".home-hero-badge { background: rgba(0,0,0,0.26); border: 1px solid rgba(255,255,255,0.16); border-radius: 999px; padding: 5px 9px; }\n"
+        ".home-hero-badge image { color: %s; }\n"
         ".home-hero-eyebrow { color: %s; font-size: 10px; font-weight: %u; letter-spacing: 0.12em; margin-bottom: 5px; }\n"
         ".home-hero-title { font-family: '%s'; color: %s; font-size: 34px; font-weight: %u; margin-bottom: 2px; }\n"
-        ".home-hero-accent { font-family: '%s'; color: %s; font-size: 34px; font-weight: %u; margin-bottom: 6px; }\n"
-        ".home-hero-subtitle { color: %s; font-size: 15px; margin-bottom: 4px; }\n"
-        ".home-hero-mark { min-width: 190px; min-height: 182px; padding: 0; border: 1px solid %s; border-radius: 18px; background: %s; }\n"
-        ".home-hero-mark image { color: %s; }\n"
-        ".home-hero-mark-title { color: %s; font-size: 17px; font-weight: %u; letter-spacing: 0.08em; }\n"
-        ".home-hero-mark-copy { color: %s; font-size: 10px; letter-spacing: 0.08em; }\n"
-        ".home-feature-row { margin-top: 18px; }\n"
-        ".home-grid, .status-grid { margin-top: 14px; }\n"
-        ".home-feature { min-height: 48px; background: %s; border: 1px solid %s; border-radius: 12px; padding: 8px 12px; }\n"
-        ".home-feature image { color: %s; }\n"
-        ".home-feature-title { color: %s; font-weight: %u; }\n"
-        ".home-feature-copy { color: %s; font-size: 10px; }\n"
-        ".home-card, .status-card { background: %s; border: 1px solid %s; border-radius: 12px; padding: 16px; box-shadow: none; }\n"
-        ".home-card:hover, .status-card:hover { border-color: %s; }\n"
+        ".home-hero-subtitle { color: rgba(255,255,255,0.84); font-size: 14px; margin-bottom: 2px; }\n"
+        ".home-grid { margin-top: 0; }\n"
+        ".home-card, .status-card { background: %s; border: 1px solid %s; border-radius: 12px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.07); }\n"
         ".home-card-title { font-family: '%s'; color: %s; font-size: 18px; font-weight: %u; }\n"
         ".home-card-icon, .status-card-icon, .location-pin-well { background: %s; border: 1px solid %s; border-radius: 12px; padding: 8px; }\n"
         ".home-card-icon image, .status-card-icon image, .location-pin-well image { color: %s; }\n"
         ".quick-action-grid { margin-top: 2px; }\n"
-        ".quick-action { min-height: 68px; padding: 8px 10px; background: %s; border: 1px solid %s; border-radius: 10px; }\n"
-        ".quick-action:hover { background: %s; border-color: %s; box-shadow: none; }\n"
+        ".quick-action { min-height: 68px; padding: 8px 10px; background: %s; border: 1px solid %s; border-radius: 10px; box-shadow: none; }\n"
+        ".quick-action:hover { background: %s; border-color: %s; box-shadow: 0 3px 10px rgba(0,0,0,0.08); }\n"
         ".quick-action-icon { min-width: 42px; min-height: 42px; border-radius: 12px; padding: 6px; background: %s; border: 1px solid %s; box-shadow: none; }\n"
         ".quick-action-icon image { color: %s; }\n"
         ".quick-action-title { color: %s; font-weight: %u; }\n"
@@ -362,41 +356,31 @@ void ss_linux_theme_install(void)
         ".status-card-heading { margin-bottom: 8px; }\n"
         ".status-card-value, .region-country, .home-clock-value, .location-primary { color: %s; font-size: 23px; font-weight: %u; }\n"
         ".status-card-detail, .home-clock-date { color: %s; font-size: 11px; }\n"
-        ".date-status-card { border-top: 2px solid %s; }\n"
-        ".region-status-card { border-top: 2px solid %s; }\n"
-        ".appearance-status-card { border-top: 2px solid %s; }\n"
-        ".network-status-card { border-top: 2px solid %s; }\n"
-        ".overview-scene { min-width: 190px; min-height: 126px; border-radius: 12px; }\n"
+        ".date-status-card, .region-status-card, .appearance-status-card, .network-status-card { border-top: 2px solid %s; }\n"
+        ".overview-scene { min-width: 150px; min-height: 122px; border-radius: 12px; }\n"
         ".network-visual { min-height: 84px; border-radius: 12px; }\n"
         ".theme-preview { padding: 5px; border: 1px solid transparent; border-radius: 10px; }\n"
         ".theme-preview-selected { border-color: %s; background: %s; }\n"
         ".theme-preview-window { border: 1px solid %s; border-radius: 6px; }\n"
         ".theme-preview-label { color: %s; font-size: 10px; }\n"
         ".asset-missing { background: transparent; border: 1px solid transparent; box-shadow: none; }\n",
-        border, accent,
-        kicker, (unsigned int)type->ui_bold_weight,
-        type->brand_family, heading, (unsigned int)type->brand_weight,
-        type->brand_family, accent, (unsigned int)type->brand_weight,
-        summary,
-        border, surface, accent,
-        heading, (unsigned int)type->ui_bold_weight,
-        detail_label,
-        surface, border, accent,
-        heading, (unsigned int)type->ui_bold_weight,
-        detail_label,
+        accent_foreground,
+        accent_foreground, (unsigned int)type->ui_bold_weight,
+        type->brand_family, accent_foreground, (unsigned int)type->brand_weight,
         card, border,
-        accent,
         type->brand_family, heading, (unsigned int)type->brand_weight,
-        surface, border, accent,
+        surface, border,
+        accent,
         surface, border,
         surface_hover, accent,
-        surface, border, accent,
+        surface, border,
+        accent,
         heading, (unsigned int)type->ui_bold_weight,
         detail_label,
         accent,
         heading, (unsigned int)type->ui_bold_weight,
         summary,
-        accent, accent, accent, success,
+        accent,
         accent, selected,
         border,
         detail_label);
@@ -416,10 +400,10 @@ void ss_linux_theme_install(void)
         ".info-strip, .status-ok, .error, .page-status, .location-results, "
         ".location-results row, .quick-action, .theme-preview { border-radius: %upx; }\n"
         ".header-brand-icon, .nav-row, .page-icon, .overview-panel, "
-        ".settings-card, .hero-copy-overlay, .hero-brand-overlay, .home-feature, "
-        ".home-card, .status-card, .home-card-icon, .status-card-icon, "
-        ".location-pin-well, .overview-scene, .network-visual { border-radius: %upx; }\n"
-        ".hero-card, .home-hero, .home-hero-mark { border-radius: %upx; }\n",
+        ".settings-card, .hero-copy-overlay, .home-card, .status-card, "
+        ".home-card-icon, .status-card-icon, .location-pin-well, "
+        ".overview-scene, .network-visual { border-radius: %upx; }\n"
+        ".hero-card, .home-hero { border-radius: %upx; }\n",
         (unsigned int)metrics->content_padding,
         (unsigned int)metrics->screen_padding,
         (unsigned int)metrics->small_radius,

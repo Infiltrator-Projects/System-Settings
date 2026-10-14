@@ -5,6 +5,12 @@ history is preserved unchanged in [`CHANGELOG-legacy.md`](CHANGELOG-legacy.md).
 The 0.4.60-0.4.69 overlap is intentional: it closes gaps in the historical file
 while keeping the original record immutable.
 
+## 0.4.100 — 2026-10-14
+
+- Reconcile the Linux Home stylesheet with the 0.4.98/0.4.99 dashboard structure: the image hero now honours the intended compact desktop height instead of being forced back to the retired 300-pixel composition, and obsolete hero/feature selectors from the superseded layout are removed.
+- Strengthen the visual hierarchy without creating a second design authority: Common still supplies palette, typography and geometry, while the Home layer adds restrained image-overlay contrast, card depth and interactive Quick Action hover treatment appropriate to this product composition.
+- Style the new InfiltratorOS hero badge explicitly, reduce the System Overview artwork footprint, and stop using the success semantic colour as a permanent Network decoration when network health is not necessarily successful.
+
 ## 0.4.99 — 2026-10-14
 
 - Reconcile the black-box Linux shell regression with the deliberate Home redesign: validate the new concise hero copy instead of preserving the retired marketing slogan as an accidental product contract.
