@@ -36,7 +36,10 @@ bool ss_home_temporal_presenter_format_now(
     SsHomeTemporalPresenter *presenter,
     SsHomeTemporalPresentation *out);
 
-/** Suggested visible refresh cadence for the presenter's current clock mode. */
+/**
+ * Home's deliberately coarse visible refresh cadence. Precision/sub-second
+ * presentation belongs to the Date & Time page, not the overview surface.
+ */
 guint ss_home_temporal_presenter_refresh_interval_ms(
     const SsHomeTemporalPresenter *presenter);
 

@@ -98,7 +98,5 @@ guint ss_home_temporal_provider_refresh_interval_ms(
 {
     SsHomeTemporalPresenter *presenter = ensure_presenter(provider);
 
-    return presenter != NULL
-        ? ss_home_temporal_presenter_refresh_interval_ms(presenter)
-        : 1000U;
+    return ss_home_temporal_presenter_refresh_interval_ms(presenter);
 }

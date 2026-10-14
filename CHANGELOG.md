@@ -5,6 +5,12 @@ history is preserved unchanged in [`CHANGELOG-legacy.md`](CHANGELOG-legacy.md).
 The 0.4.60-0.4.69 overlap is intentional: it closes gaps in the historical file
 while keeping the original record immutable.
 
+## 0.4.103 — 2026-10-14
+
+- Stop the Home dashboard from inheriting precision-clock polling cadence: Home now suppresses seconds and refreshes its temporal summary once per minute instead of every 500–1000 ms, eliminating the continuous GTK measure/re-layout cycle behind the visible micro-jump and excessive CPU use.
+- Keep precision where it belongs: the Date & Time page still presents the selected clock model at its full configured fidelity, while Home remains a stable settings overview using the same authoritative clock/calendar semantics at coarse precision.
+- Make failure behaviour equally bounded by using the same minute-scale cadence when the Home presenter is temporarily unavailable, and add regressions proving conventional and decimal Home presentations suppress seconds and cannot regress to sub-second/one-second polling.
+
 ## 0.4.102 — 2026-10-14
 
 - Finish the deterministic native Linux UI composition by replacing Date & Time's remaining `GtkFlowBox` card/manual-control layouts with explicit typed `GtkBox` rows and width-driven breakpoints, so fixed relationships no longer depend on heuristic child wrapping.

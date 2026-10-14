@@ -3,10 +3,12 @@
  * @file home-temporal-presentation.c
  * @brief Authoritative temporal formatting for the Home dashboard.
  *
- * Home uses a long-lived presenter so clock ticks never recreate the Calendar
- * provider or GSettings, reread policy storage, or reformat a calendar date that
- * has not changed. Policy-file and Cinnamon changes invalidate cached state
- * through native observers.
+ * Home uses a long-lived presenter so periodic refreshes never recreate the
+ * Calendar provider or GSettings, reread policy storage, or reformat a calendar
+ * date that has not changed. Home is a settings overview rather than a precision
+ * chronometer: it deliberately suppresses seconds and refreshes at minute-scale
+ * cadence. Policy-file and Cinnamon changes still invalidate cached state through
+ * native observers.
  */
 #include "home-temporal-presentation.h"
 #include "policy-file-observer.h"
@@ -18,6 +20,8 @@
 #include <gio/gio.h>
 #include <infiltratr/temporal_posix.h>
 #include <string.h>
+
+enum { HOME_TEMPORAL_REFRESH_INTERVAL_MS = 60000U };
 
 struct SsHomeTemporalPresenter {
     InfiltratrTemporalPolicyV3 policy;
@@ -286,6 +290,16 @@ static bool presenter_reload_policy(SsHomeTemporalPresenter *presenter)
          */
         return false;
     }
+    /*
+     * Home is an overview surface, not the authoritative precision clock. A
+     * user may legitimately enable seconds or select a clock model whose
+     * second-like unit advances more often than once per SI second. Mirroring
+     * that cadence here made the entire dashboard continuously invalidate its
+     * layout. Keep the selected clock/calendar semantics, but intentionally
+     * collapse Home to minute-scale precision. The Date & Time page remains the
+     * place where the full precision presentation is shown.
+     */
+    loaded.show_seconds = false;
     presenter->policy = loaded;
     presenter->policy_valid = true;
     return true;
@@ -436,10 +450,12 @@ bool ss_home_temporal_presenter_format_now(
 guint ss_home_temporal_presenter_refresh_interval_ms(
     const SsHomeTemporalPresenter *presenter)
 {
-    if (presenter == NULL || !presenter->policy_valid) {
-        return 1000U;
-    }
-    return ss_clock_presentation_refresh_interval_ms(
-        presenter->policy.clock_mode,
-        presenter->policy.show_seconds);
+    /*
+     * This is deliberately independent of the selected precision clock mode.
+     * The caller also uses this value while the presenter is unavailable, so a
+     * transient policy/provider failure cannot degrade into a one-second retry
+     * loop on the GTK main thread.
+     */
+    (void)presenter;
+    return HOME_TEMPORAL_REFRESH_INTERVAL_MS;
 }

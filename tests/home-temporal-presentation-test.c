@@ -7,6 +7,21 @@
 #include <infiltratr/core.h>
 #include <string.h>
 
+static guint count_character(const char *text, char needle)
+{
+    guint count = 0U;
+
+    if (text == NULL) {
+        return 0U;
+    }
+    for (; *text != '\0'; ++text) {
+        if (*text == needle) {
+            ++count;
+        }
+    }
+    return count;
+}
+
 int main(void)
 {
     g_autofree gchar *root =
@@ -89,15 +104,19 @@ int main(void)
 
         presenter = ss_home_temporal_presenter_new();
         g_assert_nonnull(presenter);
-        /* Conventional HH:MM:SS advances only once per SI second. */
+        /*
+         * Home must never inherit a precision clock's second-level cadence.
+         * The detailed Date & Time surface owns that presentation.
+         */
         g_assert_cmpuint(
             ss_home_temporal_presenter_refresh_interval_ms(presenter),
             ==,
-            1000U);
+            60000U);
         ss_home_temporal_presentation_init(&first);
         ss_home_temporal_presentation_init(&second);
         g_assert_true(ss_home_temporal_presenter_format_now(
             presenter, &first));
+        g_assert_cmpuint(count_character(first.clock_text, ':'), ==, 1U);
 
         g_assert_cmpint(g_chmod(policy_path, 0000), ==, 0);
         for (unsigned int i = 0U; i < 100U; ++i) {
@@ -124,7 +143,16 @@ int main(void)
         g_assert_cmpuint(
             ss_home_temporal_presenter_refresh_interval_ms(presenter),
             ==,
-            500U);
+            60000U);
+        {
+            SsHomeTemporalPresentation coarse;
+            ss_home_temporal_presentation_init(&coarse);
+            g_assert_true(ss_home_temporal_presenter_format_now(
+                presenter, &coarse));
+            g_assert_cmpuint(
+                count_character(coarse.clock_text, ':'), ==, 1U);
+            ss_home_temporal_presentation_clear(&coarse);
+        }
         ss_home_temporal_presenter_free(presenter);
 
         policy.show_seconds = false;
@@ -134,8 +162,12 @@ int main(void)
         g_assert_cmpuint(
             ss_home_temporal_presenter_refresh_interval_ms(presenter),
             ==,
-            1000U);
+            60000U);
         ss_home_temporal_presenter_free(presenter);
+        g_assert_cmpuint(
+            ss_home_temporal_presenter_refresh_interval_ms(NULL),
+            ==,
+            60000U);
     }
 
     infiltratr_copy_string(policy.clock_mode, sizeof(policy.clock_mode), "chinese-time");
