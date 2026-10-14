@@ -5,6 +5,11 @@ history is preserved unchanged in [`CHANGELOG-legacy.md`](CHANGELOG-legacy.md).
 The 0.4.60-0.4.69 overlap is intentional: it closes gaps in the historical file
 while keeping the original record immutable.
 
+## 0.4.101 — 2026-10-14
+
+- Remove the unsupported GTK CSS `max-width` declaration from the Home hero overlay after native PGO qualification correctly rejected the parser warning, while preserving the 0.4.100 visual composition and contrast treatment unchanged.
+- Keep the release gate authoritative: normal Linux/Windows tests and sanitizers had already passed, but the native installer remained blocked until its own extracted-source build and shell test could consume the stylesheet without GTK parser diagnostics.
+
 ## 0.4.100 — 2026-10-14
 
 - Reconcile the Linux Home stylesheet with the 0.4.98/0.4.99 dashboard structure: the image hero now honours the intended compact desktop height instead of being forced back to the retired 300-pixel composition, and obsolete hero/feature selectors from the superseded layout are removed.

@@ -334,7 +334,7 @@ void ss_linux_theme_install(void)
         ".home-page { padding: 16px; }\n"
         ".home-hero { min-height: 238px; padding: 0; border: 0; border-radius: 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.10); }\n"
         ".hero-scene { min-width: 190px; min-height: 238px; }\n"
-        ".hero-copy-overlay { min-width: 0; max-width: 470px; padding: 18px 22px; margin: 18px; border: 1px solid rgba(255,255,255,0.16); border-radius: 14px; background: rgba(0,0,0,0.58); box-shadow: 0 12px 32px rgba(0,0,0,0.18); }\n"
+        ".hero-copy-overlay { min-width: 0; padding: 18px 22px; margin: 18px; border: 1px solid rgba(255,255,255,0.16); border-radius: 14px; background: rgba(0,0,0,0.58); box-shadow: 0 12px 32px rgba(0,0,0,0.18); }\n"
         ".home-hero-badge { background: rgba(0,0,0,0.26); border: 1px solid rgba(255,255,255,0.16); border-radius: 999px; padding: 5px 9px; }\n"
         ".home-hero-badge image { color: %s; }\n"
         ".home-hero-eyebrow { color: %s; font-size: 10px; font-weight: %u; letter-spacing: 0.12em; margin-bottom: 5px; }\n"
