@@ -5,6 +5,12 @@ history is preserved unchanged in [`CHANGELOG-legacy.md`](CHANGELOG-legacy.md).
 The 0.4.60-0.4.69 overlap is intentional: it closes gaps in the historical file
 while keeping the original record immutable.
 
+## 0.4.102 — 2026-10-14
+
+- Finish the deterministic native Linux UI composition by replacing Date & Time's remaining `GtkFlowBox` card/manual-control layouts with explicit typed `GtkBox` rows and width-driven breakpoints, so fixed relationships no longer depend on heuristic child wrapping.
+- Keep the live preview and Presentation/System Clock surfaces as desktop peers, stack them intentionally on narrow content widths, and stack manual date/time controls only below an explicit compact-width threshold.
+- Extend the black-box shell regression to protect the Date & Time hero, peer-card and manual-control containers as explicit boxes, matching Home's structural regression and preventing heuristic flow layout from returning.
+
 ## 0.4.101 — 2026-10-14
 
 - Remove the unsupported GTK CSS `max-width` declaration from the Home hero overlay after native PGO qualification correctly rejected the parser warning, while preserving the 0.4.100 visual composition and contrast treatment unchanged.

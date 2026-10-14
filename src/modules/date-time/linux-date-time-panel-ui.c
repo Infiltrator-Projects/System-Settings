@@ -17,6 +17,15 @@
 #include <infiltratr/design.h>
 #include <infiltratr/temporal.h>
 
+typedef struct SsDateTimeAdaptiveLayout {
+    GtkBox *hero_row;
+    GtkBox *card_row;
+    GtkBox *manual_row;
+    guint applied_columns;
+    gboolean manual_state_valid;
+    gboolean manual_stacked;
+} SsDateTimeAdaptiveLayout;
+
 static int common_compact_spacing(void)
 {
     const InfiltratrDesignMetrics *metrics = infiltratr_design_metrics();
@@ -33,6 +42,79 @@ static int common_section_spacing(void)
 {
     const InfiltratrDesignMetrics *metrics = infiltratr_design_metrics();
     return metrics != NULL ? (int)metrics->section_spacing : 18;
+}
+
+static guint date_time_layout_columns_for_width(int width)
+{
+    return width >= 760 ? 2U : 1U;
+}
+
+static void date_time_layout_apply_width(
+    SsDateTimeAdaptiveLayout *layout,
+    int width)
+{
+    const guint columns = date_time_layout_columns_for_width(width);
+    const GtkOrientation peer_orientation =
+        columns == 2U ? GTK_ORIENTATION_HORIZONTAL : GTK_ORIENTATION_VERTICAL;
+    const gboolean manual_stacked = width < 520;
+
+    if (layout == NULL) {
+        return;
+    }
+
+    if (layout->applied_columns != columns) {
+        layout->applied_columns = columns;
+
+        /*
+         * These are semantic peers, not a masonry surface. One explicit
+         * breakpoint keeps the live preview and setting cards side-by-side at
+         * ordinary desktop widths and intentionally stacks them when the
+         * content area is genuinely narrow.
+         */
+        if (layout->hero_row != NULL) {
+            gtk_orientable_set_orientation(
+                GTK_ORIENTABLE(layout->hero_row), peer_orientation);
+        }
+        if (layout->card_row != NULL) {
+            gtk_orientable_set_orientation(
+                GTK_ORIENTABLE(layout->card_row), peer_orientation);
+            gtk_box_set_homogeneous(layout->card_row, columns == 2U);
+        }
+    }
+
+    if (!layout->manual_state_valid ||
+        layout->manual_stacked != manual_stacked) {
+        layout->manual_state_valid = TRUE;
+        layout->manual_stacked = manual_stacked;
+        if (layout->manual_row != NULL) {
+            gtk_orientable_set_orientation(
+                GTK_ORIENTABLE(layout->manual_row),
+                manual_stacked
+                    ? GTK_ORIENTATION_VERTICAL
+                    : GTK_ORIENTATION_HORIZONTAL);
+        }
+    }
+}
+
+static void date_time_layout_width_changed(
+    GObject *object,
+    GParamSpec *pspec G_GNUC_UNUSED,
+    gpointer user_data)
+{
+    const int width = gtk_widget_get_width(GTK_WIDGET(object));
+
+    if (width > 0) {
+        date_time_layout_apply_width(user_data, width);
+    }
+}
+
+static void date_time_layout_mapped(GtkWidget *widget, gpointer user_data)
+{
+    const int width = gtk_widget_get_width(widget);
+
+    if (width > 0) {
+        date_time_layout_apply_width(user_data, width);
+    }
 }
 
 static GtkStringList *clock_mode_strings(
@@ -239,7 +321,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     GtkWidget *location_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, common_control_spacing());
     GtkWidget *presentation_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, common_control_spacing());
     GtkWidget *system_card = gtk_box_new(GTK_ORIENTATION_VERTICAL, common_control_spacing());
-    GtkWidget *lower = gtk_flow_box_new();
+    GtkWidget *lower = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, common_control_spacing());
     GtkWidget *manual_box;
     GtkWidget *search_box;
     GtkWidget *coordinate_box;
@@ -274,6 +356,7 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
      */
     gtk_widget_add_css_class(hero_card, "hero-card");
     gtk_widget_add_css_class(hero_top, "hero-top");
+    gtk_widget_add_css_class(hero_top, "date-time-hero-row");
     gtk_widget_set_hexpand(hero_copy, TRUE);
     gtk_box_append(
         GTK_BOX(hero_copy),
@@ -473,17 +556,12 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     gtk_box_append(GTK_BOX(page), location_card);
 
     /*
-     * Presentation and system-clock control are peers. GtkFlowBox keeps them
-     * side-by-side on an ordinary laptop and naturally wraps them to one
-     * column when the window becomes narrow.
+     * Presentation and system-clock control are semantic peers. Their
+     * relationship is explicit, as on Home: a homogeneous desktop row changes
+     * to a single vertical stack only at the product-defined narrow breakpoint.
      */
-    gtk_flow_box_set_selection_mode(
-        GTK_FLOW_BOX(lower), GTK_SELECTION_NONE);
-    gtk_flow_box_set_min_children_per_line(GTK_FLOW_BOX(lower), 1U);
-    gtk_flow_box_set_max_children_per_line(GTK_FLOW_BOX(lower), 2U);
-    gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(lower), (guint)common_control_spacing());
-    gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(lower), (guint)common_control_spacing());
-    gtk_flow_box_set_homogeneous(GTK_FLOW_BOX(lower), TRUE);
+    gtk_widget_add_css_class(lower, "date-time-card-row");
+    gtk_box_set_homogeneous(GTK_BOX(lower), TRUE);
     gtk_widget_set_hexpand(lower, TRUE);
 
     gtk_widget_add_css_class(presentation_card, "settings-card");
@@ -590,15 +668,8 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
             "Synchronise automatically with the system service.",
             GTK_WIDGET(state->system_time.network_time)));
 
-    manual_box = gtk_flow_box_new();
-    gtk_flow_box_set_selection_mode(
-        GTK_FLOW_BOX(manual_box), GTK_SELECTION_NONE);
-    gtk_flow_box_set_min_children_per_line(
-        GTK_FLOW_BOX(manual_box), 1U);
-    gtk_flow_box_set_max_children_per_line(
-        GTK_FLOW_BOX(manual_box), 3U);
-    gtk_flow_box_set_column_spacing(GTK_FLOW_BOX(manual_box), (guint)common_compact_spacing());
-    gtk_flow_box_set_row_spacing(GTK_FLOW_BOX(manual_box), (guint)common_compact_spacing());
+    manual_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, common_compact_spacing());
+    gtk_widget_add_css_class(manual_box, "manual-time-controls");
     state->system_time.manual_date = GTK_ENTRY(gtk_entry_new());
     state->system_time.manual_time = GTK_ENTRY(gtk_entry_new());
     state->system_time.manual_set_time =
@@ -630,12 +701,12 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         GTK_WIDGET(state->system_time.manual_set_time), "setting-button");
     gtk_widget_add_css_class(
         GTK_WIDGET(state->system_time.manual_set_time), "primary-button");
-    gtk_flow_box_insert(
-        GTK_FLOW_BOX(manual_box), GTK_WIDGET(state->system_time.manual_date), -1);
-    gtk_flow_box_insert(
-        GTK_FLOW_BOX(manual_box), GTK_WIDGET(state->system_time.manual_time), -1);
-    gtk_flow_box_insert(
-        GTK_FLOW_BOX(manual_box), GTK_WIDGET(state->system_time.manual_set_time), -1);
+    gtk_box_append(
+        GTK_BOX(manual_box), GTK_WIDGET(state->system_time.manual_date));
+    gtk_box_append(
+        GTK_BOX(manual_box), GTK_WIDGET(state->system_time.manual_time));
+    gtk_box_append(
+        GTK_BOX(manual_box), GTK_WIDGET(state->system_time.manual_set_time));
     gtk_box_append(
         GTK_BOX(system_card),
         make_manual_setting_block(state, manual_box));
@@ -656,10 +727,31 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
         -1);
     gtk_widget_add_css_class(state->status_label, "page-status");
 
-    gtk_flow_box_insert(GTK_FLOW_BOX(lower), presentation_card, -1);
-    gtk_flow_box_insert(GTK_FLOW_BOX(lower), system_card, -1);
+    gtk_box_append(GTK_BOX(lower), presentation_card);
+    gtk_box_append(GTK_BOX(lower), system_card);
     gtk_box_append(GTK_BOX(page), lower);
     gtk_box_append(GTK_BOX(page), state->status_label);
+
+    SsDateTimeAdaptiveLayout *adaptive_layout =
+        g_new0(SsDateTimeAdaptiveLayout, 1);
+    adaptive_layout->hero_row = GTK_BOX(hero_top);
+    adaptive_layout->card_row = GTK_BOX(lower);
+    adaptive_layout->manual_row = GTK_BOX(manual_box);
+    g_object_set_data_full(
+        G_OBJECT(page),
+        "system-settings-date-time-adaptive-layout",
+        adaptive_layout,
+        g_free);
+    g_signal_connect(
+        page,
+        "notify::width",
+        G_CALLBACK(date_time_layout_width_changed),
+        adaptive_layout);
+    g_signal_connect(
+        page,
+        "map",
+        G_CALLBACK(date_time_layout_mapped),
+        adaptive_layout);
 
     g_signal_connect(
         state->clock_mode, "notify::selected",

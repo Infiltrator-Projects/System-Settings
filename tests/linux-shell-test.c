@@ -230,6 +230,21 @@ static void exercise_window(
     g_assert_true(subtree_has_label(root, "Clock system"));
     g_assert_true(subtree_has_label(root, "Manual date and time"));
 
+    /*
+     * Date & Time follows the same structural rule as Home: semantic peers are
+     * explicit boxes with width-driven orientation, not flow containers whose
+     * wrapping varies with fonts, locale or allocation details.
+     */
+    GtkWidget *date_time_hero_row =
+        find_widget_css_class(root, "date-time-hero-row");
+    GtkWidget *date_time_card_row =
+        find_widget_css_class(root, "date-time-card-row");
+    GtkWidget *manual_time_controls =
+        find_widget_css_class(root, "manual-time-controls");
+    g_assert_true(GTK_IS_BOX(date_time_hero_row));
+    g_assert_true(GTK_IS_BOX(date_time_card_row));
+    g_assert_true(GTK_IS_BOX(manual_time_controls));
+
     GtkDropDown *clock = GTK_DROP_DOWN(
         find_control_for_label(root, "Clock system", GTK_TYPE_DROP_DOWN));
     GtkSwitch *seconds = GTK_SWITCH(
