@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "shell-window.h"
 #include "shell-command.h"
+#include "home-status.h"
 
 #include <gtk/gtk.h>
 
@@ -339,6 +340,27 @@ int main(void)
     g_autofree gchar *manifest_path = NULL;
     g_autofree gchar *trusted_shell = NULL;
     ExerciseExpectations expectations = {0};
+    guint64 uptime_seconds = 0U;
+
+    /*
+     * Kernel uptime is machine text, not localized presentation. Protect that
+     * boundary directly so comma-decimal process locales cannot regress Home
+     * to locale-sensitive scanf parsing.
+     */
+    g_assert_true(ss_home_status_parse_uptime_seconds(
+        "59.99 100.00\n", &uptime_seconds));
+    g_assert_cmpuint(uptime_seconds, ==, 59U);
+    g_assert_true(ss_home_status_parse_uptime_seconds(
+        "3600 100.00\n", &uptime_seconds));
+    g_assert_cmpuint(uptime_seconds, ==, 3600U);
+    g_assert_false(ss_home_status_parse_uptime_seconds(
+        "59,99 100,00\n", &uptime_seconds));
+    g_assert_false(ss_home_status_parse_uptime_seconds(
+        "-1.00 100.00\n", &uptime_seconds));
+    g_assert_false(ss_home_status_parse_uptime_seconds(
+        "59. 100.00\n", &uptime_seconds));
+    g_assert_false(ss_home_status_parse_uptime_seconds(
+        "18446744073709551616.00 0.00\n", &uptime_seconds));
 
     g_assert_nonnull(root);
     module_dir = g_build_filename(root, "modules", NULL);

@@ -6,8 +6,8 @@
 
 #include "home-status.h"
 
+#include <errno.h>
 #include <locale.h>
-#include <stdio.h>
 
 #include <gio/gio.h>
 
@@ -56,19 +56,58 @@ static const char *network_connectivity_text(
     }
 }
 
+bool ss_home_status_parse_uptime_seconds(
+    const char *contents,
+    guint64 *seconds_out)
+{
+    char *end = NULL;
+    guint64 seconds;
+
+    if (contents == NULL || seconds_out == NULL ||
+        !g_ascii_isdigit(contents[0])) {
+        return false;
+    }
+
+    /*
+     * /proc/uptime is kernel-generated machine text: its first field is an
+     * ASCII decimal number with a period regardless of LC_NUMERIC. Using the
+     * process locale here made comma-decimal desktop locales parse only the
+     * integer prefix. Parse the integer seconds directly, then validate the
+     * optional ASCII fraction and field separator without involving locale.
+     */
+    errno = 0;
+    seconds = g_ascii_strtoull(contents, &end, 10);
+    if (errno == ERANGE || end == NULL || end == contents) {
+        return false;
+    }
+
+    if (*end == '.') {
+        ++end;
+        if (!g_ascii_isdigit(*end)) {
+            return false;
+        }
+        while (g_ascii_isdigit(*end)) {
+            ++end;
+        }
+    }
+    if (!g_ascii_isspace(*end)) {
+        return false;
+    }
+
+    *seconds_out = seconds;
+    return true;
+}
+
 static gchar *format_uptime(void)
 {
     g_autofree gchar *contents = NULL;
-    gsize length = 0U;
-    double seconds = 0.0;
+    guint64 total = 0U;
 
-    if (!g_file_get_contents("/proc/uptime", &contents, &length, NULL) ||
-        contents == NULL || sscanf(contents, "%lf", &seconds) != 1 ||
-        seconds < 0.0) {
+    if (!g_file_get_contents("/proc/uptime", &contents, NULL, NULL) ||
+        !ss_home_status_parse_uptime_seconds(contents, &total)) {
         return g_strdup("Unknown");
     }
 
-    const guint64 total = (guint64)seconds;
     const guint64 days = total / 86400U;
     const guint64 hours = (total % 86400U) / 3600U;
     const guint64 minutes = (total % 3600U) / 60U;

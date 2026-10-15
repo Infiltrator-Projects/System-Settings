@@ -5,6 +5,12 @@ history is preserved unchanged in [`CHANGELOG-legacy.md`](CHANGELOG-legacy.md).
 The 0.4.60-0.4.69 overlap is intentional: it closes gaps in the historical file
 while keeping the original record immutable.
 
+## 0.4.104 — 2026-10-15
+
+- Correct Home uptime parsing at the kernel-text boundary: `/proc/uptime` is now parsed as locale-independent ASCII instead of through locale-sensitive floating-point `sscanf`, preventing comma-decimal desktop locales from silently truncating the fractional field.
+- Add a focused regression to the existing Linux shell test for dotted fractions, integer fields, comma-decimal rejection, negative input, malformed fractions and integer overflow, keeping the defect permanently covered without adding another test target or ownership layer.
+- Re-audit architecture, source ownership, persistence/recovery, Common integration, build profiles, tests, CI, packaging, native/source installers, repository topology and exact-tested-artifact publication; retain deliberate transaction and standalone bootstrap complexity where it protects stronger correctness and recovery contracts.
+
 ## 0.4.103 — 2026-10-14
 
 - Stop the Home dashboard from inheriting precision-clock polling cadence: Home now suppresses seconds and refreshes its temporal summary once per minute instead of every 500–1000 ms, eliminating the continuous GTK measure/re-layout cycle behind the visible micro-jump and excessive CPU use.
