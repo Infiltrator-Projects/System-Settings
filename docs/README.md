@@ -6,6 +6,7 @@ This directory is the maintained engineering map for System Settings. Each docum
 
 ## Canonical documents
 
+- [Engineering philosophy](PHILOSOPHY.md) — governing engineering and documentation standard.
 - [ARCHITECTURE.md](ARCHITECTURE.md) — component boundaries, data flow, module lifecycle, concurrency and platform integration.
 - [DESIGN.md](DESIGN.md) — user-facing interaction model, navigation, search, apply behaviour, presentation and accessibility.
 - [UI-VISION.md](UI-VISION.md) — current visual north star and product-specific graphical direction; subordinate to Design, accessibility/platform requirements and Common's canonical design contract.
