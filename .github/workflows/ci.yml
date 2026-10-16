@@ -49,12 +49,12 @@ jobs:
           set -euo pipefail
           cd build
           cpack -G DEB
-          deb="$(find . -maxdepth 1 -type f -name 'infiltrator-system-settings_*.deb' -print -quit)"
+          deb="$(find . -maxdepth 1 -type f -name 'system-settings_*.deb' -print -quit)"
           test -n "$deb"
           cp "$deb" "$RUNNER_TEMP/system-settings-first.deb"
           rm -f "$deb"
           cpack -G DEB
-          deb="$(find . -maxdepth 1 -type f -name 'infiltrator-system-settings_*.deb' -print -quit)"
+          deb="$(find . -maxdepth 1 -type f -name 'system-settings_*.deb' -print -quit)"
           cmp "$RUNNER_TEMP/system-settings-first.deb" "$deb"
 
       - name: Validate reproducible native release assets
@@ -122,7 +122,7 @@ jobs:
           set -euo pipefail
           version="$(tr -d '[:space:]' < VERSION)"
           bundle="build/release-assets"
-          deb="$(find build -maxdepth 1 -type f -name "infiltrator-system-settings_${version}_*.deb" -print -quit)"
+          deb="$(find build -maxdepth 1 -type f -name "system-settings_${version}_*.deb" -print -quit)"
           native="build/source-assets-check/System-Settings-${version}-native.run"
           source="build/source-assets-check/System-Settings-${version}-source.zip"
           test -s "$deb"

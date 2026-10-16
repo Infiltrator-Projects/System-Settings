@@ -377,8 +377,8 @@ static bool find_debian_package(
         }
         if (strncmp(
                 entry->d_name,
-                "infiltrator-system-settings_",
-                strlen("infiltrator-system-settings_")) != 0 ||
+                "system-settings_",
+                strlen("system-settings_")) != 0 ||
             !ends_with(entry->d_name, ".deb")) {
             continue;
         }

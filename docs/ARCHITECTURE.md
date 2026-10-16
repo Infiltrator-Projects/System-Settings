@@ -490,7 +490,7 @@ System Settings owns configuration surfaces. It does not absorb mature project-o
 
 Current boundaries include:
 
-- Infiltrator Software owns package/software discovery, installation, removal, repositories, updates, history and package repair;
+- Software owns package/software discovery, installation, removal, repositories, updates, history and package repair;
 - System Monitor owns live monitoring, process/service inspection and performance telemetry;
 - Defragmenter owns filesystem analysis, defragmentation and recovery.
 

@@ -94,7 +94,7 @@ A coherent settings experience does not require every system tool to be embedded
 
 Rows that lead to an established specialised application should look intentional and should state the destination when that matters. Examples include:
 
-- Software / Updates → Infiltrator Software;
+- Software / Updates → Software;
 - live performance/process diagnostics → System Monitor;
 - filesystem defragmentation/recovery → Defragmenter.
 

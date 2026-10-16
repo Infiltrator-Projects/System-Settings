@@ -70,7 +70,7 @@ set(SYSTEM_SETTINGS_COMMON_DIR
 
 if(NOT EXISTS "${SYSTEM_SETTINGS_COMMON_DIR}/CMakeLists.txt" OR
    NOT EXISTS "${SYSTEM_SETTINGS_COMMON_DIR}/VERSION")
-    message(FATAL_ERROR "Pinned Infiltratr Common submodule is required.")
+    message(FATAL_ERROR "Pinned Libraries submodule is required.")
 endif()
 file(READ "${SYSTEM_SETTINGS_COMMON_DIR}/VERSION"
     SYSTEM_SETTINGS_COMMON_VERSION)
@@ -673,12 +673,15 @@ install(TARGETS system-settings-time
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 
 
-set(CPACK_PACKAGE_NAME "infiltrator-system-settings")
+set(CPACK_PACKAGE_NAME "system-settings")
 set(CPACK_PACKAGE_VENDOR "Infiltrator Projects")
 set(CPACK_PACKAGE_CONTACT "Shannon Smith <infiltratr@yandex.com>")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY
     "Native system-wide settings shell for Infiltrator applications")
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
+set(CPACK_DEBIAN_PACKAGE_PROVIDES "infiltrator-system-settings (= ${PROJECT_VERSION})")
+set(CPACK_DEBIAN_PACKAGE_BREAKS "infiltrator-system-settings (<< ${PROJECT_VERSION})")
+set(CPACK_DEBIAN_PACKAGE_REPLACES "infiltrator-system-settings (<< ${PROJECT_VERSION})")
 
 if(UNIX AND NOT APPLE)
     set(CPACK_GENERATOR "DEB")

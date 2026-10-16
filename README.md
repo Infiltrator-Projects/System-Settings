@@ -9,9 +9,9 @@ System Settings is a native cross-platform settings environment for Linux Mint/C
 The project takes the strongest part of the classic Amiga/Control Panel model — small focused preference tools with clear ownership — and combines it with the strongest part of a modern settings application — one consistent window, global search, deep links, shared navigation and predictable privilege handling.
 
 **Status:** Phase 1 in progress: Linux GTK4 Date & Time panel, portable model, and Linux/Windows policy persistence. Windows currently builds the policy CLI and tests, not a settings GUI. Dynamic modules, global search and deep links remain planned.
-**Primary targets:** Linux Mint/Cinnamon and Windows desktop  
-**Implementation:** native C/C++, using the strongest style for each component  
-**Shared foundation:** pinned Infiltratr Common 1.19.41\
+**Primary targets:** Linux Mint/Cinnamon and Windows desktop
+**Implementation:** native C/C++, using the strongest style for each component
+**Shared foundation:** pinned Libraries 1.19.41\
 **Licence:** GPL-3.0-or-later
 
 ## UI North Star

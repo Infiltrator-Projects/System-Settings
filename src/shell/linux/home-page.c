@@ -659,7 +659,7 @@ GtkWidget *ss_linux_home_page_new(const SsHomePageContext *context)
             updates_button,
             "infiltrator-software",
             NULL,
-            "Infiltrator Software is not installed.");
+            "Software is not installed.");
         gtk_box_append(GTK_BOX(overview_heading), updates_button);
     }
     gtk_box_append(GTK_BOX(overview), overview_heading);

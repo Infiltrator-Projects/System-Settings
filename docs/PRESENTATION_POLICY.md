@@ -123,9 +123,9 @@ That includes, where applicable:
 - Software history;
 - System Monitor event/process timestamps;
 - Calendar presentation;
-- Runner Monitor histories;
+- RunnerScope histories;
 - Defragmenter operation history;
-- MBLink/Jaglink/LINK user-facing capture/event times;
+- MBLink/Jaglink/Link user-facing capture/event times;
 - settings diagnostics;
 - future file-manager and desktop surfaces.
 

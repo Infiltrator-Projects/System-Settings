@@ -121,7 +121,7 @@ This file records durable architectural choices for System Settings.
 
 **Rationale.** Software management, live monitoring and filesystem defragmentation are substantial products with their own engines, validation and safety contracts. Duplicating them inside Settings would create two authorities and eventually inconsistent behaviour.
 
-**Consequence.** Infiltrator Software remains the owner of package/software/update workflows, System Monitor remains the owner of live monitoring, and Defragmenter remains the owner of filesystem defragmentation/recovery. Settings may own configuration adjacent to those domains and provide intentional launch/deep-link entry points.
+**Consequence.** Software remains the owner of package/software/update workflows, System Monitor remains the owner of live monitoring, and Defragmenter remains the owner of filesystem defragmentation/recovery. Settings may own configuration adjacent to those domains and provide intentional launch/deep-link entry points.
 
 
 ## ADR-015 — Canonical data is separate from system-wide presentation policy
