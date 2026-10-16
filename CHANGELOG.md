@@ -5,6 +5,10 @@ history is preserved unchanged in [`CHANGELOG-legacy.md`](CHANGELOG-legacy.md).
 The 0.4.60-0.4.69 overlap is intentional: it closes gaps in the historical file
 while keeping the original record immutable.
 
+## 0.4.105 — 2026-10-16
+
+- Move the governing engineering philosophy into `docs/PHILOSOPHY.md` and update maintained documentation references.
+
 ## 0.4.104 — 2026-10-15
 
 - Correct Home uptime parsing at the kernel-text boundary: `/proc/uptime` is now parsed as locale-independent ASCII instead of through locale-sensitive floating-point `sscanf`, preventing comma-decimal desktop locales from silently truncating the fractional field.
