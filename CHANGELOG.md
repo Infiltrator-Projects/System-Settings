@@ -5,6 +5,10 @@ history is preserved unchanged in [`CHANGELOG-legacy.md`](CHANGELOG-legacy.md).
 The 0.4.60-0.4.69 overlap is intentional: it closes gaps in the historical file
 while keeping the original record immutable.
 
+## 0.4.107 - 2026-10-17
+
+- Use canonical alpha product and package identities without migration aliases.
+
 ## 0.4.105 — 2026-10-16
 
 - Move the governing engineering philosophy into `docs/PHILOSOPHY.md` and update maintained documentation references.
@@ -78,7 +82,7 @@ while keeping the original record immutable.
 
 ## 0.4.92 — 2026-10-13
 
-- Replace the product-local Calendar/GObject runtime loader with Common 1.19.41's stronger POSIX date-provider contract. System Settings now consumes the stable bounded `calendar_plus_format_date_v1` ABI, removing duplicated trusted-root discovery, retry state, object caching, test hooks, direct `dl` ownership and the `RTLD_NODELETE` lifetime workaround.
+- Replace the product-local Calendar/GObject runtime loader with Common 1.19.41's stronger POSIX date-provider contract. System Settings now consumes the stable bounded `calendar_format_date_v1` ABI, removing duplicated trusted-root discovery, retry state, object caching, test hooks, direct `dl` ownership and the `RTLD_NODELETE` lifetime workaround.
 - Remove stale compatibility and white-box surfaces left by earlier iterations: the hidden GTK constructor alias, two same-translation-unit private headers, unused shell path fallbacks and process-environment module/UI resource overrides. The shell regression now injects its manifest root explicitly and links only through the shell boundary.
 - Reconcile lock-budget comments/callers with the actual platform contracts, replace the old Calendar provider regression with a Common/Calendar integration fixture, and re-document the resulting dependency, validation and runtime-ownership boundaries.
 

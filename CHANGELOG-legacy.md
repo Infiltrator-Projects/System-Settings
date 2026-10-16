@@ -56,7 +56,7 @@
 - Route the Home “Check for updates” action through the same fixed trusted-system executable resolver used by navigation and Quick Actions instead of falling back to `PATH` lookup.
 - Align Date & Time row/tile/page spacing directly with Common `InfiltratrDesignMetrics`, and reduce shell page crossfade to the 110 ms cadence already used by the InfiltratorOS desktop family.
 - Correct maintained architecture/presentation documentation left behind by earlier iterations: Common owns all clock rendering, Calendar supplies only non-Gregorian date previews, and failed optional-runtime discovery backs off from 5 seconds to a 60-second ceiling.
-- Re-verified the exact Common 1.19.38 pin `7070c5812b50821fd7580101cb2289a3184f6b2c` against current `Infiltrator-Libraries` main; no gitlink movement is required.
+- Re-verified the exact Common 1.19.38 pin `7070c5812b50821fd7580101cb2289a3184f6b2c` against current `Libraries` main; no gitlink movement is required.
 
 ## 0.4.53 — 2026-10-03
 
@@ -71,7 +71,7 @@
 - Back off failed optional Calendar-runtime discovery exponentially to a 60-second ceiling instead of rescanning trusted library roots every five seconds on the GTK thread.
 - Bring Home and Date & Time geometry back onto the current Common design values (18 px panel radius, 12 px card radius, 10 px control radius, 20 px screen padding) and reserve Common warning gold for actual warning semantics instead of decorative accents.
 - Align the UI vision document with the canonical Infiltrator design contract: System/Day/Night follow Common semantic palettes and metrics, while product identity remains in genuine product assets rather than ad-hoc colour splits.
-- Re-verified that the pinned Common 1.19.38 commit `7070c5812b50821fd7580101cb2289a3184f6b2c` is the current `Infiltrator-Libraries` main head; no submodule movement is required.
+- Re-verified that the pinned Common 1.19.38 commit `7070c5812b50821fd7580101cb2289a3184f6b2c` is the current `Libraries` main head; no submodule movement is required.
 
 ## 0.4.51 — 2026-10-03
 
@@ -144,7 +144,7 @@
 - Validate geocoder coordinates, country-code capacity, UTF-8 and locality-query length before search results enter the settings UI.
 - Resolve delegated Linux settings tools only from fixed system executable roots and sanitize the native/source packaging tool search path.
 - Add regressions for locality I/O classification, preservation of unreadable recovery journals, lock timeout behaviour and Date & Time preview cadence.
-- Update current documentation to the pinned Infiltratr Common 1.19.38 and the hardened Calendar runtime-discovery contract.
+- Update current documentation to the pinned Libraries 1.19.38 and the hardened Calendar runtime-discovery contract.
 
 ## 0.4.43 — 2026-09-29
 
@@ -156,7 +156,7 @@
 - Add a real forked two-process locality transaction race regression and assert the accessibility labels that the dedicated accessibility CI job is intended to protect.
 - Require actual GCC .gcda training data before a build may identify itself as native, in addition to the existing native/LTO/profile-use flag checks.
 - Restrict the optional Calendar preview bridge to explicit system library roots and exercise the full native build/test/package path in CI.
-- Pin Infiltratr Common 1.19.38 for the latest temporal coordinate validation and POSIX hardening.
+- Pin Libraries 1.19.38 for the latest temporal coordinate validation and POSIX hardening.
 
 <!-- SPDX-License-Identifier: GPL-3.0-or-later -->
 
@@ -271,7 +271,7 @@
 - Protect dirty manual date/time entry from unrelated timedated property refreshes until the manual write succeeds.
 - Make locality/custom-coordinate persistence rollback the temporal policy when metadata persistence fails, and keep locality metadata aligned to the authoritative current system zone until a requested zone change is actually observed.
 - Remove Australia-only Home presentation assumptions and display the active locale truthfully.
-- Keep Home quick navigation and the selected sidebar row in sync, disable the updates affordance when Infiltrator Software is absent, and avoid duplicate uname calls.
+- Keep Home quick navigation and the selected sidebar row in sync, disable the updates affordance when Software is absent, and avoid duplicate uname calls.
 - Reassert the shell/module boundary by removing locality-metadata ownership from main.c and extending the configure-time ownership guard.
 - Expand shell regression coverage for navigation synchronisation, search filtering, live Home sources and neutral missing-asset behaviour.
 - Prefer BigBedroom for non-release Linux CI, with REST/pinned-Common checkout support for runners without Git; immutable release validation remains hosted.
@@ -292,38 +292,38 @@
 
 ## 0.4.33 — 2026-09-26 — finish temporal selector clarity audit
 
-- Pin System Settings to released Infiltratr Common 1.19.36 at `5e129851bbd7ac0b94bd8c2f48f32924016bdbda`.
+- Pin System Settings to released Libraries 1.19.36 at `5e129851bbd7ac0b94bd8c2f48f32924016bdbda`.
 - Replace specialist shorthand in ancient/historical clock and calendar selectors with plain-language descriptions of the actual model, epoch or day boundary.
 - Keep all persisted temporal IDs and chronology behaviour unchanged; this is a clarity/accuracy-of-description release.
 
 ## 0.4.32 — 2026-09-26 — complete temporal clarity audit
 
-- Pin System Settings to released Infiltratr Common 1.19.35 at `7cc5de3de0e94ed2cfcff0840bbb5346eb5c9c9f`.
+- Pin System Settings to released Libraries 1.19.35 at `7cc5de3de0e94ed2cfcff0840bbb5346eb5c9c9f`.
 - Expose clearer model/epoch labels for the full clock and calendar catalogue, especially ancient and historical systems.
 - Consume native elapsed hierarchies for Chinese shíchén, Edo unequal hours and ancient Babylonian ūmu/bēru/UŠ.
 
 ## 0.4.31 — 2026-09-26 — audited temporal models
 
-- Pin System Settings to released Infiltratr Common 1.19.34 at `1467755d088d740b873660a8f0c9a515e9a39046`.
+- Pin System Settings to released Libraries 1.19.34 at `1467755d088d740b873660a8f0c9a515e9a39046`.
 - Present historically distinct early-Edo sunrise/sunset and late-Edo 1797 twilight clocks as separate choices rather than one ambiguous Edo mode.
 - Use clearer clock/calendar labels that expose approximations, continuation rules, computational models and bounded data ranges where they materially affect interpretation.
 
 ## 0.4.30 — 2026-09-26 — remove redundant modern Italian mode
 
-- Pin System Settings to released Infiltratr Common 1.19.32 at `ba9386fad1944d3e575a28346a46f85108326051`.
+- Pin System Settings to released Libraries 1.19.32 at `ba9386fad1944d3e575a28346a46f85108326051`.
 - Remove the duplicate Modern Italian civil-time entry from the clock-system selector; standard 24-hour time already represents modern Italian civil time.
 - Retain Historical Italian hours only for the sunset-origin historical clock system.
 
 ## 0.4.29 — 2026-09-26 — separate historical clock systems
 
-- Pin System Settings to Infiltratr Common 1.19.31 at `fd51905f3cea1f051e1163fbdeea8b62b7069833`.
+- Pin System Settings to Libraries 1.19.31 at `fd51905f3cea1f051e1163fbdeea8b62b7069833`.
 - Add an explicit Modern Italian civil-time choice, leaving historical Italian hours clearly labelled as the sunset-origin 24-hour system.
 - Separate Renaissance European “Babylonian hours” from ancient Babylonian bēru/UŠ timekeeping.
 - Split the historical Nürnberg Great Clock with its fixed Wendetage from the location-aware Nuremberg-style solar reconstruction.
 
 ## 0.4.28 — 2026-09-26 — clarify and correct historical clocks
 
-- Pin the Date & Time clock catalogue to released Infiltratr Common 1.19.30 at `9a9fae5b3f0d133d400310cdd316b21129631429`.
+- Pin the Date & Time clock catalogue to released Libraries 1.19.30 at `9a9fae5b3f0d133d400310cdd316b21129631429`.
 - Rename the old Italian option to make clear that it is the historical 24-equal-hour sunset-origin system, not modern Italian civil time.
 - Rename the sunrise-origin European "Babylonian hours" option as the Renaissance convention and add a separate Ancient Babylonian seasonal-hours option with twelve daylight and twelve night simānu.
 - Correct Nuremberg time to the discrete Wendetag day/night allocation instead of resetting its equal-hour count at every actual sunrise and sunset.
@@ -331,7 +331,7 @@
 
 ## 0.4.27 — 2026-09-26 — historical time hierarchy correction
 
-- Pin the System Settings Common submodule to released Infiltratr Common 1.19.29 at `13b824e4c4e266426590d86597249a89d18ec2f0`.
+- Pin the System Settings Common submodule to released Libraries 1.19.29 at `13b824e4c4e266426590d86597249a89d18ec2f0`.
 - Present Chinese hundred-kè time as native `NN刻` rather than redundant `刻 NN/100` notation.
 - Supply the corrected shared Roman elapsed-duration hierarchy to Common-aware consumers, where complete seasonal day/night cycles collapse into `dies` before residual horae, vigiliae and unciae.
 - Keep the generic hundred-kè mode at kè precision rather than fabricating a dynasty-specific finer subdivision.
@@ -426,7 +426,7 @@
 - Replace flat theme swatches with miniature graphical desktop/window previews
   for Light, Dark, Follow OS and Mercedes Grey.
 - Add the north-star-style Check for updates affordance to System Overview and
-  wire it to the real Infiltrator Software application.
+  wire it to the real Software application.
 - Reduce the heavy hero text panel to a translucent gradient and add deeper
   blue/grey card gradients and subtle glow without changing native controls.
 - Install the visual pack under /usr/share/infiltrator/system-settings/ui.
@@ -489,7 +489,7 @@
 - Keep Home and Date & Time native inside System Settings while wiring the
   remaining visible categories to real installed system tools: region/language,
   themes, sound, network, Bluetooth, power, users, privacy and hardware.
-- Route Software & Updates to the real Infiltrator Software application and
+- Route Software & Updates to the real Software application and
   move About into the same visual navigation language as the target.
 - Alternate warm-gold and cyan icon accents, enlarge the navigation treatment
   and keep unavailable external tools visibly disabled rather than pretending
@@ -641,7 +641,7 @@ No unreleased changes.
 
 ## 0.4.3 — 2026-09-24
 
-- Pin Infiltratr Common 1.19.25 and make its complete shared clock formatter the Date & Time preview authority for every explicit clock mode.
+- Pin Libraries 1.19.25 and make its complete shared clock formatter the Date & Time preview authority for every explicit clock mode.
 - Remove Calendar as a requirement for specialised clock previews; Calendar remains the optional chronology provider for non-Gregorian date previews.
 - Preserve the platform-owned legacy Standard mode by resolving it through Cinnamon's current 12/24-hour choice before entering the shared formatter.
 
@@ -683,7 +683,7 @@ No unreleased changes.
 
 ## 0.3.17 — 2026-09-22
 
-- Pin Infiltratr Common 1.19.24, adopting the hardened temporal-policy parser, bounded POSIX temporal document reads and safer atomic persistence path introduced after 1.19.20.
+- Pin Libraries 1.19.24, adopting the hardened temporal-policy parser, bounded POSIX temporal document reads and safer atomic persistence path introduced after 1.19.20.
 - Make Windows temporal-policy loading recover from empty, oversized and malformed per-user policy files in the same way as Linux instead of preventing Date & Time initialisation; add a native Windows regression test for missing, corrupt, valid and saved policy states.
 - Preserve the authoritative current timedated zone in the Linux selector even when it is a valid tzdata alias omitted from zone.tab/zone1970.tab, with deterministic alias regression coverage.
 - Route conventional 12/24-hour mirroring through the canonical Cinnamon/GNOME compatibility writer instead of bypassing its GNOME clock-format update.
@@ -702,7 +702,7 @@ No unreleased changes.
 
 ## 0.3.15 — 2026-09-21
 
-- Fix Calendar runtime discovery for the Date & Time live preview. The bridge now prefers trusted system library locations, including Debian/Mint multiarch directories, instead of relying only on the process loader finding `libcalendar-plus.so.0` by bare soname.
+- Fix Calendar runtime discovery for the Date & Time live preview. The bridge now prefers trusted system library locations, including Debian/Mint multiarch directories, instead of relying only on the process loader finding `libcalendar.so.0` by bare soname.
 - Retry Calendar runtime discovery while System Settings remains open, so installing or upgrading Calendar no longer leaves specialised clock/calendar previews permanently unavailable until the settings application is restarted.
 - Treat specialised clock and chronology capabilities independently, so a missing chronology entry point cannot unnecessarily disable an otherwise valid clock-preview runtime, and vice versa.
 - Add an executable runtime-bridge fixture test covering Internet Time and Positivist date rendering through the same dynamic ABI used by the real application.

@@ -27,7 +27,7 @@ static void write_text(const char *path, const char *text)
 
 int main(void)
 {
-    char root[] = "/tmp/infiltrator-system-settings-policy-XXXXXX";
+    char root[] = "/tmp/system-settings-policy-XXXXXX";
     char directory[512];
     char path[640];
     InfiltratrTemporalPolicyV3 policy;

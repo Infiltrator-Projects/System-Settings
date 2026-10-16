@@ -3,7 +3,7 @@
 
 #include <string.h>
 
-bool calendar_plus_format_date_v1(
+bool calendar_format_date_v1(
     const char *calendar_id,
     int32_t gregorian_year,
     int32_t gregorian_month,
@@ -13,7 +13,7 @@ bool calendar_plus_format_date_v1(
     size_t capacity,
     size_t *length);
 
-bool calendar_plus_format_date_v1(
+bool calendar_format_date_v1(
     const char *calendar_id,
     int32_t gregorian_year,
     int32_t gregorian_month,

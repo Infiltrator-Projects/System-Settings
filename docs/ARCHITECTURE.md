@@ -164,9 +164,9 @@ use GLib's local date formatter. Calendar remains the chronology/date-rendering
 authority for non-Gregorian previews, while Common owns the optional POSIX
 runtime bridge used to reach it.
 
-The bridge is the stable bounded pure-C `calendar_plus_format_date_v1` contract.
+The bridge is the stable bounded pure-C `calendar_format_date_v1` contract.
 Common validates the selected calendar identifier, discovers only trusted
-system-owned `libcalendar-plus.so.0` files in explicit library roots (including
+system-owned `libcalendar.so.0` files in explicit library roots (including
 the compile-time multiarch child), binds the versioned renderer, validates its
 bounded UTF-8 output and throttles failed discovery to at most once per minute.
 There is no bare-soname fallback through environment-controlled loader search

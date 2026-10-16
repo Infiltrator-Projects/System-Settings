@@ -761,7 +761,7 @@ static GtkWidget *build_sidebar(
         "Software & Updates",
         "Updates, drivers & repositories",
         "software updates drivers repositories packages",
-        "infiltrator-software",
+        "software",
         NULL);
     about_row = make_about_navigation_row();
 

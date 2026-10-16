@@ -657,7 +657,7 @@ GtkWidget *ss_linux_home_page_new(const SsHomePageContext *context)
         gtk_widget_add_css_class(updates_button, "overview-link-button");
         (void)connect_program_action(
             updates_button,
-            "infiltrator-software",
+            "software",
             NULL,
             "Software is not installed.");
         gtk_box_append(GTK_BOX(overview_heading), updates_button);
@@ -735,7 +735,7 @@ GtkWidget *ss_linux_home_page_new(const SsHomePageContext *context)
             "system-software-install-symbolic",
             "Software & Updates",
             "Apps, packages & updates",
-            "infiltrator-software",
+            "software",
             NULL),
         1, 1, 1, 1);
     gtk_box_append(GTK_BOX(quick), quick_grid);

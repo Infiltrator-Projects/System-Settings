@@ -56,4 +56,4 @@ foreach(SYSTEM_SETTINGS_FONT_INDEX RANGE 0 2)
 endforeach()
 
 install(FILES ${SYSTEM_SETTINGS_FONT_FILES}
-    DESTINATION "${CMAKE_INSTALL_DATADIR}/fonts/truetype/infiltrator-system-settings")
+    DESTINATION "${CMAKE_INSTALL_DATADIR}/fonts/truetype/system-settings")
