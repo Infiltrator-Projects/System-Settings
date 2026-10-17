@@ -4,17 +4,17 @@
 
 ## Status and authority
 
-This is a specialist design note subordinate to [PRESENTATION_POLICY.md](PRESENTATION_POLICY.md). It defines how System Settings and Common-aware applications should present historical clock systems whose attested units are coarser or structurally different from modern `HH:MM:SS` time.
+This is a specialist design note subordinate to [PRESENTATION_POLICY.md](PRESENTATION_POLICY.md). It defines how System Settings and Common-aware applications should present historical clock and calendar systems whose attested units, eras or notation differ from modern civil time.
 
-It does **not** make any clock mode supported merely by documenting it. A historical clock is selectable only after its owning model, shared registry entry, formatter, boundary scheduling and validation are implemented and released.
+It does **not** make any historical mode supported merely by documenting it. A calendar or clock is selectable only after its owning model, shared registry entry, formatter/converter, boundary scheduling where required and validation are implemented and released.
 
 Calendar owns historical chronology/time-model evidence. System Settings owns the user-facing selection and presentation policy. Common owns reusable formatting mechanics. Applications retain their canonical timestamps.
 
-For the planned Ancient Egyptian mode, the historical evidence and reconstruction boundaries are maintained in Calendar's `docs/EGYPTIAN_TIMEKEEPING.md`.
+For Egypt, the full historical catalogue and reconstruction boundaries are maintained in Calendar's `docs/EGYPTIAN_CHRONOLOGY_AND_TIMEKEEPING.md`.
 
 ## Governing rule
 
-Historical presentation must not manufacture precision by inventing historical units.
+Historical presentation must not manufacture precision or uniformity by inventing historical units, eras or pairings.
 
 If a historical system attests hours but not minutes or seconds, System Settings must not turn a modern timestamp such as
 
@@ -30,6 +30,8 @@ Egyptian 5:37:18
 
 unless the `37` and `18` correspond to historically supported units under the owning model.
 
+Likewise, if a historical date normally used regnal years, System Settings must not imply that a convenient modern continuous era was the ordinary historical year notation.
+
 At the same time, presentation must not destroy the precision of the canonical timestamp merely because the historical notation is coarse.
 
 These are separate concerns:
@@ -40,7 +42,7 @@ canonical instant
         |
         v
 historical model
-    determines authentic/native unit and boundaries
+    determines authentic/native units, era and boundaries
         |
         v
 presentation context
@@ -48,15 +50,16 @@ presentation context
     explicitly modern precision extension
 ```
 
-## Three evidence classes
+## Evidence classes
 
-A historical clock renderer should be able to identify every visible component as one of:
+A historical renderer should be able to identify every visible component as one of:
 
 1. **attested** — supported by historical evidence or strong specialist scholarship;
 2. **reconstructed** — a documented computational choice necessary to make incomplete evidence deterministic;
-3. **modern precision extension** — a modern representation used to expose the position of an exact timestamp inside a historically attested unit.
+3. **modern precision extension** — a modern representation used to expose the position of an exact timestamp inside a historically attested unit;
+4. **foreign system used in the region** — historically present but not to be relabelled as an indigenous system.
 
-A modern precision extension must never be named or styled so that a reasonable reader could mistake it for attested historical notation.
+A reconstruction or modern precision extension must never be named or styled so that a reasonable reader could mistake it for attested historical notation.
 
 ## Context-sensitive precision
 
@@ -66,7 +69,7 @@ The same canonical instant may legitimately be rendered differently in different
 
 A panel clock, live preview or casual date/time label should prefer the historically attested granularity of the selected system.
 
-For a future Egyptian temporal clock, a normal English rendering may therefore be similar to:
+For a future New Kingdom Egyptian temporal clock, a normal English rendering may therefore be similar to:
 
 ```text
 5th hour of the night
@@ -106,25 +109,43 @@ It must not:
 - assume historical day/night hours had fixed SI durations;
 - infer minutes or seconds because a modern display context requests them;
 - substitute another culture's subdivisions because they are numerically convenient;
-- flatten different day and night systems into one 24-hour sequence when the historical model does not support that interpretation.
+- flatten different day and night systems into one 24-hour sequence when the historical model does not support that interpretation;
+- apply one era's calendar name, clock method or month vocabulary universally across a civilisation's entire history.
 
-## Planned Ancient Egyptian presentation
+## Egyptian systems are a family, not one mode
 
-### User-facing name
+System Settings must not present one generic **Ancient Egyptian** calendar or clock when Calendar has admitted more historically precise models.
 
-The eventual selector label should expose the reconstruction rather than claim universality. A suitable form is:
+The historical catalogue includes, among other things:
+
+- the wandering 365-day Egyptian civil calendar;
+- historical regnal-year dating layered on civil month/day coordinates;
+- lunar/lunistellar date-keeping whose exact status and regulation vary by period and remain partly disputed;
+- the late Papyrus Carlsberg 9 lunar scheme;
+- the Canopus reform attempt;
+- the successful Alexandrian/Augustan leap-year reform;
+- the Nabonassar astronomical era using Egyptian 365-day years;
+- Middle Kingdom stellar/decanal material;
+- New Kingdom shadow, sundial and water-clock timekeeping;
+- later Ptolemaic/Roman seasonal and scientific equal-hour conventions.
+
+Some of these are currently implementable, some are research-blocked, and some are foreign conventions used in Egypt rather than native Egyptian systems. Calendar's specialist document owns those classifications.
+
+### Current Egyptian calendar mode
+
+The currently implemented `egyptian-nabonassar` calendar is not to be shortened to a historically vague label in specialist UI/help. It is the Egyptian wandering civil structure with **Nabonassar-era astronomical year numbering**.
+
+That is a valid deterministic calendar model, but it is not the same thing as ordinary pharaonic regnal dating.
+
+### Future New Kingdom temporal clock
+
+A suitable eventual selector label is:
 
 ```text
 Ancient Egyptian temporal time — New Kingdom civil reconstruction
 ```
 
-A shorter selector string may be used if layout requires it, but the detail/help text must preserve the New Kingdom-centred scope and the fact that it is a reconstruction.
-
-The generic label **"Ancient Egyptian time"** by itself is too broad for specialist documentation because the evidence spans different periods and observational methods.
-
-### Historical display
-
-The planned model should use separate ordinal day/night hours, for example:
+The model should use separate ordinal day/night hours, for example:
 
 ```text
 3rd hour of the day
@@ -133,7 +154,19 @@ The planned model should use separate ordinal day/night hours, for example:
 
 The transliterated Egyptian term `wnwt` may appear in explanatory material, but the UI must not fabricate pseudo-hieroglyphic timestamp syntax.
 
-### Precision display
+### Future Alexandrian calendar
+
+If implemented, the reformed Augustan calendar should be labelled separately from both the wandering pharaonic civil calendar and the later Coptic era, for example:
+
+```text
+Egyptian Alexandrian calendar — Augustan reform
+```
+
+### Research-blocked Egyptian modes
+
+A lunar, decanal or Ramesside stellar provider must not appear merely because a plausible algorithm can be invented. If Calendar marks the model as disputed or not admission-ready, System Settings must not expose it as settled historical fact.
+
+## Precision display for Egyptian temporal hours
 
 The historical model may expose an exact dimensionless phase through the current `wnwt`:
 
@@ -151,15 +184,17 @@ For such a clock mode, `show-seconds` may instead increase the precision of an e
 
 This behaviour must be documented per clock mode and regression-tested; a global boolean must not override historical semantics.
 
-### Date and time independence
+## Date and time independence
 
 The selected calendar and clock remain independent presentation dimensions.
 
-Selecting Calendar's Ptolemaic/Nabonassar-era Egyptian civil calendar together with the planned New Kingdom-centred Egyptian temporal clock is allowed as a user presentation combination, but System Settings must not describe that pair as a single historically attested timestamp standard. The two models are based on evidence from different historical contexts.
+A user may intentionally combine models from different Egyptian periods. For example, Calendar's Ptolemaic/Nabonassar-era year count could be displayed with a New Kingdom-centred temporal clock. System Settings may allow that because calendar and clock are independent policies, but it must not describe the pair as one historically attested timestamp standard.
+
+The same rule applies when a user combines an Egyptian calendar with a Roman, Babylonian, French Republican or modern clock, or an Egyptian clock with another calendar.
 
 ## Unavailable and ambiguous states
 
-Historical clocks may legitimately be unavailable when their required physical or evidential conditions cannot be established.
+Historical clocks/calendars may legitimately be unavailable when their required physical or evidential conditions cannot be established.
 
 System Settings must display that state honestly rather than silently falling back to a plausible-looking historical value.
 
@@ -167,40 +202,49 @@ Examples include:
 
 - a location-dependent clock with no valid coordinates;
 - a solar boundary that does not exist at the configured latitude/date;
-- a future stellar/decanal model without the required era-specific data;
-- a historical model that deliberately treats a twilight interval as outside numbered hours.
+- a stellar/decanal model without the required era-specific data;
+- a historical model that deliberately treats a twilight interval as outside numbered hours;
+- a regnal formatter without sufficient ruler/accession chronology;
+- an observational lunar model when the required observational rule cannot be determined.
 
-A conventional fallback may be offered as a separate clearly identified presentation, but must not masquerade as output from the selected historical clock.
+A conventional fallback may be offered as a separate clearly identified presentation, but must not masquerade as output from the selected historical model.
 
 ## Help and provenance
 
-Historical clock modes should expose concise user-facing provenance/help sufficient to answer:
+Historical modes should expose concise user-facing provenance/help sufficient to answer:
 
 - what period or convention is being modelled;
-- which units are historically attested;
-- which boundaries are reconstructed;
-- whether geographic location is required;
+- which units/era are historically attested;
+- which boundaries or continuations are reconstructed;
+- whether geographic location or astronomical observation is required;
 - whether any finer precision is a modern interpolation;
+- whether the mode is indigenous, reformed, or a foreign convention used in the region;
 - where the specialist model documentation lives.
 
 This is especially important for systems whose familiar modern name hides substantial scholarly uncertainty or multiple historical practices.
 
 ## Acceptance requirements
 
-A historical clock must not be exposed by System Settings until tests prove at least:
+A historical mode must not be exposed by System Settings until tests prove at least:
 
 - the shared registry label identifies the intended historical model accurately;
-- the preview renders a real value from the owning formatter rather than a mode name;
+- the preview renders a real value from the owning formatter/converter rather than a mode name;
 - native historical units are not replaced by modern `HH:MM:SS` assumptions;
+- historical year eras are not silently substituted for regnal or other attested year labels;
 - canonical timestamps remain unchanged;
 - precision-sensitive contexts can distinguish nearby instants without inventing historical units;
 - `show-seconds` cannot manufacture unsupported second notation;
-- missing geographic/astronomical inputs produce an explicit unavailable state;
+- missing geographic/astronomical/historical inputs produce an explicit unavailable state;
 - help/provenance identifies reconstructions and modern extensions;
 - Calendar, Common and System Settings agree on the same stable provider identity and semantics.
 
-## Ancient Egyptian admission state
+## Egyptian admission state
 
-At the time this document is written, the Ancient Egyptian temporal clock is **planned, not supported**. The currently published clock catalogue must remain unchanged until Calendar/Common implement and validate the model.
+At the time this document is written:
 
-Documentation is being recorded first so the eventual code has a falsifiable historical contract rather than acquiring behaviour by convenience and documenting it afterwards.
+- `egyptian-nabonassar` is the implemented Egyptian calendar mode;
+- the New Kingdom civil temporal clock is documented/planned, not supported;
+- an Alexandrian reformed calendar is historically well-defined enough to be a future candidate but is not yet declared supported here;
+- lunar, regnal and stellar/decanal Egyptian providers remain research or data work until Calendar's admission requirements are satisfied.
+
+Documentation is recorded first so eventual code has a falsifiable historical contract rather than acquiring behaviour by convenience and documenting it afterwards.
