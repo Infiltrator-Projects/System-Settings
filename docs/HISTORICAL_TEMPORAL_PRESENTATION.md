@@ -10,7 +10,7 @@ It does **not** make any historical mode supported merely by documenting it. A c
 
 Calendar owns historical chronology/time-model evidence. System Settings owns the user-facing selection and presentation policy. Common owns reusable formatting mechanics. Applications retain their canonical timestamps.
 
-For Egypt, the full historical catalogue and reconstruction boundaries are maintained in Calendar's `docs/EGYPTIAN_CHRONOLOGY_AND_TIMEKEEPING.md`.
+For native ancient Egyptian systems, the authoritative historical catalogue and reconstruction boundaries are maintained in Calendar's `docs/EGYPTIAN_CHRONOLOGY_AND_TIMEKEEPING.md`.
 
 ## Governing rule
 
@@ -56,8 +56,7 @@ A historical renderer should be able to identify every visible component as one 
 
 1. **attested** — supported by historical evidence or strong specialist scholarship;
 2. **reconstructed** — a documented computational choice necessary to make incomplete evidence deterministic;
-3. **modern precision extension** — a modern representation used to expose the position of an exact timestamp inside a historically attested unit;
-4. **foreign system used in the region** — historically present but not to be relabelled as an indigenous system.
+3. **modern precision extension** — a modern representation used to expose the position of an exact timestamp inside a historically attested unit.
 
 A reconstruction or modern precision extension must never be named or styled so that a reasonable reader could mistake it for attested historical notation.
 
@@ -69,7 +68,7 @@ The same canonical instant may legitimately be rendered differently in different
 
 A panel clock, live preview or casual date/time label should prefer the historically attested granularity of the selected system.
 
-For a future New Kingdom Egyptian temporal clock, a normal English rendering may therefore be similar to:
+For a future Egyptian seasonal night-hour clock, a normal English rendering may therefore be similar to:
 
 ```text
 5th hour of the night
@@ -110,65 +109,69 @@ It must not:
 - infer minutes or seconds because a modern display context requests them;
 - substitute another culture's subdivisions because they are numerically convenient;
 - flatten different day and night systems into one 24-hour sequence when the historical model does not support that interpretation;
-- apply one era's calendar name, clock method or month vocabulary universally across a civilisation's entire history.
+- apply one era's calendar name, clock method or month vocabulary universally across ancient Egyptian history.
 
-## Egyptian systems are a family, not one mode
+## Native Egyptian systems are a family, not one mode
 
-System Settings must not present one generic **Ancient Egyptian** calendar or clock when Calendar has admitted more historically precise models.
+System Settings must not present one generic **Ancient Egyptian** calendar or clock once Calendar has admitted more historically precise models.
 
-The historical catalogue includes, among other things:
+For project purposes, the native Egyptian historical catalogue contains exactly the following five date-system families and five time-system families.
 
-- the wandering 365-day Egyptian civil calendar;
-- historical regnal-year dating layered on civil month/day coordinates;
-- lunar/lunistellar date-keeping whose exact status and regulation vary by period and remain partly disputed;
-- the late Papyrus Carlsberg 9 lunar scheme;
-- the Canopus reform attempt;
-- the successful Alexandrian/Augustan leap-year reform;
-- the Nabonassar astronomical era using Egyptian 365-day years;
-- Middle Kingdom stellar/decanal material;
-- New Kingdom shadow, sundial and water-clock timekeeping;
-- later Ptolemaic/Roman seasonal and scientific equal-hour conventions.
+### Native Egyptian date systems
 
-Some of these are currently implementable, some are research-blocked, and some are foreign conventions used in Egypt rather than native Egyptian systems. Calendar's specialist document owns those classifications.
+1. **Early Egyptian lunar / lunistellar reckoning**
+2. **Egyptian civil calendar**
+3. **Egyptian regnal dating**
+4. **Egyptian lunar date-keeping and festival reckoning**
+5. **Late Egyptian schematic 25-year lunar cycle (Papyrus Carlsberg 9 tradition)**
+
+### Native Egyptian time systems
+
+1. **Decanal / stellar night timekeeping**
+2. **Seasonal daylight hours (shadow-clock / sundial tradition)**
+3. **Seasonal night hours (outflow water-clock tradition)**
+4. **Ramesside stellar timekeeping**
+5. **Merkhet / meridian-transit stellar timekeeping**
+
+These are historical families, not automatically ten selector entries. Calendar's specialist document decides whether the evidence supports a distinct reproducible provider for each family.
+
+Ramesside stellar reckoning and merkhet/meridian observation, in particular, are genuine Egyptian practices but may ultimately be exposed as variants or methods within a broader stellar provider rather than as independent clocks.
+
+### What System Settings must not count as a native Egyptian mode
+
+Coptic, Macedonian/Ptolemaic, Julian/Roman, Jewish, Babylonian/Aramaic, Greek/Roman equal-hour and other imported or later systems are not added to this native Egyptian family merely because they were used in Egypt.
+
+The same applies to the Alexandrian/Augustan reformed calendar as a later historical development already separable from the pharaonic native family, and to Nabonassar-era astronomical year numbering as a continuous chronological convention rather than ordinary pharaonic regnal dating.
+
+Those systems may exist elsewhere under their own proper identities. System Settings must not duplicate them under an Egyptian heading.
 
 ### Current Egyptian calendar mode
 
-The currently implemented `egyptian-nabonassar` calendar is not to be shortened to a historically vague label in specialist UI/help. It is the Egyptian wandering civil structure with **Nabonassar-era astronomical year numbering**.
+The currently implemented `egyptian-nabonassar` calendar remains selectable under its historically qualified identity. It uses the wandering Egyptian civil month/day structure with **Nabonassar-era astronomical year numbering**.
 
-That is a valid deterministic calendar model, but it is not the same thing as ordinary pharaonic regnal dating.
+It is not to be represented as ordinary pharaonic regnal dating and is not evidence that all five native Egyptian date systems are already implemented.
 
-### Future New Kingdom temporal clock
+### Future native Egyptian providers
 
-A suitable eventual selector label is:
-
-```text
-Ancient Egyptian temporal time — New Kingdom civil reconstruction
-```
-
-The model should use separate ordinal day/night hours, for example:
+Provider names must expose the historical model rather than hide it behind a vague `Ancient Egyptian` label. Examples of acceptable direction include:
 
 ```text
-3rd hour of the day
-8th hour of the night
+Egyptian civil calendar — wandering 365-day year
+Egyptian regnal dating — <chronology/source qualification>
+Egyptian lunar date-keeping — <period/observation qualification>
+Egyptian 25-year lunar cycle — Papyrus Carlsberg 9 tradition
+Egyptian seasonal night hours — New Kingdom water-clock reconstruction
+Egyptian seasonal daylight hours — shadow-clock/sundial reconstruction
+Egyptian stellar night time — <period/source qualification>
 ```
 
-The transliterated Egyptian term `wnwt` may appear in explanatory material, but the UI must not fabricate pseudo-hieroglyphic timestamp syntax.
+Exact labels remain subject to Calendar's admission review.
 
-### Future Alexandrian calendar
-
-If implemented, the reformed Augustan calendar should be labelled separately from both the wandering pharaonic civil calendar and the later Coptic era, for example:
-
-```text
-Egyptian Alexandrian calendar — Augustan reform
-```
-
-### Research-blocked Egyptian modes
-
-A lunar, decanal or Ramesside stellar provider must not appear merely because a plausible algorithm can be invented. If Calendar marks the model as disputed or not admission-ready, System Settings must not expose it as settled historical fact.
+A research-blocked system must not appear merely because a plausible algorithm can be invented. If Calendar marks a lunar, regnal, decanal, Ramesside or merkhet model as disputed or not admission-ready, System Settings must not expose it as settled historical fact.
 
 ## Precision display for Egyptian temporal hours
 
-The historical model may expose an exact dimensionless phase through the current `wnwt`:
+A temporal Egyptian model may expose an exact dimensionless phase through the current `wnwt`:
 
 ```text
 phase = (instant - hour_start) / (hour_end - hour_start)
@@ -182,15 +185,15 @@ The system-wide `show-seconds` preference must not force fictional seconds into 
 
 For such a clock mode, `show-seconds` may instead increase the precision of an explicitly modern phase/progress display where the formatting context permits one. If no such precision extension is appropriate for the context, the historical display remains at its native granularity.
 
-This behaviour must be documented per clock mode and regression-tested; a global boolean must not override historical semantics.
+This behaviour must be documented per clock mode and regression-tested; a global Boolean must not override historical semantics.
 
 ## Date and time independence
 
 The selected calendar and clock remain independent presentation dimensions.
 
-A user may intentionally combine models from different Egyptian periods. For example, Calendar's Ptolemaic/Nabonassar-era year count could be displayed with a New Kingdom-centred temporal clock. System Settings may allow that because calendar and clock are independent policies, but it must not describe the pair as one historically attested timestamp standard.
+A user may intentionally combine Egyptian models from different periods. System Settings may allow that because calendar and clock are independent policies, but it must not describe the pair as one historically attested timestamp standard unless Calendar's historical authority says that pairing is attested.
 
-The same rule applies when a user combines an Egyptian calendar with a Roman, Babylonian, French Republican or modern clock, or an Egyptian clock with another calendar.
+The same architectural rule permits an Egyptian calendar to be paired with a non-Egyptian clock or vice versa, but those other systems retain their own identities and are not added to the native Egyptian catalogue.
 
 ## Unavailable and ambiguous states
 
@@ -218,10 +221,9 @@ Historical modes should expose concise user-facing provenance/help sufficient to
 - which boundaries or continuations are reconstructed;
 - whether geographic location or astronomical observation is required;
 - whether any finer precision is a modern interpolation;
-- whether the mode is indigenous, reformed, or a foreign convention used in the region;
 - where the specialist model documentation lives.
 
-This is especially important for systems whose familiar modern name hides substantial scholarly uncertainty or multiple historical practices.
+This is especially important for Egyptian systems because the evidence spans long periods and multiple observational traditions.
 
 ## Acceptance requirements
 
@@ -242,9 +244,10 @@ A historical mode must not be exposed by System Settings until tests prove at le
 
 At the time this document is written:
 
-- `egyptian-nabonassar` is the implemented Egyptian calendar mode;
-- the New Kingdom civil temporal clock is documented/planned, not supported;
-- an Alexandrian reformed calendar is historically well-defined enough to be a future candidate but is not yet declared supported here;
-- lunar, regnal and stellar/decanal Egyptian providers remain research or data work until Calendar's admission requirements are satisfied.
+- `egyptian-nabonassar` is the currently implemented historically qualified Egyptian-structure calendar mode;
+- the five native Egyptian date families and five native Egyptian time families are documented by Calendar as the target historical catalogue;
+- documentation of a family does not mean its provider exists;
+- seasonal night/water-clock and seasonal daylight/shadow-clock models have the strongest path to deterministic temporal implementation;
+- early lunistellar, regnal, decanal, Ramesside and merkhet providers remain dependent on model/data work and evidence review.
 
 Documentation is recorded first so eventual code has a falsifiable historical contract rather than acquiring behaviour by convenience and documenting it afterwards.
