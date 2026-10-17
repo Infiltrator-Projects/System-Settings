@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Native filesystem migration
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/native-filesystem-migration.yml
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          submodules: recursive
+      - name: Apply native filesystem migration
+        run: python3 packaging/migrate_native_filesystem.py
+      - name: Commit native filesystem release
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'The-First-Infiltrator'
+          git config user.email 'The-First-Infiltrator@users.noreply.github.com'
+          git add CMakeLists.txt VERSION CHANGELOG.md README.md docs/ARCHITECTURE.md \
+            data/org.infiltrator.SystemSettings.desktop data/infiltrator-native-path.sh \
+            cmake/InfiltratorNativeFilesystem.cmake packaging/native-installer.c \
+            .github/workflows/ci.yml
+          git diff --cached --check
+          git diff --cached --quiet && { echo 'Migration already applied.'; exit 0; }
+          git commit -m 'Release System Settings 0.4.110 native filesystem layout'
+          git push origin HEAD:main
