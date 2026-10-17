@@ -132,6 +132,12 @@ int main(void)
     CHECK(strcmp(
         policy_of(&model)->calendar,
         "egyptian-nabonassar") == 0);
+    /* A valid resource ID remains persistable even when not compiled in. */
+    CHECK(ss_date_time_model_set_calendar(
+        &model, "egyptian-early-lunar"));
+    CHECK(strcmp(
+        policy_of(&model)->calendar,
+        "egyptian-early-lunar") == 0);
 
     CHECK(ss_date_time_model_set_show_seconds(&model, true));
     CHECK(policy_of(&model)->show_seconds);
@@ -151,12 +157,12 @@ int main(void)
     CHECK(strcmp(policy_of(&model)->clock_mode, "decimal") == 0);
     CHECK(strcmp(
         policy_of(&model)->calendar,
-        "egyptian-nabonassar") == 0);
+        "egyptian-early-lunar") == 0);
     CHECK(policy_of(&model)->show_seconds);
     CHECK(policy_of(&model)->location_configured);
 
     CHECK(!ss_date_time_model_set_clock_mode(&model, "system"));
-    CHECK(!ss_date_time_model_set_calendar(&model, "none"));
+    CHECK(!ss_date_time_model_set_calendar(&model, "bad/id"));
     CHECK(!ss_date_time_model_reload(NULL));
     before = *policy_of(&model);
     CHECK(!ss_date_time_model_set_location(&model, true, NAN, 0.0));
@@ -184,7 +190,7 @@ int main(void)
     draft = ss_date_time_policy_draft_new(&before);
     CHECK(draft != NULL);
     CHECK(!ss_date_time_policy_draft_set_clock_mode(draft, "system"));
-    CHECK(!ss_date_time_policy_draft_set_calendar(draft, "none"));
+    CHECK(!ss_date_time_policy_draft_set_calendar(draft, "Not A Calendar"));
     CHECK(ss_date_time_policy_draft_set_clock_mode(draft, "decimal"));
     CHECK(ss_date_time_policy_draft_set_calendar(draft, "gregorian"));
     CHECK(ss_date_time_policy_draft_set_show_seconds(draft, false));

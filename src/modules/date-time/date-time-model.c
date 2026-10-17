@@ -9,7 +9,7 @@
 #include "system-settings/date-time-model.h"
 
 #include <infiltratr/core.h>
-#include <infiltratr/temporal_runtime.h>
+#include <infiltratr/temporal_id.h>
 #include <math.h>
 #include <stdlib.h>
 
@@ -43,12 +43,16 @@ static const InfiltratrTemporalClockModeInfo *valid_clock_mode(
         : NULL;
 }
 
-static const InfiltratrTemporalCalendarInfo *valid_calendar(
-    const char *calendar_id)
+/*
+ * Persistence validates the stable identifier grammar rather than current
+ * installation state. A filesystem resource may legitimately disappear and
+ * later return; retaining its ID is how Settings makes that absence explicit
+ * instead of silently replacing the user's selection. The Linux UI validates
+ * installed capability when presenting selectable choices.
+ */
+static bool valid_calendar(const char *calendar_id)
 {
-    return calendar_id != NULL
-        ? infiltratr_temporal_installed_calendar_find(calendar_id)
-        : NULL;
+    return infiltratr_temporal_id_valid(calendar_id);
 }
 
 static bool valid_location(double latitude, double longitude)
@@ -70,12 +74,12 @@ static void assign_clock_mode(
 
 static void assign_calendar(
     InfiltratrTemporalPolicyV3 *policy,
-    const InfiltratrTemporalCalendarInfo *info)
+    const char *calendar_id)
 {
     infiltratr_copy_string(
         policy->calendar,
         sizeof(policy->calendar),
-        info->id);
+        calendar_id);
 }
 
 static void assign_location(
@@ -283,14 +287,13 @@ bool ss_date_time_model_set_calendar(
     SsDateTimeModel *model,
     const char *calendar_id)
 {
-    const InfiltratrTemporalCalendarInfo *info = valid_calendar(calendar_id);
     InfiltratrTemporalPolicyV3 candidate;
 
-    if (model == NULL || info == NULL ||
+    if (model == NULL || !valid_calendar(calendar_id) ||
         !begin_candidate(model, &candidate, NULL)) {
         return false;
     }
-    assign_calendar(&candidate, info);
+    assign_calendar(&candidate, calendar_id);
     return save_candidate(model, &candidate);
 }
 
@@ -465,12 +468,10 @@ bool ss_date_time_policy_draft_set_calendar(
     SsDateTimePolicyDraft *draft,
     const char *calendar_id)
 {
-    const InfiltratrTemporalCalendarInfo *info = valid_calendar(calendar_id);
-
-    if (draft == NULL || info == NULL) {
+    if (draft == NULL || !valid_calendar(calendar_id)) {
         return false;
     }
-    assign_calendar(&draft->policy, info);
+    assign_calendar(&draft->policy, calendar_id);
     return true;
 }
 
