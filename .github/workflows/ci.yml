@@ -93,8 +93,9 @@ jobs:
             cmp "modules/$manifest" "$module_dir/$manifest"
           done < <(find modules -maxdepth 1 -type f -name '*.settings-module' -printf '%f\n' | LC_ALL=C sort)
           ui="$root/usr/share/infiltrator/system-settings/ui"
-          binary="$root/usr/bin/system-settings"
+          binary="$root/Programs/system-settings"
           test -x "$binary"
+          test ! -e "$root/usr/bin/system-settings"
           grep -aFq '/usr/share/infiltrator/system-settings/ui' "$binary"
           if grep -aFq '/usr/local/share/infiltrator/system-settings/ui' "$binary"; then
             echo "Packaged binary still contains the wrong /usr/local UI asset path." >&2

@@ -13,6 +13,7 @@
 #include "system-settings/native-clock-policy.h"
 
 #include <infiltratr/temporal_posix.h>
+#include <infiltratr/temporal_runtime.h>
 
 #include <stdint.h>
 #include <string.h>
@@ -166,7 +167,7 @@ gboolean ss_linux_date_time_preview_refresh(gpointer user_data)
 
     if (!date_cache_hit) {
         const InfiltratrTemporalCalendarInfo *calendar =
-            infiltratr_temporal_calendar_find(policy->calendar);
+            infiltratr_temporal_installed_calendar_find(policy->calendar);
         g_autofree gchar *gregorian =
             g_date_time_format(now, "%A, %e %B %Y");
         char selected_date[INFILTRATR_TEMPORAL_DATE_CAPACITY];
@@ -202,6 +203,10 @@ gboolean ss_linux_date_time_preview_refresh(gpointer user_data)
                         calendar->name);
                 }
             }
+        } else {
+            summary = g_strdup_printf(
+                "%s • resource unavailable",
+                policy->calendar);
         }
 
         if (summary != NULL &&

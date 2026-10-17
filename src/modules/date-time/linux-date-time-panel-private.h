@@ -19,6 +19,7 @@
 #include "linux-date-time-preview-private.h"
 #include "linux-date-time-system-time-private.h"
 #include "policy-file-observer.h"
+#include "temporal-catalogue-private.h"
 
 #include "system-settings/date-time-model.h"
 #include "system-settings/regional-context.h"

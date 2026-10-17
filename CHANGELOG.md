@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.111 - 2026-10-17
+
+- Consume Common's merged built-in plus validated native calendar catalogue in Date & Time, making trusted resources installed under `/System/Resources/Calendars` selectable without a System Settings master-list edit.
+- Keep clock selection on the executable built-in catalogue until a complete native clock behaviour ABI is qualified; metadata-only filesystem clocks are deliberately not exposed as runnable choices.
+- Advance the pinned Libraries foundation to 1.19.47 and retain Calendar's bounded formatting path so native calendar metadata and chronology execution remain owned by their proper layers.
+- Align Debian qualification with the native `/Programs/system-settings` contract and explicitly reject a restored `/usr/bin/system-settings` compatibility entry.
+
 ## 0.4.110 - 2026-10-17
 
 - Install the Linux control-panel application at `/Programs/system-settings` and its genuine command helper at `/System/Commands/system-settings-time`.

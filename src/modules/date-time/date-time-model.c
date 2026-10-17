@@ -9,6 +9,7 @@
 #include "system-settings/date-time-model.h"
 
 #include <infiltratr/core.h>
+#include <infiltratr/temporal_runtime.h>
 #include <math.h>
 #include <stdlib.h>
 
@@ -46,7 +47,7 @@ static const InfiltratrTemporalCalendarInfo *valid_calendar(
     const char *calendar_id)
 {
     return calendar_id != NULL
-        ? infiltratr_temporal_calendar_find(calendar_id)
+        ? infiltratr_temporal_installed_calendar_find(calendar_id)
         : NULL;
 }
 
