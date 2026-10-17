@@ -12,6 +12,7 @@ This directory is the maintained engineering map for System Settings. Each docum
 - [UI-VISION.md](UI-VISION.md) — current visual north star and product-specific graphical direction; subordinate to Design, accessibility/platform requirements and Common's canonical design contract.
 - [MODULES.md](MODULES.md) — module discovery, manifests, ABI, lifecycle, deep links, state and trust requirements.
 - [PRESENTATION_POLICY.md](PRESENTATION_POLICY.md) — system-wide user presentation policy, beginning with temporal/clock/calendar formatting.
+- [HISTORICAL_TEMPORAL_PRESENTATION.md](HISTORICAL_TEMPORAL_PRESENTATION.md) — specialist presentation rules for historically coarse or reconstructed clock systems, including the planned Ancient Egyptian temporal mode.
 - [PLATFORM_COMPATIBILITY.md](PLATFORM_COMPATIBILITY.md) — shared cross-platform authority, capability, adapter, UI/ABI and handoff rules.
 - [MINT_COMPATIBILITY.md](MINT_COMPATIBILITY.md) — Mint/Cinnamon-specific mapping, fallbacks and integration.
 - [WINDOWS_COMPATIBILITY.md](WINDOWS_COMPATIBILITY.md) — Windows-specific globalisation, privilege, registry and Settings-handoff rules.
@@ -36,6 +37,7 @@ When two documents appear to overlap, choose one owner:
 - shell/module boundaries → Architecture;
 - exact module contract → Modules;
 - cross-application representation policy → Presentation Policy;
+- historically reconstructed/coarse clock display precision → Historical Temporal Presentation, subordinate to Presentation Policy and the owning Calendar model evidence;
 - cross-platform authority and adapter rules → Platform Compatibility;
 - Mint/Cinnamon-specific mapping → Mint Compatibility;
 - Windows-specific mapping → Windows Compatibility;
