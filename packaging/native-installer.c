@@ -103,6 +103,60 @@ static int run_command(const char *cwd, char *const argv[])
     return -1;
 }
 
+static bool build_prerequisites_available(void)
+{
+    static const char *const required[] = {
+        "tar", "cmake", "cc", "make", "ctest", "cpack",
+        "pkg-config", "dpkg-deb", "xvfb-run", "dbus-daemon"
+    };
+    char *gtk_argv[] = {
+        "pkg-config", "--exists", "gtk4 >= 4.6", NULL
+    };
+    char *geocode_argv[] = {
+        "pkg-config", "--exists", "geocode-glib-2.0", NULL
+    };
+
+    for (size_t i = 0U; i < sizeof(required) / sizeof(required[0]); ++i) {
+        if (!command_exists(required[i])) {
+            return false;
+        }
+    }
+    return run_command(NULL, gtk_argv) == 0 &&
+           run_command(NULL, geocode_argv) == 0;
+}
+
+static void ensure_prerequisites(void)
+{
+    char *update_argv[] = {
+        "sudo", "apt-get", "-o", "DPkg::Lock::Timeout=300", "update", NULL
+    };
+    char *install_argv[] = {
+        "sudo", "apt-get", "-o", "DPkg::Lock::Timeout=300", "install", "-y",
+        "--no-install-recommends", "build-essential", "cmake", "dpkg-dev",
+        "pkg-config", "libgtk-4-dev", "libgeocode-glib-dev", "xvfb", "dbus-x11",
+        "tar", NULL
+    };
+
+    if (build_prerequisites_available()) {
+        return;
+    }
+    if (!command_exists("apt-get")) {
+        fail("APT is required to install missing native-build prerequisites.");
+    }
+    if (!command_exists("sudo")) {
+        fail("sudo is required to install missing native-build prerequisites.");
+    }
+
+    puts("Installing System Settings native-build prerequisites...");
+    if (run_command(NULL, update_argv) != 0 ||
+        run_command(NULL, install_argv) != 0) {
+        fail("APT could not install the required native-build prerequisites.");
+    }
+    if (!build_prerequisites_available()) {
+        fail("required native-build prerequisites remain unavailable after APT installation.");
+    }
+}
+
 static bool capture_command(
     const char *cwd,
     char *const argv[],
@@ -399,7 +453,7 @@ static void show_help(void)
     puts("System Settings native installer");
     puts("Usage: ./System-Settings-VERSION-native.run [--extract DIRECTORY|--build-only]");
     puts("Default: build for this CPU with LTO and GCC PGO, test, package, then install through APT.");
-    puts("Build prerequisites: GCC, build-essential, cmake, pkg-config, libgtk-4-dev, libgeocode-glib-dev, xvfb, dbus-x11");
+    puts("Missing build prerequisites are detected and installed automatically through APT.");
 }
 
 int main(int argc, char **argv)
@@ -409,10 +463,6 @@ int main(int argc, char **argv)
     if (setenv("PATH", trusted_path, 1) != 0) {
         fail("could not establish the trusted build-tool search path.");
     }
-    static const char *const required[] = {
-        "tar", "cmake", "cc", "make", "ctest", "cpack",
-        "pkg-config", "dpkg-deb", "sudo", "xvfb-run", "dbus-daemon"
-    };
     char self[PATH_MAX];
     char work_template[] = "/tmp/system-settings-native-XXXXXX";
     char *work;
@@ -457,32 +507,15 @@ int main(int argc, char **argv)
         return 2;
     }
     if (geteuid() == 0) {
-        fail("run as your ordinary user; only final package installation uses sudo.");
+        fail("run as your ordinary user; prerequisite and package installation use sudo only when required.");
     }
-    for (size_t i = 0U; i < sizeof(required) / sizeof(required[0]); ++i) {
-        if (build_only && strcmp(required[i], "sudo") == 0) {
-            continue;
-        }
-        if (!command_exists(required[i])) {
-            fprintf(stderr, "Missing prerequisite: %s\n", required[i]);
-            return EXIT_FAILURE;
-        }
+
+    ensure_prerequisites();
+    if (!build_only && !command_exists("sudo")) {
+        fail("sudo is required for final package installation.");
     }
     if (!compiler_supports_gcc_pgo()) {
         fail("the native profile requires GCC so LTO and trained PGO are both guaranteed.");
-    }
-
-    {
-        char *gtk_argv[] = {
-            "pkg-config", "--exists", "gtk4 >= 4.6", NULL
-        };
-        char *geocode_argv[] = {
-            "pkg-config", "--exists", "geocode-glib-2.0", NULL
-        };
-        if (run_command(NULL, gtk_argv) != 0 ||
-            run_command(NULL, geocode_argv) != 0) {
-            fail("install libgtk-4-dev and libgeocode-glib-dev before building.");
-        }
     }
 
     work = mkdtemp(work_template);
