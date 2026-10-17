@@ -6,6 +6,7 @@
 - Load the five migrated clock systems exclusively from installed system resources and report missing resources instead of using duplicated legacy formatting.
 - Cache the Date & Time preview's selected clock module across rapid refreshes; preserve legacy clock modes and the existing temporal selection policy.
 - Pin the exact Common 1.19.54 release and qualify the migration against System Settings CI.
+- Update the synthetic Calendar resource test fixture to the versioned system provider ABI and use genuinely malformed CLI ID syntax in the transaction regression.
 
 
 ## 0.4.111 - 2026-10-17
