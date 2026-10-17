@@ -644,6 +644,11 @@ int main(int argc, char **argv)
             (void)remove_tree(work);
             fail("APT installation failed.");
         }
+        if (access("/Programs/system-settings", X_OK) != 0 ||
+            access("/System/Commands/system-settings-time", X_OK) != 0) {
+            (void)remove_tree(work);
+            fail("native package did not install System Settings into the InfiltratorOS executable namespaces.");
+        }
     }
 
     if (remove_tree(work) != 0) {

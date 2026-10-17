@@ -524,3 +524,7 @@ A release may describe a module as supported only when:
 5. external state changes reconcile safely where applicable;
 6. relevant validation evidence exists;
 7. documentation agrees with the implementation.
+
+## Native Linux filesystem ownership
+
+System Settings is user-launchable, so its Linux GUI belongs to the single application namespace at `/Programs/system-settings`, even when bundled with InfiltratorOS. The non-GUI `system-settings-time` administrative interface is a genuine command and belongs at `/System/Commands/system-settings-time`. `/System` otherwise remains operating-system infrastructure; there is deliberately no `/System/Programs`. Standalone System Settings installation creates the common native skeleton when necessary and never adds product executables or compatibility links to `/usr/bin`.

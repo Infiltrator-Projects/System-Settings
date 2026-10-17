@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.110 - 2026-10-17
+
+- Install the Linux control-panel application at `/Programs/system-settings` and its genuine command helper at `/System/Commands/system-settings-time`.
+- Establish the native InfiltratorOS filesystem skeleton and `/System/Commands:/Programs` login-shell PATH when System Settings is installed standalone.
+- Use the absolute native application path from the desktop launcher and install no System Settings executable or compatibility link under `/usr/bin`.
+- Extend package qualification so `/usr/bin` executable entries and the obsolete `/System/Programs` split cannot return.
+
 This file tracks the current System Settings maintenance line. The pre-audit
 history is preserved unchanged in [`CHANGELOG-legacy.md`](CHANGELOG-legacy.md).
 The 0.4.60-0.4.69 overlap is intentional: it closes gaps in the historical file

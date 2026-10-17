@@ -355,3 +355,7 @@ administrative access only when prerequisite installation or final Debian packag
 installation actually requires it. A compiler that cannot provide the full native
 profile is rejected rather than silently producing a weaker build. Its `--help`
 and `--extract DIRECTORY` modes need no elevation.
+
+## Native Linux installation paths
+
+The Linux GUI installs at `/Programs/system-settings`. Its `system-settings-time` command helper installs at `/System/Commands/system-settings-time`. Debian and hardware-native installation create the InfiltratorOS native directory skeleton when needed and add `/System/Commands:/Programs` to future login-shell PATHs. No System Settings executable or compatibility link is installed under `/usr/bin`; the desktop launcher uses `/Programs/system-settings` directly.

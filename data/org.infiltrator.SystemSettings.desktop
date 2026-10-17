@@ -2,7 +2,7 @@
 Type=Application
 Name=System Settings
 Comment=Configure system-wide Infiltrator preferences
-Exec=system-settings
+Exec=/Programs/system-settings
 Icon=org.infiltrator.SystemSettings
 Terminal=false
 Categories=Settings;System;

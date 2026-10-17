@@ -9,6 +9,7 @@ endif()
 
 project(InfiltratrSystemSettings VERSION "${SYSTEM_SETTINGS_VERSION}" LANGUAGES C)
 include(CTest)
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/InfiltratorNativeFilesystem.cmake")
 
 # System Settings is a system control panel. Keep the runtime paths compiled
 # into the executable identical to the paths used by the Debian package.
@@ -455,8 +456,12 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     unset(SS_FORBIDDEN_SHELL_LINK_INDEX)
     unset(SS_SHELL_LIBRARY_DIRECT_LINKS)
 
+    infiltrator_install_native_filesystem_skeleton()
     install(TARGETS system-settings
-        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+        RUNTIME DESTINATION "/Programs")
+    install(FILES data/infiltrator-native-path.sh
+        DESTINATION "/etc/profile.d"
+        RENAME "91-infiltrator-system-settings-path.sh")
     install(FILES data/org.infiltrator.SystemSettings.desktop
         DESTINATION "${CMAKE_INSTALL_DATADIR}/applications")
     install(FILES data/org.infiltrator.SystemSettings.svg
@@ -669,8 +674,13 @@ if(BUILD_TESTING)
 endif()
 
 
-install(TARGETS system-settings-time
-    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    install(TARGETS system-settings-time
+        RUNTIME DESTINATION "/System/Commands")
+else()
+    install(TARGETS system-settings-time
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+endif()
 
 
 set(CPACK_PACKAGE_NAME "system-settings")
@@ -682,7 +692,10 @@ set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
 
 if(UNIX AND NOT APPLE)
     set(CPACK_GENERATOR "DEB")
-    # Keep package staging and the paths compiled into the executable in lockstep.
+    # Absolute native paths (/Programs and /System/Commands) must be staged
+    # under CPack's package root, while conventional passive resources remain
+    # below the /usr prefix.
+    set(CPACK_SET_DESTDIR ON)
     set(CPACK_PACKAGING_INSTALL_PREFIX "${CMAKE_INSTALL_PREFIX}")
     set(CPACK_DEBIAN_FILE_NAME DEB-DEFAULT)
     set(CPACK_DEBIAN_PACKAGE_SECTION "utils")
