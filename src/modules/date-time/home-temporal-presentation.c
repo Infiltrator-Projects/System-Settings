@@ -19,6 +19,7 @@
 
 #include <gio/gio.h>
 #include <infiltratr/temporal_posix.h>
+#include <infiltratr/temporal_clock_resource.h>
 #include <string.h>
 
 enum { HOME_TEMPORAL_REFRESH_INTERVAL_MS = 60000U };
@@ -57,6 +58,7 @@ static gchar *format_clock(
     bool use_24h)
 {
     const InfiltratrTemporalClockModeInfo *mode;
+    InfiltratrTemporalClockPresentation *presentation;
     const char *effective_mode;
     char buffer[192];
     int64_t unix_us;
@@ -74,19 +76,27 @@ static gchar *format_clock(
         return g_strdup_printf("%s — location required", mode->name);
     }
 
+    /*
+     * Home refreshes at minute scale. Its short-lived handle still executes
+     * the same validated system resource as Calendar; no duplicate formatter.
+     */
+    presentation = infiltratr_temporal_clock_presentation_new(effective_mode);
+    if (presentation == NULL) {
+        return g_strdup_printf("%s — resource unavailable", mode->name);
+    }
     unix_us = g_date_time_to_unix(now) * G_USEC_PER_SEC +
         g_date_time_get_microsecond(now);
     offset_us = g_date_time_get_utc_offset(now);
-    if (!infiltratr_temporal_format_clock_mode_localized(
-            g_get_language_names()[0], effective_mode, unix_us,
-            (int32_t)(offset_us / G_USEC_PER_SEC),
-            policy->show_seconds, false,
-            policy->location_configured,
-            policy->latitude, policy->longitude,
-            buffer, sizeof(buffer), NULL)) {
-        return NULL;
-    }
-    return g_strdup(buffer);
+    const bool formatted = infiltratr_temporal_clock_presentation_format(
+        presentation, g_get_language_names()[0], unix_us,
+        (int32_t)(offset_us / G_USEC_PER_SEC),
+        policy->show_seconds, false, policy->location_configured,
+        policy->latitude, policy->longitude,
+        buffer, sizeof(buffer), NULL);
+    infiltratr_temporal_clock_presentation_free(presentation);
+    return formatted
+        ? g_strdup(buffer)
+        : g_strdup_printf("%s — display unavailable", mode->name);
 }
 
 static gchar *format_date_with_provider(

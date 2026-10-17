@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.112 — 2026-10-18
+
+- Route the Date & Time preview and Home clock display through Common's executable clock presentation API.
+- Load the five migrated clock systems exclusively from installed system resources and report missing resources instead of using duplicated legacy formatting.
+- Cache the Date & Time preview's selected clock module across rapid refreshes; preserve legacy clock modes and the existing temporal selection policy.
+- Pin the exact Common 1.19.54 release and qualify the migration against System Settings CI.
+
+
 ## 0.4.111 - 2026-10-17
 
 - Consume Common's merged built-in plus validated native calendar catalogue in Date & Time, making trusted resources installed under `/System/Resources/Calendars` selectable without a System Settings master-list edit.

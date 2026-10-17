@@ -3,6 +3,7 @@
 #define SYSTEM_SETTINGS_LINUX_DATE_TIME_PREVIEW_PRIVATE_H
 
 #include <infiltratr/temporal_posix.h>
+#include <infiltratr/temporal_clock_resource.h>
 #include "linux-date-time-panel.h"
 
 #include "system-settings/date-time-model.h"
@@ -18,6 +19,8 @@ typedef struct SsLinuxDateTimePreviewState {
     GtkWidget *overview_calendar;
 
     InfiltratrTemporalDateProvider *calendar_provider;
+    InfiltratrTemporalClockPresentation *clock_presentation;
+    gchar *clock_presentation_id;
     guint timer_id;
     guint idle_id;
     gint date_year;

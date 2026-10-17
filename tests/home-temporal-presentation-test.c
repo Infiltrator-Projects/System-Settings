@@ -5,6 +5,7 @@
 #include <glib.h>
 #include <glib/gstdio.h>
 #include <infiltratr/core.h>
+#include <infiltratr/temporal_clock_resource.h>
 #include <string.h>
 
 static guint count_character(const char *text, char needle)
@@ -65,13 +66,23 @@ int main(void)
         policy.calendar, sizeof(policy.calendar), "gregorian");
     policy.show_seconds = true;
 
-    g_assert_true(ss_home_temporal_presentation_format(
-        &policy, noon, true, &presentation));
-    g_assert_cmpstr(presentation.clock_text, ==, "5:00:00");
-    g_assert_nonnull(presentation.date_text);
-    g_assert_nonnull(strstr(
-        presentation.system_time_text, "5:00:00"));
-    ss_home_temporal_presentation_clear(&presentation);
+    {
+        InfiltratrTemporalClockModule *installed =
+            infiltratr_temporal_clock_module_open_id("decimal");
+        g_assert_true(ss_home_temporal_presentation_format(
+            &policy, noon, true, &presentation));
+        if (installed != NULL) {
+            g_assert_cmpstr(presentation.clock_text, ==, "5:00:00");
+            g_assert_nonnull(strstr(
+                presentation.system_time_text, "5:00:00"));
+        } else {
+            g_assert_nonnull(strstr(
+                presentation.clock_text, "resource unavailable"));
+        }
+        g_assert_nonnull(presentation.date_text);
+        ss_home_temporal_presentation_clear(&presentation);
+        infiltratr_temporal_clock_module_free(installed);
+    }
 
     infiltratr_copy_string(
         policy.clock_mode, sizeof(policy.clock_mode), "standard-24");
@@ -147,11 +158,19 @@ int main(void)
         {
             SsHomeTemporalPresentation coarse;
             ss_home_temporal_presentation_init(&coarse);
+            InfiltratrTemporalClockModule *installed =
+                infiltratr_temporal_clock_module_open_id("decimal");
             g_assert_true(ss_home_temporal_presenter_format_now(
                 presenter, &coarse));
-            g_assert_cmpuint(
-                count_character(coarse.clock_text, ':'), ==, 1U);
+            if (installed != NULL) {
+                g_assert_cmpuint(
+                    count_character(coarse.clock_text, ':'), ==, 1U);
+            } else {
+                g_assert_nonnull(strstr(
+                    coarse.clock_text, "resource unavailable"));
+            }
             ss_home_temporal_presentation_clear(&coarse);
+            infiltratr_temporal_clock_module_free(installed);
         }
         ss_home_temporal_presenter_free(presenter);
 

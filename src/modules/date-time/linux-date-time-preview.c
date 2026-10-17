@@ -32,6 +32,34 @@ static InfiltratrTemporalDateProvider *ensure_calendar_date_provider(
     return ss_linux_date_time_preview_state(state)->calendar_provider;
 }
 
+/*
+ * Reuse the resource handle for the selected clock across fast preview ticks.
+ * A missing resource remains unavailable until the selection changes or the
+ * panel is recreated; no app-local formatter may replace the chosen system.
+ */
+static InfiltratrTemporalClockPresentation *ensure_clock_presentation(
+    SsLinuxDateTimePanel *state, const char *clock_id)
+{
+    SsLinuxDateTimePreviewState *preview =
+        state != NULL ? ss_linux_date_time_preview_state(state) : NULL;
+
+    if (preview == NULL || clock_id == NULL) {
+        return NULL;
+    }
+    if (g_strcmp0(preview->clock_presentation_id, clock_id) != 0) {
+        infiltratr_temporal_clock_presentation_free(
+            preview->clock_presentation);
+        preview->clock_presentation = NULL;
+        g_free(preview->clock_presentation_id);
+        preview->clock_presentation_id = g_strdup(clock_id);
+        if (preview->clock_presentation_id != NULL) {
+            preview->clock_presentation =
+                infiltratr_temporal_clock_presentation_new(clock_id);
+        }
+    }
+    return preview->clock_presentation;
+}
+
 static bool preview_coordinates(
     SsLinuxDateTimePanel *state,
     double *latitude,
@@ -67,6 +95,7 @@ static bool format_preview_at(SsLinuxDateTimePanel *state,
     const InfiltratrTemporalPolicyV3 *policy =
         ss_date_time_model_policy(ss_linux_date_time_preview_model(state));
     const InfiltratrTemporalClockModeInfo *mode;
+    InfiltratrTemporalClockPresentation *presentation;
     const char *effective_mode;
     int64_t unix_us;
     gint64 offset_us;
@@ -79,11 +108,9 @@ static bool format_preview_at(SsLinuxDateTimePanel *state,
     }
 
     /*
-     * Common is the system-wide clock renderer. The legacy "standard" value
-     * deliberately remains platform-owned, so resolve it to Cinnamon's current
-     * conventional choice before entering the portable formatter. Every
-     * explicit mode then uses the same implementation that other Infiltrator
-     * applications consume.
+     * Resolve the desktop's conventional choice, then dispatch all explicit
+     * time systems through Common's shared presentation/resource boundary.
+     * The five migrated systems must not use Common's legacy compiled copy.
      */
     effective_mode = policy->clock_mode;
     if (strcmp(effective_mode, "standard") == 0) {
@@ -107,21 +134,23 @@ static bool format_preview_at(SsLinuxDateTimePanel *state,
                    mode->name) > 0;
     }
 
+    presentation = ensure_clock_presentation(state, effective_mode);
+    if (presentation == NULL) {
+        return g_snprintf(buffer, capacity,
+            "%s — resource unavailable", mode->name) > 0;
+    }
     unix_us = g_date_time_to_unix(now) * G_USEC_PER_SEC +
         g_date_time_get_microsecond(now);
     offset_us = g_date_time_get_utc_offset(now);
-    return infiltratr_temporal_format_clock_mode_localized(
-        g_get_language_names()[0], effective_mode,
-        unix_us,
-        (int32_t)(offset_us / G_USEC_PER_SEC),
-        policy->show_seconds,
-        false,
-        has_location,
-        latitude,
-        longitude,
-        buffer,
-        capacity,
-        NULL);
+    if (!infiltratr_temporal_clock_presentation_format(
+            presentation, g_get_language_names()[0], unix_us,
+            (int32_t)(offset_us / G_USEC_PER_SEC),
+            policy->show_seconds, false, has_location,
+            latitude, longitude, buffer, capacity, NULL)) {
+        return g_snprintf(buffer, capacity,
+            "%s — display unavailable", mode->name) > 0;
+    }
+    return true;
 }
 
 gboolean ss_linux_date_time_preview_refresh(gpointer user_data)
@@ -356,6 +385,9 @@ void ss_linux_date_time_preview_dispose(SsLinuxDateTimePanel *panel)
         preview->idle_id = 0U;
     }
     g_clear_pointer(&preview->date_calendar, g_free);
+    infiltratr_temporal_clock_presentation_free(preview->clock_presentation);
+    preview->clock_presentation = NULL;
+    g_clear_pointer(&preview->clock_presentation_id, g_free);
     infiltratr_temporal_posix_date_provider_free(preview->calendar_provider);
     preview->calendar_provider = NULL;
     preview->date_cache_valid = false;
