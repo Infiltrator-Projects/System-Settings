@@ -13,6 +13,7 @@ This directory is the maintained engineering map for System Settings. Each docum
 - [MODULES.md](MODULES.md) — module discovery, manifests, ABI, lifecycle, deep links, state and trust requirements.
 - [PRESENTATION_POLICY.md](PRESENTATION_POLICY.md) — system-wide user presentation policy, beginning with temporal/clock/calendar formatting.
 - [HISTORICAL_TEMPORAL_PRESENTATION.md](HISTORICAL_TEMPORAL_PRESENTATION.md) — specialist presentation rules for historical clock and calendar systems whose native units or notation differ from modern civil time.
+- [TEMPORAL_PROVIDER_DISCOVERY.md](TEMPORAL_PROVIDER_DISCOVERY.md) — concept for filesystem-discovered calendar/clock resources; System Settings eventually enumerates what Common discovers rather than owning a master list.
 - [EGYPTIAN_FIRST_PROFILE.md](EGYPTIAN_FIRST_PROFILE.md) — selector contract for the first Egyptian profile: Early Egyptian Lunar Calendar plus Early Egyptian Stellar–Solar Time, following Calendar's maintained best-evidence model.
 - [PLATFORM_COMPATIBILITY.md](PLATFORM_COMPATIBILITY.md) — shared cross-platform authority, capability, adapter, UI/ABI and handoff rules.
 - [MINT_COMPATIBILITY.md](MINT_COMPATIBILITY.md) — Mint/Cinnamon-specific mapping, fallbacks and integration.
@@ -38,6 +39,7 @@ When two documents appear to overlap, choose one owner:
 - shell/module boundaries → Architecture;
 - exact module contract → Modules;
 - cross-application representation policy → Presentation Policy;
+- temporal resource discovery → Temporal Provider Discovery, subordinate to Common's canonical resource design;
 - historical clock/calendar display precision → Historical Temporal Presentation, subordinate to Presentation Policy and the owning Calendar model evidence;
 - first Egyptian selector pairing → Egyptian First Profile, subordinate to Calendar's owning historical model;
 - cross-platform authority and adapter rules → Platform Compatibility;
