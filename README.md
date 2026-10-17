@@ -349,8 +349,9 @@ Each release publishes the Debian package, a `System-Settings-VERSION-native.run
 source installer, a complete source ZIP (including pinned Common), and SHA256SUMS.
 The native installer builds and tests as the ordinary user with GCC
 `-march=native`/`-mtune=native`, link-time optimisation and a trained PGO
-generate/test/use cycle, then asks sudo only to install the generated Debian
-package through APT. A compiler that cannot provide that full native profile is
-rejected rather than silently producing a weaker build. Its `--help` and
-`--extract DIRECTORY` modes need no elevation. Build prerequisites are the
-same as above; it does not install dependencies silently.
+generate/test/use cycle. Before building, it detects missing host development
+packages and installs them automatically through APT using sudo. It asks for
+administrative access only when prerequisite installation or final Debian package
+installation actually requires it. A compiler that cannot provide the full native
+profile is rejected rather than silently producing a weaker build. Its `--help`
+and `--extract DIRECTORY` modes need no elevation.
