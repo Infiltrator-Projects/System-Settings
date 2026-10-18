@@ -329,6 +329,16 @@ static guint next_preview_boundary_ms(SsLinuxDateTimePanel *state)
             ss_linux_date_time_preview_desktop_uses_24h(state))
         : policy->clock_mode;
     presentation = ensure_clock_presentation(state, id);
+    if (presentation == NULL)
+        return 60000U; /* A missing module cannot change its displayed text. */
+    {
+        const InfiltratrTemporalClockModeInfo *mode =
+            infiltratr_temporal_clock_mode_find(id);
+        if (mode != NULL &&
+            (mode->requires_latitude || mode->requires_longitude) &&
+            !preview_coordinates(state, &latitude, &longitude))
+            return 60000U; /* No implicit Greenwich for unset geography. */
+    }
     if (presentation != NULL) {
         now = g_date_time_new_now_local();
         if (now != NULL) {
