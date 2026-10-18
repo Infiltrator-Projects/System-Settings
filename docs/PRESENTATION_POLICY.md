@@ -159,7 +159,7 @@ Machine/export contexts may deliberately resolve to a fixed canonical representa
 
 Temporal Presentation uses stable clock-system identifiers supplied by Common rather than application-local conditionals.
 
-The pinned Common 1.19.56 carries the complete current clock catalogue shared with Calendar: standard OS-locale time, explicit 12-hour and 24-hour time, Internet Time, Unix time, binary and hexadecimal clocks, Julian/MJD, sidereal/apparent/mean-solar time, French Republican decimal time, traditional Chinese double-hours and hundred-kè, Roman temporal time, Edo Japanese seasonal time, Italian hours, Babylonian hours, Indian ghaṭī time and Nuremberg hours.
+The pinned Common 1.19.64 discovers and validates the installed executable resource catalogue shared with Calendar and Files. The complete resource pack supplies 30 calendars and 23 explicit clocks, including both Edo seasonal models and historical and location-aware Nürnberg. The OS-following `standard` mode remains a bootstrap/platform policy choice. System Settings offers installed executable capabilities rather than a compiled list of unavailable implementations.
 
 System Settings is the authority. The internal Common catalogue retains the `standard` identifier as a bootstrap/fallback for consumers that must run without System Settings, but System Settings itself does not present that identifier as a third conventional choice. Its user-facing conventional clock systems are **Standard time (12-hour)** and **Standard time (24-hour)**. The Cinnamon/GNOME 12/24-hour Boolean is the exact native compatibility backend for those modes, not another visible authority. Common-aware applications consume the System Settings policy directly rather than offering competing local clock/calendar choices.
 
@@ -192,15 +192,11 @@ Showing a clock-system name (for example, `Internet Time (@000 to @999)`) in
 the live-value position is not a preview, and labelling a Gregorian date as a
 selected non-Gregorian calendar is misleading.
 
-Common dispatches the eleven migrated clock modes to their independent system resources without fallback, while the twelve remaining alternative modes temporarily use Common's portable formatter.
-including the specialised historical and astronomical systems. Calendar remains
-the implementation owner of non-Gregorian chronology/date arithmetic. Common's
-POSIX temporal adapter owns trusted discovery and validation of Calendar's stable,
-bounded pure-C date-renderer ABI; System Settings consumes that Common provider
-while remaining the authority for which clock/calendar is selected.
+All 23 explicit clock resources own their rendering, localization and next-visible-tick scheduling. All 30 calendar resources, including Gregorian, own conversion, navigation and date presentation. The independently installed Calendar Resources package owns the algorithms, ICU runtime dependency and translations; uninstalling Calendar or System Settings does not remove it.
 
-If the optional chronology provider is unavailable, the affected non-Gregorian
-date preview must say so explicitly rather than inventing an approximation.
+Common owns the executable resource ABIs, discovery, validation, loading and policy integration. System Settings selects and configures resources and consumes the same Common presentation interfaces as Calendar and Files. It contains no duplicate calendar or clock-face implementation.
+
+If a selected resource is missing, invalid or incompatible, its preview reports unavailable. Stored selection IDs remain intact, and selectors are disabled when no compatible installed resources exist.
 
 ## Calendar profiles
 
@@ -284,7 +280,7 @@ Presentation policy is user state, not application-local state.
 
 The Infiltrator policy is an optional enrichment layer for participating applications, not a hard dependency that prevents an application from running without System Settings. When no valid policy has been published, a platform-integrated consumer resolves the equivalent native operating-system/desktop preferences and remains fully usable. On Mint/Cinnamon, Calendar therefore behaves like the stock temporal surface until an Infiltrator policy exists; once a valid policy exists, the richer Infiltrator clock/calendar/location choices become authoritative for Common-aware presentation.
 
-The pinned Common 1.19.56 provides the canonical POSIX XDG location, validated load/atomic-save mechanics and the installed `temporal-v3` provider capability contract for this policy. System Settings publishes the provider marker when installed and writes the authoritative per-user `presentation.conf` only after the user changes temporal policy. Policy v3 stores `clock-mode`, `calendar`, `show-seconds`, `location-configured`, `latitude` and `longitude`. Linux stores it below the XDG configuration home; Windows stores the equivalent user policy below LocalAppData. Common parses/serializes the same versioned contract on both platforms. Existing v2 files are privately migrated by keeping their former primary calendar as the single v3 calendar and discarding the retired secondary value.
+The pinned Common 1.19.64 provides the canonical POSIX XDG location, validated load/atomic-save mechanics and the installed `temporal-v3` provider capability contract for this policy. System Settings publishes the provider marker when installed and writes the authoritative per-user `presentation.conf` only after the user changes temporal policy. Policy v3 stores `clock-mode`, `calendar`, `show-seconds`, `location-configured`, `latitude` and `longitude`. Linux stores it below the XDG configuration home; Windows stores the equivalent user policy below LocalAppData. Common parses/serializes the same versioned contract on both platforms. Existing v2 files are privately migrated by keeping their former primary calendar as the single v3 calendar and discarding the retired secondary value.
 
 ## Third-party applications
 

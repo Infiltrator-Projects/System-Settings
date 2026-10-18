@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.4.117 — 2026-10-18
+
+- Align the temporal presentation policy with all 30 independent calendars and
+  23 explicit clocks; remove descriptions of retired Common/application fallbacks.
+- Document resource-owned arithmetic, localization and scheduling, visible
+  unavailability and independent resource-package lifetime.
+- Retain the qualified Common 1.19.64 resource contract and consumer behaviour.
+
+## 0.4.116 — 2026-10-18
+
+- Require executable calendar resources for Gregorian and alternative date
+  presentation, and executable resources for every explicit clock.
+- Build selectors from installed validated resources and disable empty selectors.
+- Preserve unavailable selections and qualify previews, UI, sanitizer and
+  packaging behaviour against Common 1.19.64.
+
 ## 0.4.115 — 2026-10-18
 
 - Consume the reviewed Libraries/Common 1.19.58 typography resource contract with version 1.010 MB Corpo Title fonts, keeping family names and rendering weights unchanged.
