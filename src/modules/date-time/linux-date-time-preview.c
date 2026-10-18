@@ -179,7 +179,7 @@ gboolean ss_linux_date_time_preview_refresh(gpointer user_data)
     }
 
     /*
-     * Extended clocks can legitimately require a 250 ms timer, but the
+     * Extended clock modules schedule their own next boundary, but the
      * calendar and overview policy do not. Older iterations rebuilt the same
      * date, called into Calendar and rewrote static labels on every clock tick.
      * Cache successful date formatting by civil day/calendar and leave overview
@@ -296,10 +296,68 @@ guint ss_linux_date_time_panel_preview_interval_ms(
     }
     /*
      * Extended clocks may advance displayed units faster than one SI second.
-     * Until Common exposes a per-mode cadence capability, 250 ms remains the
-     * conservative sampling interval for those modes only.
+     * This 250 ms fallback applies only while a mode has no native next-tick
+     * provider; it is not the scheduling policy for installed clock modules.
      */
     return 250U;
+}
+
+/*
+ * The selected native module owns the exact next visible boundary. Legacy
+ * unextracted clocks retain their conservative sampling interval until they
+ * have executable resources. A one-minute cap also keeps civil-date previews
+ * and unexpected external system-clock/time-zone changes responsive.
+ */
+static guint next_preview_boundary_ms(SsLinuxDateTimePanel *state)
+{
+    const InfiltratrTemporalPolicyV3 *policy;
+    const char *id;
+    InfiltratrTemporalClockPresentation *presentation;
+    g_autoptr(GDateTime) now = NULL;
+    gint64 instant_us;
+    double latitude = 0.0;
+    double longitude = 0.0;
+    uint32_t until_tick = 0U;
+
+    if (state == NULL)
+        return 1000U;
+    policy = ss_date_time_model_policy(ss_linux_date_time_preview_model(state));
+    if (policy == NULL)
+        return 1000U;
+    id = strcmp(policy->clock_mode, "standard") == 0
+        ? ss_native_clock_mode_id(
+            ss_linux_date_time_preview_desktop_uses_24h(state))
+        : policy->clock_mode;
+    presentation = ensure_clock_presentation(state, id);
+    if (presentation != NULL) {
+        now = g_date_time_new_now_local();
+        if (now != NULL) {
+            instant_us = g_date_time_to_unix(now) * G_USEC_PER_SEC +
+                g_date_time_get_microsecond(now);
+            (void)preview_coordinates(state, &latitude, &longitude);
+            if (infiltratr_temporal_clock_presentation_next_tick(
+                    presentation, instant_us,
+                    (int32_t)(g_date_time_get_utc_offset(now) /
+                              G_USEC_PER_SEC),
+                    policy->show_seconds, latitude, longitude,
+                    &until_tick) && until_tick > 0U)
+                return MIN((guint)until_tick, 60000U);
+        }
+    }
+    return ss_linux_date_time_panel_preview_interval_ms(state);
+}
+
+static gboolean preview_timer_once(gpointer user_data)
+{
+    SsLinuxDateTimePanel *state = user_data;
+    if (state == NULL)
+        return G_SOURCE_REMOVE;
+
+    /* Clear the completed source before rearming the next one-shot timer. */
+    ss_linux_date_time_preview_state(state)->timer_id = 0U;
+    (void)ss_linux_date_time_preview_refresh(state);
+    ss_linux_date_time_preview_restart(state);
+    return G_SOURCE_REMOVE;
 }
 
 void ss_linux_date_time_preview_restart(SsLinuxDateTimePanel *state)
@@ -310,8 +368,8 @@ void ss_linux_date_time_preview_restart(SsLinuxDateTimePanel *state)
     }
     stop_preview_timer(state);
     ss_linux_date_time_preview_state(state)->timer_id = g_timeout_add(
-        ss_linux_date_time_panel_preview_interval_ms(state),
-        ss_linux_date_time_preview_refresh,
+        next_preview_boundary_ms(state),
+        preview_timer_once,
         state);
     g_source_set_name_by_id(
         ss_linux_date_time_preview_state(state)->timer_id,
@@ -328,15 +386,8 @@ static void on_panel_mapped(
         return;
     }
     (void)ss_linux_date_time_preview_refresh(state);
-    if (ss_linux_date_time_preview_state(state)->timer_id == 0U) {
-        ss_linux_date_time_preview_state(state)->timer_id = g_timeout_add(
-            ss_linux_date_time_panel_preview_interval_ms(state),
-            ss_linux_date_time_preview_refresh,
-            state);
-        g_source_set_name_by_id(
-            ss_linux_date_time_preview_state(state)->timer_id,
-            "[system-settings] visible Date & Time preview");
-    }
+    if (ss_linux_date_time_preview_state(state)->timer_id == 0U)
+        ss_linux_date_time_preview_restart(state);
 }
 
 static void on_panel_unmapped(
