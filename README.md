@@ -11,7 +11,7 @@ The project takes the strongest part of the classic Amiga/Control Panel model �
 **Status:** Phase 1 in progress: Linux GTK4 Date & Time panel, portable model, and Linux/Windows policy persistence. Windows currently builds the policy CLI and tests, not a settings GUI. Dynamic modules, global search and deep links remain planned.
 **Primary targets:** Linux Mint/Cinnamon and Windows desktop
 **Implementation:** native C/C++, using the strongest style for each component
-**Shared foundation:** pinned Libraries 1.19.62\
+**Shared foundation:** pinned Libraries 1.19.63\
 **Licence:** GPL-3.0-or-later
 
 ## UI North Star
@@ -86,9 +86,9 @@ System Settings should:
 
 The first implementation slice is Date & Time. The repository now contains the shared semantic Date & Time model, Linux and Windows per-user temporal-policy stores, module metadata, tests, Linux/Windows CI, and the first native System Settings shell. On Linux the GTK4 shell presents a real Date & Time panel with a live clock/date preview, the clock and calendar catalogues from the exact pinned Common revision, seconds policy, geographic location and current time-zone display. Changes are saved immediately through the same model used by non-UI consumers.
 
-The current temporal policy is version 3 in Common 1.19.62. System Settings is the sole Infiltrator authority for the richer clock system, calendar system, seconds and geographic-location policy; Calendar does not maintain competing local choices. The policy is deliberately optional for consumers: the installed Linux package publishes a versioned `temporal-v3` provider capability marker, but consumers still remain on their native platform defaults until a valid Infiltrator policy has actually been saved. On Mint/Cinnamon this means the Calendar replacement continues to follow Cinnamon/locale temporal preferences until System Settings publishes an extended policy.
+The current temporal policy is version 3 in Common 1.19.63. System Settings is the sole Infiltrator authority for the richer clock system, calendar system, seconds and geographic-location policy; Calendar does not maintain competing local choices. The policy is deliberately optional for consumers: the installed Linux package publishes a versioned `temporal-v3` provider capability marker, but consumers still remain on their native platform defaults until a valid Infiltrator policy has actually been saved. On Mint/Cinnamon this means the Calendar replacement continues to follow Cinnamon/locale temporal preferences until System Settings publishes an extended policy.
 
-Common 1.19.62 retains interim historical formatting only for seven unmigrated alternative modes. All sixteen extracted clock modes, including sidereal, Chinese double-hours, apparent solar, Italian sunset hours, Renaissance Babylonian sunrise hours and explicit conventional 12/24-hour time, own their notation and next-tick scheduling in independently installed resources; a missing module never triggers a compiled fallback. Calendar 1.0.86 supplies Chinese/Dangi native cyclic year names to both date preview surfaces, without an added Gregorian year or bare cycle counter. These shared owners control presentation; System Settings saves the user's choices and consumes their output.
+Common 1.19.63 retains interim historical formatting for the five unmigrated alternative modes. All eighteen extracted clocks, including ancient Babylonian bēru/UŠ and Indian ghaṭī/pala, own their notation and next-tick scheduling in independently installed resources; missing modules never trigger compiled clock-face fallbacks. Calendar 1.0.86 supplies Chinese/Dangi native cyclic year names to both date preview surfaces, without an added Gregorian year or bare cycle counter. These shared owners control presentation; System Settings saves the user's choices and consumes their output.
 
 ## User experience
 
