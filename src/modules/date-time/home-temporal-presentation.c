@@ -77,8 +77,9 @@ static gchar *format_clock(
     }
 
     /*
-     * Home refreshes at minute scale. Its short-lived handle still executes
-     * the same validated system resource as Calendar; no duplicate formatter.
+     * Home refreshes at minute scale. Installed resources take precedence,
+     * including Julian/MJD, via Common 1.19.55. Older non-migrated modes
+     * retain a temporary portable compatibility path.
      */
     presentation = infiltratr_temporal_clock_presentation_new(effective_mode);
     if (presentation == NULL) {

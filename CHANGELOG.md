@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.113 — 2026-10-18
+
+- Pin the released Common 1.19.55 clock presentation contract and prefer the installed executable Julian Date / Modified Julian Date resources in Home and Date & Time previews.
+- Preserve the existing shared clock-selection policy, preview caching, fixed-unit clock fail-closed behaviour and temporary Julian portable compatibility when a resource is not installed.
+- Add Home presentation regression checks for Julian/MJD, including resource rendering or the compatibility fallback.
+
+
 ## 0.4.112 — 2026-10-18
 
 - Route the Date & Time preview and Home clock display through Common's executable clock presentation API.

@@ -84,6 +84,35 @@ int main(void)
         infiltratr_temporal_clock_module_free(installed);
     }
 
+    /*
+     * A shared installed Julian/MJD provider must win over Common's
+     * compatibility formatter; when the module has not been installed,
+     * preserve the portable result until migration is enforced.
+     */
+    for (gsize i = 0; i < 2U; ++i) {
+        const char *id = i == 0U ? "julian" : "modified-julian";
+        char expected[192] = {0};
+        size_t length = 0U;
+        InfiltratrTemporalClockModule *installed =
+            infiltratr_temporal_clock_module_open_id(id);
+        infiltratr_copy_string(policy.clock_mode, sizeof(policy.clock_mode), id);
+        g_assert_true(ss_home_temporal_presentation_format(
+            &policy, noon, true, &presentation));
+        if (installed != NULL) {
+            g_assert_true(infiltratr_temporal_clock_format(
+                installed, "en_AU", INT64_C(43200000000), 0, true, false,
+                0.0, 0.0, expected, sizeof(expected), &length));
+        } else {
+            g_assert_true(infiltratr_temporal_format_clock_mode_localized(
+                "en_AU", id, INT64_C(43200000000), 0,
+                true, false, false, 0.0, 0.0,
+                expected, sizeof(expected), &length));
+        }
+        g_assert_cmpstr(presentation.clock_text, ==, expected);
+        ss_home_temporal_presentation_clear(&presentation);
+        infiltratr_temporal_clock_module_free(installed);
+    }
+
     infiltratr_copy_string(
         policy.clock_mode, sizeof(policy.clock_mode), "standard-24");
     policy.show_seconds = false;
