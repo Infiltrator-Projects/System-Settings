@@ -702,7 +702,7 @@ if(UNIX AND NOT APPLE)
     set(CPACK_DEBIAN_PACKAGE_SECTION "utils")
     set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
     set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
-    set(CPACK_DEBIAN_PACKAGE_DEPENDS "infiltrator-calendar-resources (>= 1.0.116)")
+    set(CPACK_DEBIAN_PACKAGE_SUGGESTS "infiltrator-calendar-resources (>= 1.19.66)")
 endif()
 
 include(CPack)
