@@ -12,6 +12,7 @@
 #include "system-settings/manual-time.h"
 #include "system-settings/system-time-service.h"
 
+#include <infiltratr/temporal_clock_resource.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -76,6 +77,34 @@ static bool manual_representation_supported(
            ss_manual_time_mode_supported(policy->clock_mode);
 }
 
+/* The manual editor is a canonical-date writer, not an alternative clock
+ * engine. Reuse the native provider for its initial clock text. Deliberately
+ * request English AM/PM: manual_time_parse currently accepts those ASCII
+ * markers, so the editable representation must remain reversible even under
+ * non-English desktop UI locales. */
+static bool format_manual_clock_resource(const char *mode,
+                                         bool desktop_use_24h,
+                                         int64_t instant,
+                                         int32_t offset,
+                                         bool seconds,
+                                         char *buffer,
+                                         size_t capacity)
+{
+    const char *id = mode;
+    InfiltratrTemporalClockPresentation *presentation;
+    bool ok;
+    if (id == NULL) return false;
+    if (strcmp(id, "standard") == 0)
+        id = ss_native_clock_mode_id(desktop_use_24h);
+    presentation = infiltratr_temporal_clock_presentation_new(id);
+    if (presentation == NULL) return false;
+    ok = infiltratr_temporal_clock_presentation_format(
+        presentation, "en_AU", instant, offset, seconds,
+        false, false, 0.0, 0.0, buffer, capacity, NULL);
+    infiltratr_temporal_clock_presentation_free(presentation);
+    return ok;
+}
+
 static void fill_manual_time_entries(SsLinuxDateTimePanel *state)
 {
     const InfiltratrTemporalPolicyV3 *policy;
@@ -106,7 +135,7 @@ static void fill_manual_time_entries(SsLinuxDateTimePanel *state)
         gtk_editable_set_text(
             GTK_EDITABLE(ss_linux_date_time_system_time_state(state)->manual_date), date);
     }
-    if (ss_manual_time_format(
+    if (format_manual_clock_resource(
             policy->clock_mode,
             ss_linux_date_time_panel_desktop_uses_24h(state),
             unix_microseconds,

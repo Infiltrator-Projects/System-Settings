@@ -49,11 +49,12 @@ int main(void)
     CHECK(!ss_manual_time_parse(
         "decimal", true, "10:00:00", &us));
 
-    CHECK(ss_manual_time_format(
-        "decimal", true,
-        INT64_C(43200000000), 0, true,
+    /* Portable policy code must not recreate the installed decimal clock. */
+    strcpy(text, "untouched");
+    CHECK(!ss_manual_time_format(
+        "decimal", true, INT64_C(43200000000), 0, true,
         text, sizeof(text)));
-    CHECK(strcmp(text, "5:00:00") == 0);
+    CHECK(strcmp(text, "untouched") == 0);
 
     static const char *const invalid[] = {
         "", "1", ":20", "12:", "12:00:", "12:00:00junk", "+1:00", "-1:00",

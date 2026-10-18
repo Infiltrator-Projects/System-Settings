@@ -21,11 +21,10 @@ extern "C" {
 bool ss_manual_time_mode_supported(const char *clock_mode);
 
 /**
- * Format one canonical instant using the selected reversible clock mode.
- *
- * "standard" follows @desktop_use_24h. Explicit 12-hour, 24-hour and decimal
- * modes ignore that desktop preference. Other clock systems deliberately fail
- * until a mathematically sound inverse is available.
+ * Deprecated portable formatter: deliberately returns false now that
+ * clock faces are owned by installed native resources. The Linux manual-time
+ * UI formats through Common's clock presentation ABI. The separate legacy
+ * parse operation below remains available while resource parsing is designed.
  */
 bool ss_manual_time_format(const char *clock_mode,
                            bool desktop_use_24h,

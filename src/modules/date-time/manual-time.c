@@ -34,6 +34,11 @@ bool ss_manual_time_mode_supported(const char *clock_mode)
     return profile_for_mode(clock_mode, true, &profile);
 }
 
+/*
+ * Compatibility symbol for portable callers: no copied clock-face arithmetic.
+ * Linux's manual-time editor invokes the installed resource through the
+ * platform adapter instead. Portable mode parsing is a separate input contract.
+ */
 bool ss_manual_time_format(const char *clock_mode,
                            bool desktop_use_24h,
                            int64_t unix_microseconds,
@@ -42,19 +47,10 @@ bool ss_manual_time_format(const char *clock_mode,
                            char *buffer,
                            size_t capacity)
 {
-    InfiltratrClockProfile profile;
-
-    if (!profile_for_mode(clock_mode, desktop_use_24h, &profile)) {
-        return false;
-    }
-    return infiltratr_temporal_format_clock(
-        profile,
-        unix_microseconds,
-        utc_offset_seconds,
-        show_seconds,
-        buffer,
-        capacity,
-        NULL);
+    (void)clock_mode; (void)desktop_use_24h;
+    (void)unix_microseconds; (void)utc_offset_seconds;
+    (void)show_seconds; (void)buffer; (void)capacity;
+    return false;
 }
 
 /* Each field has at most two ASCII digits: reject signs, whitespace,

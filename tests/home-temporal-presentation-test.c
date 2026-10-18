@@ -56,7 +56,11 @@ int main(void)
         policy.show_seconds = false;
         g_assert_true(ss_home_temporal_presentation_format(
             &policy, noon, true, &raw_output));
-        g_assert_cmpstr(raw_output.clock_text, ==, "12:00");
+        if (infiltratr_temporal_clock_module_open_id("standard-24") != NULL) {
+            g_assert_cmpstr(raw_output.clock_text, ==, "12:00");
+        } else {
+            g_assert_nonnull(strstr(raw_output.clock_text, "resource unavailable"));
+        }
         ss_home_temporal_presentation_clear(&raw_output);
     }
 
@@ -85,9 +89,8 @@ int main(void)
     }
 
     /*
-     * A shared installed Julian/MJD provider must win over Common's
-     * compatibility formatter; when the module has not been installed,
-     * preserve the portable result until migration is enforced.
+     * Native Julian/MJD are mandatory, not preferred. When absent, display
+     * resource-unavailable rather than using a duplicate built-in formatter.
      */
     for (gsize i = 0; i < 2U; ++i) {
         const char *id = i == 0U ? "julian" : "modified-julian";
@@ -103,12 +106,11 @@ int main(void)
                 installed, "en_AU", INT64_C(43200000000), 0, true, false,
                 0.0, 0.0, expected, sizeof(expected), &length));
         } else {
-            g_assert_true(infiltratr_temporal_format_clock_mode_localized(
-                "en_AU", id, INT64_C(43200000000), 0,
-                true, false, false, 0.0, 0.0,
-                expected, sizeof(expected), &length));
+            g_assert_nonnull(strstr(presentation.clock_text,
+                                    "resource unavailable"));
         }
-        g_assert_cmpstr(presentation.clock_text, ==, expected);
+        if (installed != NULL)
+            g_assert_cmpstr(presentation.clock_text, ==, expected);
         ss_home_temporal_presentation_clear(&presentation);
         infiltratr_temporal_clock_module_free(installed);
     }
@@ -118,8 +120,18 @@ int main(void)
     policy.show_seconds = false;
     g_assert_true(ss_home_temporal_presentation_format(
         &policy, noon, false, &presentation));
-    g_assert_cmpstr(presentation.clock_text, ==, "12:00");
-    g_assert_null(strstr(presentation.clock_text, ":00:"));
+    {
+        InfiltratrTemporalClockModule *standard =
+            infiltratr_temporal_clock_module_open_id("standard-24");
+        if (standard != NULL) {
+            g_assert_cmpstr(presentation.clock_text, ==, "12:00");
+            g_assert_null(strstr(presentation.clock_text, ":00:"));
+        } else {
+            g_assert_nonnull(strstr(presentation.clock_text,
+                                    "resource unavailable"));
+        }
+        infiltratr_temporal_clock_module_free(standard);
+    }
     ss_home_temporal_presentation_clear(&presentation);
 
     /*
