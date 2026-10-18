@@ -308,6 +308,23 @@ static void exercise_window(
             expectations->show_seconds != FALSE);
     }
 
+    /*
+     * The shell's GtkStack uses a 110 ms crossfade. Its outgoing subtree is
+     * still participating in frame-clock references after the navigation
+     * assertions (which intentionally wait only 20 ms). Closing the entire
+     * shell mid-transition races widget finalization under PGO. Finish the
+     * *real* UI transition before testing close/reopen ownership semantics.
+     */
+    GtkWidget *stack_widget = find_widget_type(root, GTK_TYPE_STACK);
+    g_assert_true(GTK_IS_STACK(stack_widget));
+    const gint64 transition_deadline =
+        g_get_monotonic_time() + G_TIME_SPAN_SECOND;
+    while (gtk_stack_get_transition_running(GTK_STACK(stack_widget)) &&
+           g_get_monotonic_time() < transition_deadline) {
+        drain_main_context_for(10U);
+    }
+    g_assert_false(gtk_stack_get_transition_running(GTK_STACK(stack_widget)));
+
     gtk_window_close(window);
     for (unsigned int attempt = 0U; attempt < 1000U; ++attempt) {
         drain_main_context();
