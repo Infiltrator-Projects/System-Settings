@@ -56,11 +56,14 @@ int main(void)
         policy.show_seconds = false;
         g_assert_true(ss_home_temporal_presentation_format(
             &policy, noon, true, &raw_output));
-        if (infiltratr_temporal_clock_module_open_id("standard-24") != NULL) {
+        InfiltratrTemporalClockModule *standard =
+            infiltratr_temporal_clock_module_open_id("standard-24");
+        if (standard != NULL) {
             g_assert_cmpstr(raw_output.clock_text, ==, "12:00");
         } else {
             g_assert_nonnull(strstr(raw_output.clock_text, "resource unavailable"));
         }
+        infiltratr_temporal_clock_module_free(standard);
         ss_home_temporal_presentation_clear(&raw_output);
     }
 

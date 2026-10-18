@@ -50,7 +50,7 @@ int main(void)
         "decimal", true, "10:00:00", &us));
 
     /* Portable policy code must not recreate the installed decimal clock. */
-    strcpy(text, "untouched");
+    memcpy(text, "untouched", sizeof("untouched"));
     CHECK(!ss_manual_time_format(
         "decimal", true, INT64_C(43200000000), 0, true,
         text, sizeof(text)));

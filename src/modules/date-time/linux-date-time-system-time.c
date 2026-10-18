@@ -10,6 +10,7 @@
 #include "linux-date-time-system-time-private.h"
 
 #include "system-settings/manual-time.h"
+#include "system-settings/native-clock-policy.h"
 #include "system-settings/system-time-service.h"
 
 #include <infiltratr/temporal_clock_resource.h>
