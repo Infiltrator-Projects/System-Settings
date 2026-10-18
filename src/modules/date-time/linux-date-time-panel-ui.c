@@ -577,6 +577,12 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     strings = clock_mode_strings(state);
     state->clock_mode = GTK_DROP_DOWN(
         gtk_drop_down_new(G_LIST_MODEL(strings), NULL));
+    const bool clocks_available = g_list_model_get_n_items(
+        gtk_drop_down_get_model(state->clock_mode)) > 0U;
+    gtk_widget_set_sensitive(GTK_WIDGET(state->clock_mode),clocks_available);
+    if (!clocks_available)
+        gtk_widget_set_tooltip_text(GTK_WIDGET(state->clock_mode),
+            "No clock resources available");
     /* gtk_drop_down_new() consumes the model reference (transfer full). */
     gtk_widget_add_css_class(
         GTK_WIDGET(state->clock_mode), "setting-dropdown");
@@ -592,6 +598,12 @@ GtkWidget *ss_linux_date_time_panel_build_ui(SsLinuxDateTimePanel *state)
     strings = calendar_strings();
     state->calendar = GTK_DROP_DOWN(
         gtk_drop_down_new(G_LIST_MODEL(strings), NULL));
+    const bool calendars_available = g_list_model_get_n_items(
+        gtk_drop_down_get_model(state->calendar)) > 0U;
+    gtk_widget_set_sensitive(GTK_WIDGET(state->calendar),calendars_available);
+    if (!calendars_available)
+        gtk_widget_set_tooltip_text(GTK_WIDGET(state->calendar),
+            "No calendar resources available");
     /* gtk_drop_down_new() consumes the model reference (transfer full). */
     gtk_widget_add_css_class(
         GTK_WIDGET(state->calendar), "setting-dropdown");

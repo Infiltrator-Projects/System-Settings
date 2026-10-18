@@ -557,6 +557,7 @@ if(BUILD_TESTING)
             "${CMAKE_CURRENT_SOURCE_DIR}/src/shell/linux")
         target_link_libraries(linux-shell-test PRIVATE
             system-settings-linux-shell
+            InfiltratrCommon::Common
             PkgConfig::GTK4)
         find_program(SS_XVFB_RUN xvfb-run)
         if(SS_XVFB_RUN)

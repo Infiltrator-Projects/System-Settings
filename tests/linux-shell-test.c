@@ -4,6 +4,7 @@
 #include "home-status.h"
 
 #include <gtk/gtk.h>
+#include <infiltratr/temporal_runtime.h>
 
 typedef struct ExerciseExpectations {
     gboolean persisted;
@@ -270,8 +271,13 @@ static void exercise_window(
         const guint clock_count = g_list_model_get_n_items(clock_model);
         const guint current_clock = gtk_drop_down_get_selected(clock);
 
-        g_assert_cmpuint(clock_count, >, 1U);
-        expectations->clock_index = (current_clock + 1U) % clock_count;
+        /* Only validated installed explicit clocks are selectable. A clean
+         * build host can correctly have none; it must not offer fake clocks. */
+        const size_t installed=infiltratr_temporal_installed_clock_mode_count();
+        g_assert_cmpuint(clock_count,==,installed-1U); // excludes OS-following standard
+        expectations->clock_index = clock_count > 0U
+            ? (current_clock + 1U) % clock_count : GTK_INVALID_LIST_POSITION;
+        g_assert_cmpint(gtk_widget_get_sensitive(GTK_WIDGET(clock)),==,clock_count>0U);
         expectations->show_seconds =
             gtk_switch_get_active(seconds) == FALSE;
 
