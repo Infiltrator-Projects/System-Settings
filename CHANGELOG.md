@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.115 — 2026-10-18
+
+- Consume the reviewed Libraries/Common 1.19.58 typography resource contract with version 1.010 MB Corpo Title fonts, keeping family names and rendering weights unchanged.
+- Replace the legacy MBLink archive download with three pinned individual InfiltratorOS font sources validated by SHA-256, preserving standalone System Settings packaging.
+- Keep the program's date/time policy, installed filesystem paths and persistent shared OS font cache unchanged.
+
+
 ## 0.4.113 — 2026-10-18
 
 - Pin the released Common 1.19.55 clock presentation contract and prefer the installed executable Julian Date / Modified Julian Date resources in Home and Date & Time previews.
