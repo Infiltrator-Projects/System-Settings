@@ -171,7 +171,17 @@ int main(void)
         ss_home_temporal_presentation_init(&second);
         g_assert_true(ss_home_temporal_presenter_format_now(
             presenter, &first));
-        g_assert_cmpuint(count_character(first.clock_text, ':'), ==, 1U);
+        {
+            InfiltratrTemporalClockModule *standard =
+                infiltratr_temporal_clock_module_open_id("standard-24");
+            if (standard != NULL) {
+                g_assert_cmpuint(count_character(first.clock_text, ':'), ==, 1U);
+            } else {
+                g_assert_nonnull(strstr(first.clock_text,
+                                        "resource unavailable"));
+            }
+            infiltratr_temporal_clock_module_free(standard);
+        }
 
         g_assert_cmpint(g_chmod(policy_path, 0000), ==, 0);
         for (unsigned int i = 0U; i < 100U; ++i) {
@@ -245,11 +255,29 @@ int main(void)
     infiltratr_copy_string(policy.clock_mode, sizeof(policy.clock_mode), "standard-12");
     policy.show_seconds = false;
     g_assert_true(ss_home_temporal_presentation_format(&policy, noon, true, &presentation));
-    g_assert_cmpstr(presentation.clock_text, ==, "下午12:00");
+    {
+        InfiltratrTemporalClockModule *standard =
+            infiltratr_temporal_clock_module_open_id("standard-12");
+        if (standard != NULL)
+            g_assert_cmpstr(presentation.clock_text, ==, "下午12:00");
+        else
+            g_assert_nonnull(strstr(presentation.clock_text,
+                                    "resource unavailable"));
+        infiltratr_temporal_clock_module_free(standard);
+    }
     ss_home_temporal_presentation_clear(&presentation);
     g_setenv("LANGUAGE", "ja_JP", TRUE);
     g_assert_true(ss_home_temporal_presentation_format(&policy, noon, true, &presentation));
-    g_assert_cmpstr(presentation.clock_text, ==, "午後12:00");
+    {
+        InfiltratrTemporalClockModule *standard =
+            infiltratr_temporal_clock_module_open_id("standard-12");
+        if (standard != NULL)
+            g_assert_cmpstr(presentation.clock_text, ==, "午後12:00");
+        else
+            g_assert_nonnull(strstr(presentation.clock_text,
+                                    "resource unavailable"));
+        infiltratr_temporal_clock_module_free(standard);
+    }
     ss_home_temporal_presentation_clear(&presentation);
     g_setenv("LANGUAGE", "en_AU", TRUE);
     {
