@@ -110,7 +110,8 @@ static bool format_preview_at(SsLinuxDateTimePanel *state,
     /*
      * Resolve the desktop's conventional choice, then dispatch all explicit
      * time systems through Common's shared presentation/resource boundary.
-     * The five migrated systems must not use Common's legacy compiled copy.
+     * All eleven extracted clocks must use native resources. None may
+     * silently fall back to an old Common-compiled clock face.
      */
     effective_mode = policy->clock_mode;
     if (strcmp(effective_mode, "standard") == 0) {
