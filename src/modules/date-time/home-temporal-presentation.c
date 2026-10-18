@@ -77,9 +77,8 @@ static gchar *format_clock(
     }
 
     /*
-     * Home refreshes at minute scale. Installed resources take precedence,
-     * including Julian/MJD, via Common 1.19.55. Older non-migrated modes
-     * retain a temporary portable compatibility path.
+     * Home refreshes at minute scale. All explicit clock modes require their
+     * independent installed implementation through Common's validated ABI.
      */
     presentation = infiltratr_temporal_clock_presentation_new(effective_mode);
     if (presentation == NULL) {
@@ -109,11 +108,7 @@ static gchar *format_date_with_provider(
     char formatted[INFILTRATR_TEMPORAL_DATE_CAPACITY];
 
     if (policy == NULL || now == NULL) return NULL;
-    if (strcmp(policy->calendar, "gregorian") == 0) {
-        return g_date_time_format(now, "%A, %e %B %Y");
-    }
-    calendar = infiltratr_temporal_calendar_find(policy->calendar);
-    if (calendar == NULL) return NULL;
+    calendar = infiltratr_temporal_installed_calendar_find(policy->calendar);
 
     if (infiltratr_temporal_posix_format_date(
             provider,
@@ -127,7 +122,8 @@ static gchar *format_date_with_provider(
             NULL)) {
         return g_strdup(formatted);
     }
-    return g_strdup_printf("%s — preview unavailable", calendar->name);
+    return g_strdup_printf("%s — resource unavailable",
+        calendar != NULL ? calendar->name : policy->calendar);
 }
 
 static bool format_into(
@@ -168,8 +164,6 @@ static gchar *presenter_format_date(
     const gint year = g_date_time_get_year(now);
     const gint month = g_date_time_get_month(now);
     const gint day = g_date_time_get_day_of_month(now);
-    const bool gregorian =
-        g_strcmp0(presenter->policy.calendar, "gregorian") == 0;
     g_autofree gchar *formatted = NULL;
 
     if (presenter->cached_date_text != NULL &&
@@ -182,30 +176,17 @@ static gchar *presenter_format_date(
         return g_strdup(presenter->cached_date_text);
     }
 
-    if (gregorian) {
-        formatted = g_date_time_format(now, "%A, %e %B %Y");
-    } else {
-        const InfiltratrTemporalCalendarInfo *calendar =
-            infiltratr_temporal_calendar_find(presenter->policy.calendar);
-        char buffer[INFILTRATR_TEMPORAL_DATE_CAPACITY];
-        if (infiltratr_temporal_posix_format_date(
-                presenter->calendar_provider,
-                presenter->policy.calendar,
-                year,
-                month,
-                day,
-                "full",
-                buffer,
-                sizeof(buffer),
-                NULL)) {
-            formatted = g_strdup(buffer);
-        }
-        if (formatted == NULL) {
-            return calendar != NULL
-                ? g_strdup_printf(
-                      "%s — preview unavailable", calendar->name)
-                : NULL;
-        }
+    const InfiltratrTemporalCalendarInfo *calendar =
+        infiltratr_temporal_installed_calendar_find(presenter->policy.calendar);
+    char buffer[INFILTRATR_TEMPORAL_DATE_CAPACITY];
+    if (infiltratr_temporal_posix_format_date(
+            presenter->calendar_provider, presenter->policy.calendar,
+            year, month, day, "full", buffer, sizeof(buffer), NULL)) {
+        formatted = g_strdup(buffer);
+    }
+    if (formatted == NULL) {
+        return g_strdup_printf("%s — resource unavailable",
+            calendar != NULL ? calendar->name : presenter->policy.calendar);
     }
     if (formatted == NULL) {
         return NULL;

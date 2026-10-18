@@ -5,20 +5,20 @@
 #include <infiltratr/temporal.h>
 #include <infiltratr/temporal_runtime.h>
 
-/*
- * Date & Time consumes the installed calendar catalogue, not Common's
- * compatibility-only built-in array.  This private remapping keeps the two
- * large GTK controller units source-compatible while making filesystem
- * resources first-class selectors.  It is intentionally calendar-only:
- * Common can discover clock metadata, but an executable clock behaviour ABI
- * has not yet been qualified, so exposing metadata-only clocks would allow a
- * user to select something the formatter cannot execute.
- */
+/* Settings enumerates validated installed implementations. OS-following
+ * standard remains a policy selector; every explicit clock needs a module. */
 #define infiltratr_temporal_calendar_count() \
     infiltratr_temporal_installed_calendar_count()
 #define infiltratr_temporal_calendar_at(index_) \
     infiltratr_temporal_installed_calendar_at((index_))
 #define infiltratr_temporal_calendar_find(id_) \
     infiltratr_temporal_installed_calendar_find((id_))
+
+#define infiltratr_temporal_clock_mode_count() \
+    infiltratr_temporal_installed_clock_mode_count()
+#define infiltratr_temporal_clock_mode_at(index_) \
+    infiltratr_temporal_installed_clock_mode_at((index_))
+#define infiltratr_temporal_clock_mode_find(id_) \
+    infiltratr_temporal_installed_clock_mode_find((id_))
 
 #endif

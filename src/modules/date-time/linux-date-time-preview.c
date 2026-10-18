@@ -199,45 +199,21 @@ gboolean ss_linux_date_time_preview_refresh(gpointer user_data)
     if (!date_cache_hit) {
         const InfiltratrTemporalCalendarInfo *calendar =
             infiltratr_temporal_installed_calendar_find(policy->calendar);
-        g_autofree gchar *gregorian =
-            g_date_time_format(now, "%A, %e %B %Y");
         char selected_date[INFILTRATR_TEMPORAL_DATE_CAPACITY];
         g_autofree gchar *summary = NULL;
         bool cacheable = false;
 
-        if (calendar != NULL) {
-            if (strcmp(policy->calendar, "gregorian") == 0) {
-                summary = g_strdup_printf(
-                    "%s • %s",
-                    calendar->name,
-                    gregorian != NULL ? gregorian : "");
-                cacheable = true;
-            } else {
-                if (infiltratr_temporal_posix_format_date(
-                        ensure_calendar_date_provider(state),
-                        policy->calendar,
-                        year,
-                        month,
-                        day,
-                        "full",
-                        selected_date,
-                        sizeof(selected_date),
-                        NULL)) {
-                    summary = g_strdup_printf(
-                        "%s • %s",
-                        calendar->name,
-                        selected_date);
-                    cacheable = true;
-                } else {
-                    summary = g_strdup_printf(
-                        "%s • preview unavailable",
-                        calendar->name);
-                }
-            }
+        if (infiltratr_temporal_posix_format_date(
+                ensure_calendar_date_provider(state), policy->calendar,
+                year, month, day, "full", selected_date,
+                sizeof(selected_date), NULL)) {
+            summary = g_strdup_printf("%s • %s",
+                calendar != NULL ? calendar->name : policy->calendar,
+                selected_date);
+            cacheable = true;
         } else {
-            summary = g_strdup_printf(
-                "%s • resource unavailable",
-                policy->calendar);
+            summary = g_strdup_printf("%s • resource unavailable",
+                calendar != NULL ? calendar->name : policy->calendar);
         }
 
         if (summary != NULL &&

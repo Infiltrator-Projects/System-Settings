@@ -23,6 +23,15 @@ static guint count_character(const char *text, char needle)
     return count;
 }
 
+static void assert_clock_text(const SsHomeTemporalPresentation *value,
+    const char *id,const char *expected)
+{
+    InfiltratrTemporalClockModule *module=infiltratr_temporal_clock_module_open_id(id);
+    if (module != NULL) g_assert_cmpstr(value->clock_text,==,expected);
+    else g_assert_nonnull(strstr(value->clock_text,"resource unavailable"));
+    infiltratr_temporal_clock_module_free(module);
+}
+
 int main(void)
 {
     g_autofree gchar *root =
@@ -246,11 +255,11 @@ int main(void)
     infiltratr_copy_string(policy.clock_mode, sizeof(policy.clock_mode), "chinese-time");
     policy.show_seconds = true;
     g_assert_true(ss_home_temporal_presentation_format(&policy, noon, true, &presentation));
-    g_assert_cmpstr(presentation.clock_text, ==, "Wǔ, second half");
+    assert_clock_text(&presentation,"chinese-time","Wǔ, second half");
     ss_home_temporal_presentation_clear(&presentation);
     g_setenv("LANGUAGE", "zh_TW", TRUE);
     g_assert_true(ss_home_temporal_presentation_format(&policy, noon, true, &presentation));
-    g_assert_cmpstr(presentation.clock_text, ==, "午正");
+    assert_clock_text(&presentation,"chinese-time","午正");
     ss_home_temporal_presentation_clear(&presentation);
     infiltratr_copy_string(policy.clock_mode, sizeof(policy.clock_mode), "standard-12");
     policy.show_seconds = false;
@@ -289,7 +298,7 @@ int main(void)
         for (gsize i = 0; i < G_N_ELEMENTS(modes); i++) {
             infiltratr_copy_string(policy.clock_mode, sizeof(policy.clock_mode), modes[i]);
             g_assert_true(ss_home_temporal_presentation_format(&policy, j2000, true, &presentation));
-            g_assert_cmpstr(presentation.clock_text, ==, "Mi · 四 bells");
+            assert_clock_text(&presentation,modes[i],"Mi · 四 bells");
             ss_home_temporal_presentation_clear(&presentation);
         }
     }
