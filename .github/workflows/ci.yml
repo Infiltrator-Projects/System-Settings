@@ -143,7 +143,7 @@ jobs:
 
   static-analysis:
     name: Clang static analysis
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, Linux, X64, linux-native]
     timeout-minutes: 30
     env:
       PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -219,7 +219,7 @@ jobs:
 
   sanitizers:
     name: Linux ASan and UBSan
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, Linux, X64, linux-native]
     timeout-minutes: 30
     env:
       PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -267,7 +267,7 @@ jobs:
     name: Publish exact tested release
     needs: [linux, static-analysis, windows, sanitizers]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04
+    runs-on: [self-hosted, Linux, X64, linux-native]
     concurrency:
       group: system-settings-release
       cancel-in-progress: false
