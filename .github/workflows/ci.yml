@@ -15,7 +15,7 @@ permissions:
 jobs:
   linux:
     name: Linux build, test and package
-    runs-on: [self-hosted, Linux, X64, linux-native]
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -143,7 +143,7 @@ jobs:
 
   static-analysis:
     name: Clang static analysis
-    runs-on: [self-hosted, Linux, X64, linux-native]
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
@@ -219,7 +219,7 @@ jobs:
 
   sanitizers:
     name: Linux ASan and UBSan
-    runs-on: [self-hosted, Linux, X64, linux-native]
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
