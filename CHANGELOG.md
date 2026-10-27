@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.121 — 2026-10-28
+
+- Document exclusive clock/calendar implementation ownership by the 54 independent provider repositories, following removal of Common's reference copies.
+- Keep the public provider interfaces and independent package installation contract.
+
 ## 0.4.120 — 2026-10-27
 
 - Suggest the 54 independent clock/calendar provider packages instead of Common’s retired combined package.
