@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.120 — 2026-10-27
+
+- Suggest the 54 independent clock/calendar provider packages instead of Common’s retired combined package.
+- Keep provider implementation, translation and installation ownership separate from the application.
+
 ## 0.4.117 — 2026-10-18
 
 - Align the temporal presentation policy with all 30 independent calendars and
