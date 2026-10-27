@@ -88,7 +88,7 @@ The first implementation slice is Date & Time. The repository now contains the s
 
 The current temporal policy is version 3 in Common 1.19.66. System Settings is the sole Infiltrator authority for the richer clock system, calendar system, seconds and geographic-location policy; Calendar does not maintain competing local choices. The policy is deliberately optional for consumers: the installed Linux package publishes a versioned `temporal-v3` provider capability marker, but consumers still remain on their native platform defaults until a valid Infiltrator policy has actually been saved. On Mint/Cinnamon this means the Calendar replacement continues to follow Cinnamon/locale temporal preferences until System Settings publishes an extended policy.
 
-Common 1.19.66 provides normal host Gregorian dates and standard system time without optional modules. Additional calendars and explicit clock styles require their independent installed resources. All twenty-three clocks own their notation and scheduling in Calendar Resources; all thirty calendar implementations own their fields, formatting and navigation there. Missing modules are visibly unavailable. An installed Gregorian provider can enrich the normal host calendar. System Settings enumerates validated installations and records selections; it owns no calendar or clock algorithms.
+Common 1.19.66 provides normal host Gregorian dates and standard system time without optional modules. Additional calendars and explicit clock styles require their independent installed resources. The 31 calendar and 23 clock repositories own their implementations, builds, translations and releases. Missing modules are visibly unavailable. An installed Gregorian provider can enrich the normal host calendar. System Settings enumerates validated installations and records selections; it owns no calendar or clock algorithms.
 
 ## User experience
 
@@ -361,9 +361,8 @@ and `--extract DIRECTORY` modes need no elevation.
 The Linux GUI installs at `/Programs/system-settings`. Its `system-settings-time` command helper installs at `/System/Commands/system-settings-time`. Debian and hardware-native installation create the InfiltratorOS native directory skeleton when needed and add `/System/Commands:/Programs` to future login-shell PATHs. No System Settings executable or compatibility link is installed under `/usr/bin`; the desktop launcher uses `/Programs/system-settings` directly.
 
 The normal host Gregorian calendar and standard system time remain usable without
-optional modules. Shared calendar/clock implementation source, builds and Debian
-releases belong to Common, which supplies the optional system resource package.
-This application contains no custom calendar or clock fallback implementations.
+optional modules. This application contains no custom calendar or clock fallback
+implementations.
 
 ## Independent calendar and clock packages
 
