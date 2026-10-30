@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.122 — 2026-10-30
+
+- Retire the completed one-time native filesystem migration script and its dormant CI migration workflow.
+- Remove System Settings' last Python source file; existing native filesystem locations and C/C++ application code are unchanged.
+- Prevent the obsolete migration from reverting the product version to 0.4.110.
+
+
 ## 0.4.121 — 2026-10-28
 
 - Document exclusive clock/calendar implementation ownership by the 54 independent provider repositories, following removal of Common's reference copies.
